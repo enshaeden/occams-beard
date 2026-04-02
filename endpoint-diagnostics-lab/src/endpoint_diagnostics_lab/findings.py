@@ -99,6 +99,7 @@ def _evaluate_network_path(facts: CollectedFacts) -> list[Finding]:
     successful_public_tcp = [check for check in public_tcp_checks if check.success]
     successful_dns = [check for check in facts.dns.checks if check.success]
     non_loopback_active = _non_loopback_active_interfaces(facts)
+    route_inconsistency_evidence = _route_inconsistency_evidence(facts)
 
     if non_loopback_active and not facts.network.local_addresses:
         confidence = 0.9 if not route_summary.has_default_route else 0.78
@@ -145,7 +146,28 @@ def _evaluate_network_path(facts: CollectedFacts) -> list[Finding]:
             )
         )
 
-    if route_summary.has_default_route and successful_dns and len(failed_public_tcp) >= 2 and not successful_public_tcp:
+    if route_summary.has_default_route and route_inconsistency_evidence and failed_public_tcp and not successful_public_tcp:
+        findings.append(
+            Finding(
+                identifier="default-route-present-but-inconsistent",
+                severity="high" if not facts.connectivity.internet_reachable else "medium",
+                title="Default route exists but looks inconsistent with local interface state",
+                summary="A default route was collected, but route and interface evidence suggest it may not be usable.",
+                evidence=route_inconsistency_evidence
+                + [f"External TCP checks failed: {_format_tcp_targets(failed_public_tcp)}."],
+                probable_cause="The route table contains a default path, but the host still appears locally misrouted, attached to the wrong interface, or missing a usable next-hop path.",
+                fault_domain="local_network",
+                confidence=0.9 if len(route_inconsistency_evidence) >= 2 else 0.81,
+            )
+        )
+
+    if (
+        route_summary.has_default_route
+        and not route_inconsistency_evidence
+        and successful_dns
+        and len(failed_public_tcp) >= 2
+        and not successful_public_tcp
+    ):
         findings.append(
             Finding(
                 identifier="route-and-dns-ok-external-tcp-failure",
@@ -483,10 +505,49 @@ def _connectivity_pressure_evidence(facts: CollectedFacts) -> str:
     return "Internet reachability checks did not succeed."
 
 
+def _route_inconsistency_evidence(facts: CollectedFacts) -> list[str]:
+    route_summary = facts.network.route_summary
+    if not route_summary.has_default_route:
+        return []
+
+    evidence = list(route_summary.observations)
+    default_interface = route_summary.default_interface
+    interface = next(
+        (item for item in facts.network.interfaces if default_interface and item.name == default_interface),
+        None,
+    )
+    if default_interface is None:
+        evidence.append("Route summary reported a default route but did not identify an interface.")
+    elif default_interface not in facts.network.active_interfaces:
+        evidence.append(f"Default route uses interface {default_interface}, but that interface was not collected as active.")
+
+    if interface is not None:
+        has_usable_non_loopback_address = any(not address.is_loopback for address in interface.addresses)
+        if not has_usable_non_loopback_address:
+            evidence.append(
+                f"Default route uses interface {default_interface}, but that interface has no usable non-loopback address."
+            )
+
+    if route_summary.default_route_state == "suspect" and not evidence:
+        evidence.append("Route summary classified the default route as suspect from platform-specific route output.")
+    return _dedupe_preserve_order(evidence)
+
+
 def _format_ratio(numerator: int | None, denominator: int | None) -> str:
     if numerator is None or denominator in {None, 0}:
         return "an unknown ratio"
     return f"{(numerator / denominator):.1%}"
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return ordered
 
 
 def _format_dns_hosts(checks: Iterable[object]) -> str:

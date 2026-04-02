@@ -93,6 +93,8 @@ class ReportOutputTests(unittest.TestCase):
                         default_interface="eth0",
                         has_default_route=True,
                         routes=[],
+                        default_route_state="present",
+                        observations=[],
                     ),
                 ),
                 dns=DnsState(
@@ -174,6 +176,7 @@ class ReportOutputTests(unittest.TestCase):
         self.assertIn("Fault-domain basis", text)
         self.assertIn("Interface MTUs: eth0=1500", text)
         self.assertIn("ARP neighbors: none collected", text)
+        self.assertIn("Default route state: not collected", text)
         self.assertIn("Trace github.com: partial, last response at hop 2, target 140.82.114.3 not reached", text)
         self.assertIn("/tmp/report.json", text)
 
@@ -217,6 +220,8 @@ class ReportOutputTests(unittest.TestCase):
                         default_interface="utun2",
                         has_default_route=True,
                         routes=[],
+                        default_route_state="suspect",
+                        observations=["Default route uses link-scoped gateway link#15, so next-hop reachability is less explicit."],
                     ),
                 ),
                 dns=DnsState(),

@@ -25,6 +25,9 @@ def collect_route_summary() -> tuple[RouteSummary, list[DiagnosticWarning]]:
             "default_interface": None,
             "has_default_route": False,
             "routes": [],
+            "default_route_state": "missing",
+            "observations": [],
+            "parse_warnings": [],
         }, None
         warnings.append(
             DiagnosticWarning(
@@ -45,6 +48,15 @@ def collect_route_summary() -> tuple[RouteSummary, list[DiagnosticWarning]]:
             )
         )
 
+    for parse_warning in raw_data.get("parse_warnings", []):
+        warnings.append(
+            DiagnosticWarning(
+                domain="routing",
+                code="route-data-warning",
+                message=str(parse_warning),
+            )
+        )
+
     return (
         RouteSummary(
             default_gateway=raw_data["default_gateway"],
@@ -56,9 +68,12 @@ def collect_route_summary() -> tuple[RouteSummary, list[DiagnosticWarning]]:
                     gateway=str(route.get("gateway")) if route.get("gateway") else None,
                     interface=str(route.get("interface")) if route.get("interface") else None,
                     metric=int(route["metric"]) if route.get("metric") is not None else None,
+                    note=str(route.get("note")) if route.get("note") else None,
                 )
                 for route in raw_data["routes"]
             ],
+            default_route_state=str(raw_data.get("default_route_state", "missing")),
+            observations=[str(item) for item in raw_data.get("observations", [])],
         ),
         warnings,
     )

@@ -11,3 +11,8 @@ Each scenario includes machine-readable JSON and a terminal-style report artifac
 - [`vpn-private-target-failure.json`](vpn-private-target-failure.json) and [`vpn-private-target-failure.txt`](vpn-private-target-failure.txt)
 
 These are illustrative artifacts for static review. They are intentionally realistic, but they are not captured from a live production endpoint.
+
+They also reflect the project's conservative review posture:
+- route summaries can show `present`, `missing`, or `suspect` state
+- route observations are surfaced when collected route data is incomplete or potentially misleading
+- warnings remain the place for degraded collection, not for speculative diagnosis

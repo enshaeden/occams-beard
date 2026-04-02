@@ -61,7 +61,9 @@
         "default_gateway": null,
         "default_interface": null,
         "has_default_route": false,
-        "routes": []
+        "routes": [],
+        "default_route_state": "missing",
+        "observations": []
       }
     },
     "dns": {

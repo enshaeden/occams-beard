@@ -29,8 +29,13 @@ System Snapshot
 Network Snapshot
 - Active interfaces: eth0
 - Local addresses: 169.254.10.20
+- Interface MTUs: eth0=1500
+- ARP neighbors: none collected
 - Default gateway: none
 - Default interface: none
+- Default route state: missing
+- Route entries collected: 0
+- Route observations: none
 
 Generic Reachability Checks
 - github.com:443 [github-https]: failed (Network is unreachable)

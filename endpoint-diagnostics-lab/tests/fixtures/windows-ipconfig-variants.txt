@@ -1,0 +1,21 @@
+Windows IP Configuration
+
+Unknown adapter Loopback Pseudo-Interface 1:
+
+   Connection-specific DNS Suffix  . :
+   Description . . . . . . . . . . . : Software Loopback Interface 1
+   Physical Address. . . . . . . . . :
+   IPv6 Address. . . . . . . . . . . : ::1
+
+Wireless LAN adapter Wi-Fi 2:
+
+   Description . . . . . . . . . . . : Intel(R) Wi-Fi 6E AX210 160MHz
+   Physical Address. . . . . . . . . : AA-BB-CC-DD-EE-FF
+   IPv4 Address. . . . . . . . . . . : 10.10.10.50(Preferred)
+   Temporary IPv6 Address. . . . . . : 2001:db8::1234:5678(Preferred)
+   Link-local IPv6 Address . . . . . : fe80::1234:5678:abcd:ef01%8(Preferred)
+
+Ethernet adapter Ethernet 3:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Physical Address. . . . . . . . . : 00-11-22-33-44-55

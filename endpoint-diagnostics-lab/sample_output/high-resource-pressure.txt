@@ -35,8 +35,13 @@ System Snapshot
 Network Snapshot
 - Active interfaces: not collected
 - Local addresses: not collected
+- Interface MTUs: not collected
+- ARP neighbors: not collected
 - Default gateway: not collected
 - Default interface: not collected
+- Default route state: not collected
+- Route entries collected: not collected
+- Route observations: not collected
 
 Generic Reachability Checks
 - Generic connectivity checks were not collected.

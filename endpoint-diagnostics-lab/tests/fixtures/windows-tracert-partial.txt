@@ -1,0 +1,9 @@
+Tracing route to github.com [140.82.114.4]
+over a maximum of 5 hops:
+
+  1    <1 ms    <1 ms    <1 ms  192.168.1.1
+  2    12 ms    10 ms    11 ms  ae1.cr1.example.net [203.0.113.10]
+  3     *        *        *     Request timed out.
+  4     *        *        *     Destination net unreachable.
+
+Trace complete.

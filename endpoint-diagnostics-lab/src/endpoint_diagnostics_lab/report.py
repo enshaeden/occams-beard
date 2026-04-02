@@ -62,7 +62,9 @@ def render_report(result: EndpointDiagnosticResult, json_path: str | None = None
             f"- ARP neighbors: {_format_arp_summary(network) if 'network' in selected_checks else 'not collected'}",
             f"- Default gateway: {_routing_value('routing' in selected_checks, network.route_summary.default_gateway)}",
             f"- Default interface: {_routing_value('routing' in selected_checks, network.route_summary.default_interface)}",
+            f"- Default route state: {_routing_value('routing' in selected_checks, network.route_summary.default_route_state)}",
             f"- Route entries collected: {len(network.route_summary.routes) if 'routing' in selected_checks else 'not collected'}",
+            f"- Route observations: {_routing_observations('routing' in selected_checks, network.route_summary.observations)}",
             "",
             "Generic Reachability Checks",
         ]
@@ -229,6 +231,14 @@ def _routing_value(collected: bool, value: str | None) -> str:
     if not collected:
         return "not collected"
     return value or "none"
+
+
+def _routing_observations(collected: bool, values: list[str]) -> str:
+    if not collected:
+        return "not collected"
+    if not values:
+        return "none"
+    return "; ".join(values[:2]) + (" and more" if len(values) > 2 else "")
 
 
 def _format_interface_mtu_summary(network) -> str:

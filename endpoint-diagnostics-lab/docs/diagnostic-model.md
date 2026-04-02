@@ -36,6 +36,8 @@ Key normalization goals:
 - a clear distinction between generic path reachability and intended service reachability
 - explicit support for heuristic evidence such as VPN signals and partial traceroute outcomes without collapsing them into hard failure claims
 
+Route normalization is intentionally richer than a binary "default route yes or no" flag. `RouteSummary` keeps route presence, a conservative `default_route_state` (`present`, `missing`, or `suspect`), and human-readable route observations when the raw platform output deserves operator attention.
+
 ### Findings
 
 `findings.py` evaluates deterministic rules against normalized facts. Each finding includes:
@@ -94,6 +96,7 @@ The interface layers remain intentionally thin:
 The model treats incomplete data as first-class:
 - unsupported checks produce warnings, not crashes
 - missing commands produce warnings, not silent skips
+- malformed or partial parser input degrades into warnings or suspect-route observations rather than broken results
 - findings require supporting evidence before they trigger
 - no baseline check requires elevated privileges
 - supplemental ARP evidence is optional and never required for a successful baseline run

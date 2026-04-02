@@ -28,8 +28,13 @@ System Snapshot
 Network Snapshot
 - Active interfaces: en0
 - Local addresses: 192.168.0.25
+- Interface MTUs: none detected
+- ARP neighbors: none collected
 - Default gateway: 192.168.0.1
 - Default interface: en0
+- Default route state: present
+- Route entries collected: 0
+- Route observations: none
 
 Generic Reachability Checks
 - 1.1.1.1:53 [cloudflare-dns]: ok, 14.2 ms, via 1.1.1.1

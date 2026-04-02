@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
+from endpoint_diagnostics_lab.platform.macos import _parse_uptime_seconds
 from endpoint_diagnostics_lab.utils.parsing import (
     parse_arp_table,
     parse_ifconfig,
@@ -11,36 +13,46 @@ from endpoint_diagnostics_lab.utils.parsing import (
     parse_ipconfig,
     parse_ip_neigh,
     parse_linux_ip_route,
+    parse_netstat_rn,
     parse_route_get_default,
     parse_route_print,
     parse_traceroute_output,
 )
-from endpoint_diagnostics_lab.platform.macos import _parse_uptime_seconds
+
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+
+def _fixture(name: str) -> str:
+    return (FIXTURE_DIR / name).read_text(encoding="utf-8").strip()
 
 
 class ParsingTests(unittest.TestCase):
     """Validate representative parser behavior."""
 
-    def test_parse_linux_ip_route_extracts_default(self) -> None:
-        output = """
-default via 192.168.1.1 dev en0 proto dhcp metric 100
-10.0.0.0/24 dev tun0 proto kernel scope link src 10.0.0.10
-192.168.1.0/24 dev en0 proto kernel scope link src 192.168.1.50 metric 100
-""".strip()
+    def test_parse_linux_ip_route_extracts_lowest_metric_default(self) -> None:
+        parsed = parse_linux_ip_route(_fixture("linux-ip-route-multiple-defaults.txt"))
 
-        parsed = parse_linux_ip_route(output)
+        self.assertEqual(parsed["default_gateway"], "10.8.0.1")
+        self.assertEqual(parsed["default_interface"], "tun0")
+        self.assertEqual(parsed["default_route_state"], "suspect")
+        self.assertIn("Multiple default routes were collected", parsed["observations"][0])
+        self.assertEqual(len(parsed["routes"]), 4)
 
-        self.assertEqual(parsed["default_gateway"], "192.168.1.1")
-        self.assertEqual(parsed["default_interface"], "en0")
+    def test_parse_linux_ip_route_marks_unreachable_default_as_suspect(self) -> None:
+        parsed = parse_linux_ip_route(_fixture("linux-ip-route-unreachable-default.txt"))
+
         self.assertTrue(parsed["has_default_route"])
-        self.assertEqual(len(parsed["routes"]), 3)
+        self.assertEqual(parsed["default_interface"], "lo")
+        self.assertEqual(parsed["default_route_state"], "suspect")
+        self.assertIn("marked unreachable", " ".join(parsed["observations"]))
 
-    def test_parse_ip_addr_show_extracts_addresses(self) -> None:
+    def test_parse_ip_addr_show_extracts_addresses_and_normalizes_peer_suffixes(self) -> None:
         output = """
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
     inet 127.0.0.1/8 scope host lo
-2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+2: eth0@if3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
     link/ether 52:54:00:12:34:56 brd ff:ff:ff:ff:ff:ff
     inet 192.168.1.50/24 brd 192.168.1.255 scope global dynamic eth0
     inet6 fe80::5054:ff:fe12:3456/64 scope link
@@ -70,22 +82,32 @@ utun2: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380
         self.assertEqual(parsed[1]["name"], "utun2")
         self.assertTrue(parsed[1]["is_up"])
 
-    def test_parse_route_print_extracts_windows_default_route(self) -> None:
+    def test_parse_netstat_rn_marks_link_scoped_default_as_suspect(self) -> None:
         output = """
-===========================================================================
-IPv4 Route Table
-===========================================================================
-Active Routes:
-Network Destination        Netmask          Gateway       Interface  Metric
-          0.0.0.0          0.0.0.0      10.10.10.1    10.10.10.50     25
-        10.10.10.0    255.255.255.0         On-link     10.10.10.50    281
+Routing tables
+
+Internet:
+Destination        Gateway            Flags               Netif Expire
+default            link#15            UCSIg                 utun2
+default            192.168.1.1        UGScg                 en0
+192.168.1/24       link#4             UCS                   en0
 """.strip()
 
-        parsed = parse_route_print(output)
+        parsed = parse_netstat_rn(output)
+
+        self.assertEqual(parsed["default_gateway"], "192.168.1.1")
+        self.assertEqual(parsed["default_interface"], "en0")
+        self.assertEqual(parsed["default_route_state"], "suspect")
+        self.assertTrue(any("link-scoped gateway" in note for note in parsed["observations"]))
+
+    def test_parse_route_print_prefers_usable_windows_default_and_records_observation(self) -> None:
+        parsed = parse_route_print(_fixture("windows-route-print-on-link.txt"))
 
         self.assertEqual(parsed["default_gateway"], "10.10.10.1")
         self.assertEqual(parsed["default_interface"], "10.10.10.50")
-        self.assertEqual(parsed["routes"][0]["destination"], "default")
+        self.assertEqual(parsed["default_route_state"], "suspect")
+        self.assertTrue(any("on-link" in note for note in parsed["observations"]))
+        self.assertEqual(parsed["routes"][0]["note"], "Default route exists but is on-link without an explicit gateway.")
 
     def test_parse_route_get_default_extracts_gateway_and_interface(self) -> None:
         output = """
@@ -101,29 +123,18 @@ destination: default
         self.assertEqual(parsed["default_gateway"], "192.168.1.1")
         self.assertEqual(parsed["default_interface"], "en0")
         self.assertTrue(parsed["has_default_route"])
+        self.assertEqual(parsed["default_route_state"], "present")
 
-    def test_parse_ipconfig_extracts_link_local_ipv6(self) -> None:
-        output = """
-Windows IP Configuration
+    def test_parse_ipconfig_extracts_common_windows_variants(self) -> None:
+        parsed = parse_ipconfig(_fixture("windows-ipconfig-variants.txt"))
 
-Wireless LAN adapter Wi-Fi:
-
-   Media State . . . . . . . . . . . : Media disconnected
-
-Ethernet adapter Ethernet:
-
-   Physical Address. . . . . . . . . : AA-BB-CC-DD-EE-FF
-   IPv4 Address. . . . . . . . . . . : 10.10.10.50(Preferred)
-   Link-local IPv6 Address . . . . . : fe80::1234:5678:abcd:ef01%8(Preferred)
-""".strip()
-
-        parsed = parse_ipconfig(output)
-
-        self.assertEqual(len(parsed), 2)
-        self.assertFalse(parsed[0]["is_up"])
+        self.assertEqual(len(parsed), 3)
+        self.assertEqual(parsed[0]["name"], "Loopback Pseudo-Interface 1")
+        self.assertEqual(parsed[0]["addresses"][0]["address"], "::1")
         self.assertTrue(parsed[1]["is_up"])
         self.assertEqual(parsed[1]["addresses"][1]["family"], "ipv6")
-        self.assertEqual(parsed[1]["addresses"][1]["address"], "fe80::1234:5678:abcd:ef01%8")
+        self.assertEqual(parsed[1]["addresses"][1]["address"], "2001:db8::1234:5678")
+        self.assertFalse(parsed[2]["is_up"])
 
     def test_parse_macos_uptime_fallback(self) -> None:
         output = "23:41  up 1 day,  2:34, 4 users, load averages: 2.08 1.95 1.90"
@@ -132,20 +143,16 @@ Ethernet adapter Ethernet:
 
         self.assertEqual(uptime_seconds, 95640)
 
-    def test_parse_traceroute_output_marks_timeouts_and_target_hops(self) -> None:
-        output = """
-traceroute to 1.1.1.1 (1.1.1.1), 5 hops max, 60 byte packets
- 1  192.168.1.1  1.123 ms  1.045 ms  0.987 ms
- 2  * * *
- 3  1.1.1.1  10.321 ms
-""".strip()
+    def test_parse_traceroute_output_marks_windows_timeouts_and_hostnames(self) -> None:
+        parsed = parse_traceroute_output(_fixture("windows-tracert-partial.txt"))
 
-        parsed = parse_traceroute_output(output)
-
-        self.assertEqual(len(parsed), 3)
+        self.assertEqual(len(parsed), 4)
         self.assertEqual(parsed[0]["address"], "192.168.1.1")
-        self.assertEqual(parsed[1]["note"], "timeout")
-        self.assertEqual(parsed[2]["address"], "1.1.1.1")
+        self.assertEqual(parsed[0]["latency_ms"], 1.0)
+        self.assertEqual(parsed[1]["host"], "ae1.cr1.example.net")
+        self.assertEqual(parsed[1]["address"], "203.0.113.10")
+        self.assertEqual(parsed[2]["note"], "request timed out.")
+        self.assertEqual(parsed[3]["note"], "destination net unreachable.")
 
     def test_parse_ip_neigh_extracts_neighbor_cache(self) -> None:
         output = """

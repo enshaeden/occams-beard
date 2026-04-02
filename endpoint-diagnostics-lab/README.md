@@ -42,6 +42,8 @@ For IT, endpoint, infrastructure, and systems engineering roles, this project is
 
 Baseline checks do not require sudo or administrator privileges. Some richer checks, such as traceroute visibility or full interface detail, remain subject to platform and command availability.
 
+Windows support is intentionally practical rather than overclaimed: common `ipconfig`, `route print`, `ping`, and `tracert` output variants are covered with captured fixtures, but deeper localization-specific parsing still fails conservatively and may emit warnings instead of strong claims.
+
 ## Architecture Overview
 
 The codebase uses a deliberately small layered design:
@@ -55,6 +57,8 @@ The codebase uses a deliberately small layered design:
 - `app.py` renders the local Flask interface with server-side templates
 
 This separation keeps reporting concerns out of collection code, keeps the findings engine free from UI logic, and avoids duplicating orchestration between the CLI and the web app.
+
+This hardening pass deliberately stayed inside that architecture. The changes focus on broader parser fixtures, more conservative route interpretation, and clearer evidence or warnings under partial command output rather than new product scope.
 
 ## Interfaces
 

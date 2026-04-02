@@ -45,7 +45,9 @@
         "default_gateway": "192.168.0.1",
         "default_interface": "en0",
         "has_default_route": true,
-        "routes": []
+        "routes": [],
+        "default_route_state": "present",
+        "observations": []
       }
     },
     "dns": {

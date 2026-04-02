@@ -27,8 +27,13 @@ System Snapshot
 Network Snapshot
 - Active interfaces: eth0
 - Local addresses: 192.168.1.50
+- Interface MTUs: eth0=1500
+- ARP neighbors: none collected
 - Default gateway: 192.168.1.1
 - Default interface: eth0
+- Default route state: present
+- Route entries collected: 1
+- Route observations: none
 
 Generic Reachability Checks
 - github.com:443 [github-https]: ok, 28.1 ms, via 140.82.113.3

@@ -67,6 +67,14 @@
         <dd>{{ result.facts.network.route_summary.default_interface or "none" }}</dd>
       </div>
       <div>
+        <dt>Route state</dt>
+        <dd>{{ result.facts.network.route_summary.default_route_state }}</dd>
+      </div>
+      <div>
+        <dt>Route observations</dt>
+        <dd>{{ result.facts.network.route_summary.observations | join("; ") if result.facts.network.route_summary.observations else "none" }}</dd>
+      </div>
+      <div>
         <dt>ARP or neighbor entries</dt>
         <dd>{{ result.facts.network.arp_neighbors | length }}</dd>
       </div>

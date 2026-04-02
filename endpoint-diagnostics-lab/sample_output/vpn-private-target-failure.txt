@@ -30,8 +30,13 @@ System Snapshot
 Network Snapshot
 - Active interfaces: en0, utun2
 - Local addresses: 192.168.0.25, 10.8.0.10
+- Interface MTUs: en0=1500, utun2=1380
+- ARP neighbors: none collected
 - Default gateway: 10.8.0.1
 - Default interface: utun2
+- Default route state: present
+- Route entries collected: 1
+- Route observations: none
 
 Generic Reachability Checks
 - github.com:443 [github-https]: ok, 31.2 ms, via 140.82.112.4

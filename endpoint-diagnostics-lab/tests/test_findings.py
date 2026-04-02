@@ -156,6 +156,49 @@ class FindingsTests(unittest.TestCase):
         self.assertEqual(probable_fault_domain, "internet_edge")
         self.assertEqual(findings[0].identifier, "route-and-dns-ok-external-tcp-failure")
 
+    def test_default_route_present_but_inactive_interface_maps_to_local_network(self) -> None:
+        facts = build_base_facts()
+        facts.network.active_interfaces = ["eth1"]
+        facts.connectivity.internet_reachable = False
+        facts.connectivity.tcp_checks = [
+            TcpConnectivityCheck(target=TcpTarget(host="github.com", port=443), success=False, error="timeout"),
+            TcpConnectivityCheck(target=TcpTarget(host="1.1.1.1", port=53), success=False, error="timeout"),
+        ]
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["network", "routing", "connectivity"],
+        )
+
+        self.assertEqual(probable_fault_domain, "local_network")
+        self.assertEqual(findings[0].identifier, "default-route-present-but-inconsistent")
+        self.assertIn("not collected as active", " ".join(findings[0].evidence))
+
+    def test_suspect_default_route_blocks_overconfident_internet_edge_finding(self) -> None:
+        facts = build_base_facts()
+        facts.network.route_summary = RouteSummary(
+            default_gateway="10.10.10.1",
+            default_interface="eth0",
+            has_default_route=True,
+            routes=[],
+            default_route_state="suspect",
+            observations=["Default route exists but is on-link without an explicit gateway."],
+        )
+        facts.connectivity.internet_reachable = False
+        facts.connectivity.tcp_checks = [
+            TcpConnectivityCheck(target=TcpTarget(host="github.com", port=443), success=False, error="timeout"),
+            TcpConnectivityCheck(target=TcpTarget(host="1.1.1.1", port=53), success=False, error="timeout"),
+        ]
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["network", "routing", "dns", "connectivity"],
+        )
+
+        self.assertEqual(probable_fault_domain, "local_network")
+        self.assertEqual(findings[0].identifier, "default-route-present-but-inconsistent")
+        self.assertNotIn("route-and-dns-ok-external-tcp-failure", [finding.identifier for finding in findings])
+
     def test_partial_dns_success_is_heuristic_dns_finding(self) -> None:
         facts = build_base_facts()
         facts.dns.checks = [

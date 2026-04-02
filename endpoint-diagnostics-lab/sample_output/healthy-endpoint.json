@@ -74,9 +74,12 @@
             "destination": "default",
             "gateway": "192.168.1.1",
             "interface": "eth0",
-            "metric": 100
+            "metric": 100,
+            "note": null
           }
-        ]
+        ],
+        "default_route_state": "present",
+        "observations": []
       }
     },
     "dns": {

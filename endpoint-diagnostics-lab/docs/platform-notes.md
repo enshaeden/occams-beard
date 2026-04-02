@@ -60,7 +60,8 @@ Primary sources:
 Tradeoffs:
 - Windows command availability and output formatting can vary more than Unix-like platforms.
 - PowerShell is assumed for richer host data; if it is unavailable, the tool falls back to partial data and warnings.
-- Localized output may require broader fixture coverage in future iterations.
+- Parser coverage includes common `ipconfig`, `route print`, and `tracert` formatting variants, including degraded and partially incomplete outputs.
+- Full localization support is still not claimed. If output departs too far from the covered patterns, the tool prefers warnings and conservative route-state observations over guessing.
 - `tracert` and `ping` use Windows-specific timeout semantics, so their output remains best-effort rather than authoritative.
 
 ## Connectivity Checks

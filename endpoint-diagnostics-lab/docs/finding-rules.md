@@ -36,10 +36,26 @@ Likely fault domain:
 Interpretation:
 - the endpoint or its immediate access network is probably misconfigured or disconnected
 
+### Default route exists but local routing still looks inconsistent
+
+Condition:
+- routing checks show a default route entry
+- route normalization or interface state marks that route as suspect or inconsistent
+- external TCP connectivity still fails
+
+Likely fault domain:
+- `local_network`
+
+Interpretation:
+- a default path exists in the table, but the endpoint still appears locally misrouted, attached to the wrong interface, or missing a usable next hop
+
+This rule stays conservative. It does not claim the gateway is down; it only says the host-side route evidence is not strong enough to treat the default route as healthy.
+
 ### Default route plus DNS success plus repeated external TCP failure
 
 Condition:
 - a default route is present
+- the route is not already classified as suspect or locally inconsistent
 - DNS succeeds for at least one hostname
 - multiple external TCP targets fail
 - no external public TCP target succeeds

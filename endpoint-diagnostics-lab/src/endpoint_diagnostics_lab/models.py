@@ -132,6 +132,7 @@ class RouteEntry:
     gateway: str | None
     interface: str | None
     metric: int | None = None
+    note: str | None = None
 
 
 @dataclass(slots=True)
@@ -142,6 +143,8 @@ class RouteSummary:
     default_interface: str | None
     has_default_route: bool
     routes: list[RouteEntry] = field(default_factory=list)
+    default_route_state: str = "missing"
+    observations: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)

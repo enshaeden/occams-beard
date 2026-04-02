@@ -84,6 +84,9 @@ def read_routes() -> tuple[dict[str, object], CommandResult]:
             "default_interface": None,
             "has_default_route": False,
             "routes": [],
+            "default_route_state": "missing",
+            "observations": [],
+            "parse_warnings": [],
         }
     )
 
@@ -108,6 +111,9 @@ def read_routes() -> tuple[dict[str, object], CommandResult]:
         "default_interface": None,
         "has_default_route": False,
         "routes": [],
+        "default_route_state": "missing",
+        "observations": [],
+        "parse_warnings": [],
     }, table_result
 
 

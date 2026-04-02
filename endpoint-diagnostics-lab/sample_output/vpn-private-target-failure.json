@@ -81,9 +81,12 @@
             "destination": "default",
             "gateway": "10.8.0.1",
             "interface": "utun2",
-            "metric": null
+            "metric": null,
+            "note": null
           }
-        ]
+        ],
+        "default_route_state": "present",
+        "observations": []
       }
     },
     "dns": {
