@@ -234,3 +234,159 @@ Evaluate findings only when the supporting diagnostic domains were explicitly ru
 STATUS:
 RESOLVED
 ----------------------------------------
+
+----------------------------------------
+TYPE: Bug
+SEVERITY: Medium
+
+DESCRIPTION:
+Repository documentation used absolute local filesystem links, which break GitHub navigation and make the project look unfinished to external reviewers.
+
+IMPACT:
+Readers could not reliably navigate from the repository landing page to the active project, docs, or sample artifacts.
+
+AFFECTED COMPONENTS:
+README.md
+endpoint-diagnostics-lab/README.md
+
+ROOT CAUSE:
+Local authoring links were committed instead of repository-relative Markdown links.
+
+RECOMMENDED RESOLUTION:
+Replace absolute local paths with repository-relative links and make the active project path explicit from the repository root.
+
+STATUS:
+RESOLVED
+----------------------------------------
+
+----------------------------------------
+TYPE: Workflow inefficiency
+SEVERITY: Medium
+
+DESCRIPTION:
+The operator report surfaced finding headlines but not enough supporting evidence, and it did not clearly separate direct observations from derived conclusions.
+
+IMPACT:
+Reviewers and operators had to infer why a fault domain was chosen, which reduced credibility and auditability.
+
+AFFECTED COMPONENTS:
+src/endpoint_diagnostics_lab/report.py
+docs/diagnostic-model.md
+docs/finding-rules.md
+sample_output/
+
+ROOT CAUSE:
+The initial report renderer optimized for brevity before adding enough evidence scaffolding.
+
+RECOMMENDED RESOLUTION:
+Render concise finding blocks that distinguish observed facts, derived findings, and heuristic conclusions while keeping the output terminal-friendly.
+
+STATUS:
+RESOLVED
+----------------------------------------
+
+----------------------------------------
+TYPE: Technical debt
+SEVERITY: Medium
+
+DESCRIPTION:
+The deterministic findings engine was too narrow for several common endpoint-diagnostics situations such as partial DNS failure, selective filtering, local addressing gaps, and host-pressure interactions.
+
+IMPACT:
+The tool could return plausible raw data while still feeling scaffold-like because it failed to synthesize several realistic multi-signal conditions.
+
+AFFECTED COMPONENTS:
+src/endpoint_diagnostics_lab/findings.py
+tests/test_findings.py
+docs/finding-rules.md
+
+ROOT CAUSE:
+The first rule set established the pattern correctly but covered only a small number of correlation cases.
+
+RECOMMENDED RESOLUTION:
+Add more deterministic multi-signal rules while keeping confidence and heuristic labeling disciplined.
+
+STATUS:
+RESOLVED
+----------------------------------------
+
+----------------------------------------
+TYPE: Technical debt
+SEVERITY: Medium
+
+DESCRIPTION:
+Platform-specific ping, traceroute, and interface classification behavior relied on assumptions that were too Linux-shaped.
+
+IMPACT:
+macOS and Windows behavior could degrade into misleading failures or overly broad interface labeling even when the endpoint state itself was fine.
+
+AFFECTED COMPONENTS:
+src/endpoint_diagnostics_lab/collectors/connectivity.py
+src/endpoint_diagnostics_lab/collectors/network.py
+src/endpoint_diagnostics_lab/utils/parsing.py
+docs/platform-notes.md
+
+ROOT CAUSE:
+Cross-platform command semantics and naming conventions vary, but the initial collector implementation used simpler shared defaults.
+
+RECOMMENDED RESOLUTION:
+Use more deliberate platform-specific argument sets, numeric traceroute output where available, and more conservative interface classification.
+
+STATUS:
+RESOLVED
+----------------------------------------
+
+----------------------------------------
+TYPE: Technical debt
+SEVERITY: Low
+
+DESCRIPTION:
+Traceroute parsing remains intentionally conservative and is more reliable for numeric IPv4-oriented output than for all possible DNS-labeled or localized variants.
+
+IMPACT:
+Some traceroute results may degrade into partial evidence or warnings rather than richly parsed hop metadata.
+
+AFFECTED COMPONENTS:
+src/endpoint_diagnostics_lab/utils/parsing.py
+docs/platform-notes.md
+tests/test_parsing.py
+
+ROOT CAUSE:
+The project intentionally avoids deeper protocol parsing and external dependencies in favor of a bounded stdlib-first implementation.
+
+RECOMMENDED RESOLUTION:
+Expand captured traceroute fixtures across platforms and add broader parser coverage only if it remains deterministic and maintainable.
+
+STATUS:
+UNRESOLVED
+
+IF UNRESOLVED:
+- Reason it was not fixed
+  This pass tightened invocation and guardrails, but broad traceroute fixture expansion would have increased scope beyond the intended refinement pass.
+- What is required to resolve later
+  Additional captured traceroute samples from Linux, macOS, and Windows variants plus parser tests for those fixtures.
+----------------------------------------
+
+----------------------------------------
+TYPE: Workflow inefficiency
+SEVERITY: Low
+
+DESCRIPTION:
+Sample output artifacts showed JSON only for some scenarios, which made it harder for GitHub reviewers to evaluate the human report without running the tool.
+
+IMPACT:
+The project underrepresented its operator-facing output quality during static review.
+
+AFFECTED COMPONENTS:
+sample_output/
+endpoint-diagnostics-lab/README.md
+
+ROOT CAUSE:
+The initial sample artifact set prioritized machine-readable examples before terminal-report examples.
+
+RECOMMENDED RESOLUTION:
+Commit representative terminal-style report artifacts alongside scenario JSON samples.
+
+STATUS:
+RESOLVED
+----------------------------------------

@@ -122,7 +122,7 @@
       "title": "No major diagnostic findings detected",
       "summary": "The collected facts did not match any enabled fault rule.",
       "evidence": [
-        "Deterministic rule evaluation completed without triggering enabled fault signatures."
+        "Deterministic rule evaluation completed without triggering supported fault signatures."
       ],
       "probable_cause": "No major failure domain was identified from the collected evidence.",
       "fault_domain": "healthy",

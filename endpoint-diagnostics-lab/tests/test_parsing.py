@@ -5,10 +5,15 @@ from __future__ import annotations
 import unittest
 
 from endpoint_diagnostics_lab.utils.parsing import (
+    parse_arp_table,
     parse_ifconfig,
     parse_ip_addr_show,
+    parse_ipconfig,
+    parse_ip_neigh,
     parse_linux_ip_route,
+    parse_route_get_default,
     parse_route_print,
+    parse_traceroute_output,
 )
 from endpoint_diagnostics_lab.platform.macos import _parse_uptime_seconds
 
@@ -82,12 +87,93 @@ Network Destination        Netmask          Gateway       Interface  Metric
         self.assertEqual(parsed["default_interface"], "10.10.10.50")
         self.assertEqual(parsed["routes"][0]["destination"], "default")
 
+    def test_parse_route_get_default_extracts_gateway_and_interface(self) -> None:
+        output = """
+   route to: default
+destination: default
+       mask: default
+    gateway: 192.168.1.1
+  interface: en0
+""".strip()
+
+        parsed = parse_route_get_default(output)
+
+        self.assertEqual(parsed["default_gateway"], "192.168.1.1")
+        self.assertEqual(parsed["default_interface"], "en0")
+        self.assertTrue(parsed["has_default_route"])
+
+    def test_parse_ipconfig_extracts_link_local_ipv6(self) -> None:
+        output = """
+Windows IP Configuration
+
+Wireless LAN adapter Wi-Fi:
+
+   Media State . . . . . . . . . . . : Media disconnected
+
+Ethernet adapter Ethernet:
+
+   Physical Address. . . . . . . . . : AA-BB-CC-DD-EE-FF
+   IPv4 Address. . . . . . . . . . . : 10.10.10.50(Preferred)
+   Link-local IPv6 Address . . . . . : fe80::1234:5678:abcd:ef01%8(Preferred)
+""".strip()
+
+        parsed = parse_ipconfig(output)
+
+        self.assertEqual(len(parsed), 2)
+        self.assertFalse(parsed[0]["is_up"])
+        self.assertTrue(parsed[1]["is_up"])
+        self.assertEqual(parsed[1]["addresses"][1]["family"], "ipv6")
+        self.assertEqual(parsed[1]["addresses"][1]["address"], "fe80::1234:5678:abcd:ef01%8")
+
     def test_parse_macos_uptime_fallback(self) -> None:
         output = "23:41  up 1 day,  2:34, 4 users, load averages: 2.08 1.95 1.90"
 
         uptime_seconds = _parse_uptime_seconds(output)
 
         self.assertEqual(uptime_seconds, 95640)
+
+    def test_parse_traceroute_output_marks_timeouts_and_target_hops(self) -> None:
+        output = """
+traceroute to 1.1.1.1 (1.1.1.1), 5 hops max, 60 byte packets
+ 1  192.168.1.1  1.123 ms  1.045 ms  0.987 ms
+ 2  * * *
+ 3  1.1.1.1  10.321 ms
+""".strip()
+
+        parsed = parse_traceroute_output(output)
+
+        self.assertEqual(len(parsed), 3)
+        self.assertEqual(parsed[0]["address"], "192.168.1.1")
+        self.assertEqual(parsed[1]["note"], "timeout")
+        self.assertEqual(parsed[2]["address"], "1.1.1.1")
+
+    def test_parse_ip_neigh_extracts_neighbor_cache(self) -> None:
+        output = """
+192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE
+10.8.0.1 dev tun0 FAILED
+""".strip()
+
+        parsed = parse_ip_neigh(output)
+
+        self.assertEqual(len(parsed), 2)
+        self.assertEqual(parsed[0]["mac_address"], "aa:bb:cc:dd:ee:ff")
+        self.assertEqual(parsed[1]["interface"], "tun0")
+        self.assertEqual(parsed[1]["state"], "FAILED")
+
+    def test_parse_arp_table_supports_windows_and_macos_formats(self) -> None:
+        output = """
+Interface: 10.10.10.50 --- 0x7
+  Internet Address      Physical Address      Type
+  10.10.10.1            aa-bb-cc-dd-ee-ff     dynamic
+? (192.168.1.1) at 88:36:6c:12:34:56 on en0 ifscope [ethernet]
+""".strip()
+
+        parsed = parse_arp_table(output)
+
+        self.assertEqual(len(parsed), 2)
+        self.assertEqual(parsed[0]["interface"], "10.10.10.50")
+        self.assertEqual(parsed[0]["mac_address"], "aa:bb:cc:dd:ee:ff")
+        self.assertEqual(parsed[1]["interface"], "en0")
 
 
 if __name__ == "__main__":

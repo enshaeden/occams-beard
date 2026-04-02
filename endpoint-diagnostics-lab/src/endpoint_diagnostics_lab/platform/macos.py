@@ -5,7 +5,12 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from endpoint_diagnostics_lab.utils.parsing import parse_ifconfig, parse_netstat_rn
+from endpoint_diagnostics_lab.utils.parsing import (
+    parse_arp_table,
+    parse_ifconfig,
+    parse_netstat_rn,
+    parse_route_get_default,
+)
 from endpoint_diagnostics_lab.utils.subprocess import CommandResult, run_command
 
 
@@ -68,17 +73,42 @@ def read_interfaces() -> tuple[list[dict[str, object]], CommandResult]:
 
 
 def read_routes() -> tuple[dict[str, object], CommandResult]:
-    """Collect routing data via `netstat -rn`."""
+    """Collect routing data via `netstat -rn` with default-route enrichment."""
 
-    result = run_command(["netstat", "-rn"])
-    if result.succeeded:
-        return parse_netstat_rn(result.stdout), result
+    gateway_result = run_command(["route", "-n", "get", "default"])
+    gateway_data = (
+        parse_route_get_default(gateway_result.stdout)
+        if gateway_result.succeeded
+        else {
+            "default_gateway": None,
+            "default_interface": None,
+            "has_default_route": False,
+            "routes": [],
+        }
+    )
+
+    table_result = run_command(["netstat", "-rn"])
+    if table_result.succeeded:
+        route_data = parse_netstat_rn(table_result.stdout)
+        if gateway_data["has_default_route"]:
+            route_data["default_gateway"] = gateway_data["default_gateway"] or route_data["default_gateway"]
+            route_data["default_interface"] = (
+                gateway_data["default_interface"] or route_data["default_interface"]
+            )
+            route_data["has_default_route"] = True
+            if not any(route.get("destination") == "default" for route in route_data["routes"]):
+                route_data["routes"] = [*gateway_data["routes"], *route_data["routes"]]
+        return route_data, table_result
+
+    if gateway_result.succeeded:
+        return gateway_data, gateway_result
+
     return {
         "default_gateway": None,
         "default_interface": None,
         "has_default_route": False,
         "routes": [],
-    }, result
+    }, table_result
 
 
 def read_resolvers() -> list[str]:
@@ -95,6 +125,15 @@ def read_resolvers() -> list[str]:
             _, _, value = line.partition(":")
             resolvers.append(value.strip())
     return resolvers
+
+
+def read_arp_neighbors() -> tuple[list[dict[str, object]], CommandResult]:
+    """Collect supplemental ARP cache data."""
+
+    result = run_command(["arp", "-a"])
+    if result.succeeded:
+        return parse_arp_table(result.stdout), result
+    return [], result
 
 
 def _parse_uptime_seconds(output: str) -> int | None:

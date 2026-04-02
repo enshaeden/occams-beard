@@ -1,0 +1,171 @@
+{
+  "metadata": {
+    "project_name": "endpoint-diagnostics-lab",
+    "version": "0.1.0",
+    "generated_at": "2026-04-01T00:20:00+00:00",
+    "elapsed_ms": 214,
+    "selected_checks": ["host", "resources", "network", "routing", "connectivity", "vpn", "services"]
+  },
+  "platform": {
+    "system": "macOS",
+    "release": "15.0",
+    "version": "demo-build",
+    "machine": "arm64",
+    "python_version": "3.11.9"
+  },
+  "facts": {
+    "host": {
+      "hostname": "remote-access-mac",
+      "operating_system": "Darwin",
+      "kernel": "24.0.0",
+      "current_user": "operator",
+      "uptime_seconds": 28800
+    },
+    "resources": {
+      "cpu": {
+        "logical_cpus": 10,
+        "load_average_1m": 0.9,
+        "load_average_5m": 0.8,
+        "load_average_15m": 0.7,
+        "utilization_percent_estimate": 9.0
+      },
+      "memory": {
+        "total_bytes": 17179869184,
+        "available_bytes": 8589934592,
+        "free_bytes": 4294967296,
+        "pressure_level": "normal"
+      },
+      "disks": []
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "en0",
+          "is_up": true,
+          "mac_address": "aa:bb:cc:dd:ee:ff",
+          "addresses": [
+            {
+              "family": "ipv4",
+              "address": "192.168.0.25",
+              "netmask": "24",
+              "is_loopback": false
+            }
+          ],
+          "mtu": 1500,
+          "type_hint": "ethernet"
+        },
+        {
+          "name": "utun2",
+          "is_up": true,
+          "mac_address": null,
+          "addresses": [
+            {
+              "family": "ipv4",
+              "address": "10.8.0.10",
+              "netmask": "24",
+              "is_loopback": false
+            }
+          ],
+          "mtu": 1380,
+          "type_hint": "tunnel"
+        }
+      ],
+      "local_addresses": ["192.168.0.25", "10.8.0.10"],
+      "active_interfaces": ["en0", "utun2"],
+      "route_summary": {
+        "default_gateway": "10.8.0.1",
+        "default_interface": "utun2",
+        "has_default_route": true,
+        "routes": [
+          {
+            "destination": "default",
+            "gateway": "10.8.0.1",
+            "interface": "utun2",
+            "metric": null
+          }
+        ]
+      }
+    },
+    "dns": {
+      "resolvers": ["192.168.0.1"],
+      "checks": [
+        {
+          "hostname": "github.com",
+          "success": true,
+          "resolved_addresses": ["140.82.112.4"],
+          "error": null
+        }
+      ]
+    },
+    "connectivity": {
+      "internet_reachable": true,
+      "tcp_checks": [
+        {
+          "target": {
+            "host": "github.com",
+            "port": 443,
+            "label": "github-https"
+          },
+          "success": true,
+          "latency_ms": 31.2,
+          "error": null,
+          "ip_used": "140.82.112.4"
+        }
+      ],
+      "ping_checks": [],
+      "trace_results": []
+    },
+    "vpn": {
+      "signals": [
+        {
+          "interface_name": "utun2",
+          "signal_type": "interface-name-heuristic",
+          "description": "Active interface name matches a common VPN or tunnel pattern.",
+          "active": true,
+          "confidence": 0.75
+        },
+        {
+          "interface_name": "utun2",
+          "signal_type": "default-route-heuristic",
+          "description": "Default route uses an interface that looks like a VPN or tunnel.",
+          "active": true,
+          "confidence": 0.85
+        }
+      ]
+    },
+    "services": {
+      "checks": [
+        {
+          "target": {
+            "host": "10.20.30.40",
+            "port": 443,
+            "label": "private-api"
+          },
+          "success": false,
+          "latency_ms": null,
+          "error": "timeout"
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "identifier": "vpn-signal-private-resource-failure",
+      "severity": "medium",
+      "title": "VPN or tunnel appears active while private targets remain unreachable",
+      "summary": "A VPN-like interface is present, but private resource checks still failed.",
+      "evidence": [
+        "VPN heuristic matched interface utun2 (interface-name-heuristic, confidence 0.75).",
+        "VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.85).",
+        "Default route uses interface utun2.",
+        "Private target 10.20.30.40:443 failed with timeout."
+      ],
+      "probable_cause": "The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.",
+      "fault_domain": "vpn",
+      "confidence": 0.85,
+      "heuristic": true
+    }
+  ],
+  "probable_fault_domain": "vpn",
+  "warnings": []
+}

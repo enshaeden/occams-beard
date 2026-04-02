@@ -100,11 +100,7 @@ def check_tcp_target(target: TcpTarget, timeout: float = 3.0) -> TcpConnectivity
 def check_ping_target(host: str) -> tuple[PingResult, DiagnosticWarning | None]:
     """Run a best-effort ping check."""
 
-    platform_name = current_platform()
-    if platform_name == "windows":
-        args = ["ping", "-n", "1", "-w", "1000", host]
-    else:
-        args = ["ping", "-c", "1", "-W", "1", host]
+    args = _ping_command_args(host)
 
     result = run_command(args, timeout=3.0)
     if result.error and result.error.startswith("command-not-found"):
@@ -131,11 +127,8 @@ def check_ping_target(host: str) -> tuple[PingResult, DiagnosticWarning | None]:
 def check_trace_target(host: str) -> tuple[TraceResult, DiagnosticWarning | None]:
     """Run a best-effort traceroute or tracert check."""
 
-    platform_name = current_platform()
-    if platform_name == "windows":
-        args = ["tracert", "-d", "-h", "5", host]
-    else:
-        args = ["traceroute", "-m", "5", "-w", "1", host]
+    args = _trace_command_args(host)
+    target_address = _resolve_trace_target(host)
 
     result = run_command(args, timeout=10.0)
     if result.error and result.error.startswith("command-not-found"):
@@ -145,6 +138,7 @@ def check_trace_target(host: str) -> tuple[TraceResult, DiagnosticWarning | None
                 ran=False,
                 success=False,
                 error="trace-command-unavailable",
+                target_address=target_address,
             ),
             DiagnosticWarning(
                 domain="connectivity",
@@ -154,13 +148,76 @@ def check_trace_target(host: str) -> tuple[TraceResult, DiagnosticWarning | None
         )
 
     hops = [TraceHop(**hop) for hop in parse_traceroute_output(result.stdout)]
-    partial = bool(hops) and any(hop.note == "*" for hop in hops)
+    target_reached = any(_trace_hop_matches_target(hop, host, target_address) for hop in hops)
+    last_responding_hop = max(
+        (hop.hop for hop in hops if hop.address or hop.host),
+        default=None,
+    )
+    partial = bool(last_responding_hop) and not target_reached
+    error = None
+    if not target_reached and not partial and not result.succeeded:
+        error = result.error or result.stderr.strip() or "trace-failed"
+    elif not target_reached and not partial and result.succeeded:
+        error = "trace-no-responsive-hops"
+
     trace_result = TraceResult(
         target=host,
         ran=True,
-        success=result.succeeded,
+        success=target_reached,
         hops=hops,
-        error=None if result.succeeded else result.error or result.stderr.strip() or "trace-failed",
+        error=error,
         partial=partial,
+        target_address=target_address,
+        last_responding_hop=last_responding_hop,
     )
     return trace_result, None
+
+
+def _ping_command_args(host: str) -> list[str]:
+    """Build platform-appropriate ping arguments."""
+
+    platform_name = current_platform()
+    if platform_name == "windows":
+        return ["ping", "-n", "1", "-w", "1000", host]
+    if platform_name == "macos":
+        return ["ping", "-c", "1", "-W", "1000", host]
+    return ["ping", "-c", "1", "-W", "1", host]
+
+
+def _trace_command_args(host: str) -> list[str]:
+    """Build platform-appropriate traceroute arguments."""
+
+    platform_name = current_platform()
+    if platform_name == "windows":
+        return ["tracert", "-d", "-h", "5", "-w", "1000", host]
+    return ["traceroute", "-n", "-m", "5", "-w", "1", host]
+
+
+def _resolve_trace_target(host: str) -> str | None:
+    try:
+        address = socket.gethostbyname(host)
+    except OSError:
+        return host if _looks_like_ip_address(host) else None
+    return str(address)
+
+
+def _trace_hop_matches_target(hop: TraceHop, host: str, target_address: str | None) -> bool:
+    if hop.address and target_address and hop.address == target_address:
+        return True
+    if hop.host and target_address and hop.host == target_address:
+        return True
+    if hop.host and hop.host == host:
+        return True
+    if hop.address and hop.address == host:
+        return True
+    return False
+
+
+def _looks_like_ip_address(value: str) -> bool:
+    for family in (socket.AF_INET, socket.AF_INET6):
+        try:
+            socket.inet_pton(family, value)
+        except OSError:
+            continue
+        return True
+    return False

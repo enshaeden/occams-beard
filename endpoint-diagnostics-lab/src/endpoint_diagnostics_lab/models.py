@@ -145,12 +145,23 @@ class RouteSummary:
 
 
 @dataclass(slots=True)
+class ArpNeighbor:
+    """A normalized ARP or neighbor-cache entry."""
+
+    ip_address: str
+    mac_address: str | None
+    interface: str | None = None
+    state: str | None = None
+
+
+@dataclass(slots=True)
 class NetworkState:
     """Collected network configuration facts."""
 
     interfaces: list[NetworkInterface] = field(default_factory=list)
     local_addresses: list[str] = field(default_factory=list)
     active_interfaces: list[str] = field(default_factory=list)
+    arp_neighbors: list[ArpNeighbor] = field(default_factory=list)
     route_summary: RouteSummary = field(
         default_factory=lambda: RouteSummary(None, None, False, [])
     )
@@ -226,11 +237,13 @@ class TraceResult:
     hops: list[TraceHop] = field(default_factory=list)
     error: str | None = None
     partial: bool = False
+    target_address: str | None = None
+    last_responding_hop: int | None = None
 
 
 @dataclass(slots=True)
 class ConnectivityState:
-    """Collected connectivity facts."""
+    """Generic path reachability facts for the endpoint."""
 
     internet_reachable: bool
     tcp_checks: list[TcpConnectivityCheck] = field(default_factory=list)
@@ -247,6 +260,7 @@ class VpnSignal:
     description: str
     active: bool
     confidence: float
+    address_count: int = 0
 
 
 @dataclass(slots=True)
@@ -258,7 +272,7 @@ class VpnState:
 
 @dataclass(slots=True)
 class ServiceCheck:
-    """Outcome of a configured service or port check."""
+    """Outcome of an intended endpoint or application reachability check."""
 
     target: TcpTarget
     success: bool
@@ -268,7 +282,7 @@ class ServiceCheck:
 
 @dataclass(slots=True)
 class ServiceState:
-    """Collected service reachability facts."""
+    """Collected intended service reachability facts."""
 
     checks: list[ServiceCheck] = field(default_factory=list)
 

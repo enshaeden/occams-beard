@@ -8,6 +8,8 @@ Version `0.1.0` is intentionally narrow:
 - deterministic findings
 - machine-readable JSON
 - concise operator reporting
+- representative sample artifacts for GitHub review
+- lightweight local formatting, lint, and type-check support
 - representative tests and documentation
 
 ## Next Logical Improvements

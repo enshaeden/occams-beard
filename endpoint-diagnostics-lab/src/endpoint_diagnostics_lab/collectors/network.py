@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from endpoint_diagnostics_lab.models import (
+    ArpNeighbor,
     DiagnosticWarning,
     InterfaceAddress,
     NetworkInterface,
@@ -52,6 +54,8 @@ def collect_network_state() -> tuple[NetworkState, list[DiagnosticWarning]]:
         )
 
     interfaces = [_normalize_interface(item) for item in raw_interfaces]
+    arp_neighbors, arp_warnings = _collect_arp_neighbors(platform_name)
+    warnings.extend(arp_warnings)
     local_addresses = dedupe_preserve_order(
         address.address
         for interface in interfaces
@@ -64,6 +68,7 @@ def collect_network_state() -> tuple[NetworkState, list[DiagnosticWarning]]:
             interfaces=interfaces,
             local_addresses=local_addresses,
             active_interfaces=active_interfaces,
+            arp_neighbors=arp_neighbors,
         ),
         warnings,
     )
@@ -93,10 +98,56 @@ def _infer_interface_type(name: str) -> str:
     lowered = name.lower()
     if lowered.startswith(("lo", "loopback")):
         return "loopback"
-    if any(token in lowered for token in ("wi-fi", "wifi", "wlan", "wl")):
+    if any(token in lowered for token in ("wi-fi", "wifi", "wireless", "wlan")) or re.match(
+        r"^wl[a-z0-9]+",
+        lowered,
+    ):
         return "wireless"
-    if any(token in lowered for token in ("eth", "en", "ethernet")):
+    if any(token in lowered for token in ("ethernet", "lan")) or re.match(
+        r"^(eth|en[0-9]+|enp|ens|eno|em|bond)\S*",
+        lowered,
+    ):
         return "ethernet"
     if any(token in lowered for token in ("tun", "tap", "utun", "ppp", "wg", "vpn")):
         return "tunnel"
     return "unknown"
+
+
+def _collect_arp_neighbors(platform_name: str) -> tuple[list[ArpNeighbor], list[DiagnosticWarning]]:
+    warnings: list[DiagnosticWarning] = []
+
+    if platform_name == "linux":
+        raw_neighbors, command_result = linux.read_arp_neighbors()
+    elif platform_name == "macos":
+        raw_neighbors, command_result = macos.read_arp_neighbors()
+    elif platform_name == "windows":
+        raw_neighbors, command_result = windows.read_arp_neighbors()
+    else:
+        return [], warnings
+
+    if command_result is not None and not command_result.succeeded:
+        warnings.append(
+            DiagnosticWarning(
+                domain="network",
+                code="arp-command-failed",
+                message=(
+                    "Supplemental ARP collection failed: "
+                    f"{command_result.error or command_result.stderr.strip() or 'unknown-error'}"
+                ),
+            )
+        )
+
+    return (
+        [
+            ArpNeighbor(
+                ip_address=str(neighbor.get("ip_address")),
+                mac_address=(
+                    str(neighbor.get("mac_address")) if neighbor.get("mac_address") else None
+                ),
+                interface=str(neighbor.get("interface")) if neighbor.get("interface") else None,
+                state=str(neighbor.get("state")) if neighbor.get("state") else None,
+            )
+            for neighbor in raw_neighbors
+        ],
+        warnings,
+    )

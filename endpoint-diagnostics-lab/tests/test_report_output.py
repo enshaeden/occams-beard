@@ -14,13 +14,18 @@ from endpoint_diagnostics_lab.models import (
     EndpointDiagnosticResult,
     Finding,
     HostBasics,
+    InterfaceAddress,
+    NetworkInterface,
     MemoryState,
     Metadata,
     NetworkState,
     PlatformInfo,
     ResourceState,
     RouteSummary,
+    ServiceCheck,
     ServiceState,
+    TraceHop,
+    TraceResult,
     TcpConnectivityCheck,
     TcpTarget,
     VpnState,
@@ -31,14 +36,14 @@ from endpoint_diagnostics_lab.report import render_report
 class ReportOutputTests(unittest.TestCase):
     """Validate human-readable report output."""
 
-    def test_render_report_includes_required_sections(self) -> None:
+    def test_render_report_includes_required_sections_and_evidence_labels(self) -> None:
         result = EndpointDiagnosticResult(
             metadata=Metadata(
                 project_name="endpoint-diagnostics-lab",
                 version="0.1.0",
                 generated_at="2026-04-01T00:00:00+00:00",
                 elapsed_ms=100,
-                selected_checks=["network", "dns", "connectivity"],
+                selected_checks=["network", "dns", "connectivity", "services"],
             ),
             platform=PlatformInfo(
                 system="Linux",
@@ -66,8 +71,23 @@ class ReportOutputTests(unittest.TestCase):
                     disks=[],
                 ),
                 network=NetworkState(
+                    interfaces=[
+                        NetworkInterface(
+                            name="eth0",
+                            is_up=True,
+                            mtu=1500,
+                            addresses=[
+                                InterfaceAddress(
+                                    family="ipv4",
+                                    address="192.168.1.50",
+                                    netmask="24",
+                                )
+                            ],
+                        )
+                    ],
                     local_addresses=["192.168.1.50"],
                     active_interfaces=["eth0"],
+                    arp_neighbors=[],
                     route_summary=RouteSummary(
                         default_gateway="192.168.1.1",
                         default_interface="eth0",
@@ -76,34 +96,62 @@ class ReportOutputTests(unittest.TestCase):
                     ),
                 ),
                 dns=DnsState(
-                    checks=[DnsResolutionCheck(hostname="github.com", success=True, resolved_addresses=["140.82.114.3"])]
+                    resolvers=["1.1.1.1"],
+                    checks=[DnsResolutionCheck(hostname="github.com", success=True, resolved_addresses=["140.82.114.3"])],
                 ),
                 connectivity=ConnectivityState(
                     internet_reachable=True,
                     tcp_checks=[
                         TcpConnectivityCheck(
-                            target=TcpTarget(host="github.com", port=443),
+                            target=TcpTarget(host="github.com", port=443, label="github-https"),
                             success=True,
                             latency_ms=23.1,
+                            ip_used="140.82.114.3",
+                        )
+                    ],
+                    trace_results=[
+                        TraceResult(
+                            target="github.com",
+                            ran=True,
+                            success=False,
+                            partial=True,
+                            target_address="140.82.114.3",
+                            last_responding_hop=2,
+                            hops=[
+                                TraceHop(hop=1, host="192.168.1.1", address="192.168.1.1", latency_ms=1.0),
+                                TraceHop(hop=2, host="10.0.0.1", address="10.0.0.1", latency_ms=4.0),
+                                TraceHop(hop=3, host=None, address=None, latency_ms=None, note="timeout"),
+                            ],
                         )
                     ],
                 ),
                 vpn=VpnState(),
-                services=ServiceState(),
+                services=ServiceState(
+                    checks=[
+                        ServiceCheck(
+                            target=TcpTarget(host="status.example.com", port=443, label="status-api"),
+                            success=False,
+                            error="timeout",
+                        )
+                    ]
+                ),
             ),
             findings=[
                 Finding(
-                    identifier="healthy-baseline",
-                    severity="info",
-                    title="No major diagnostic findings detected",
-                    summary="The collected facts did not match any major fault rule.",
-                    evidence=["No deterministic fault signatures triggered."],
-                    probable_cause="No major failure domain identified.",
-                    fault_domain="healthy",
-                    confidence=0.8,
+                    identifier="internet-ok-selected-service-failure",
+                    severity="medium",
+                    title="Generic internet reachability works but selected service checks fail",
+                    summary="Baseline external path checks succeeded, but every configured public service check failed.",
+                    evidence=[
+                        "Generic internet reachability checks succeeded.",
+                        "Failed configured public services: status-api (timeout).",
+                    ],
+                    probable_cause="The failure is more likely isolated to the intended service path than to general internet access.",
+                    fault_domain="upstream_network",
+                    confidence=0.79,
                 )
             ],
-            probable_fault_domain="healthy",
+            probable_fault_domain="upstream_network",
             warnings=[
                 DiagnosticWarning(
                     domain="connectivity",
@@ -117,12 +165,89 @@ class ReportOutputTests(unittest.TestCase):
 
         self.assertIn("Summary", text)
         self.assertIn("Key Findings", text)
-        self.assertIn("System Snapshot", text)
-        self.assertIn("Network Snapshot", text)
-        self.assertIn("Connectivity Results", text)
-        self.assertIn("Probable Fault Domain", text)
+        self.assertIn("Derived finding:", text)
+        self.assertIn("Observed fact:", text)
+        self.assertIn("Generic Reachability Checks", text)
+        self.assertIn("DNS Resolution", text)
+        self.assertIn("Configured Service Checks", text)
+        self.assertIn("Warnings and degraded checks", text)
+        self.assertIn("Fault-domain basis", text)
+        self.assertIn("Interface MTUs: eth0=1500", text)
+        self.assertIn("ARP neighbors: none collected", text)
+        self.assertIn("Trace github.com: partial, last response at hop 2, target 140.82.114.3 not reached", text)
         self.assertIn("/tmp/report.json", text)
-        self.assertIn("Warnings", text)
+
+    def test_render_report_marks_heuristic_findings(self) -> None:
+        result = EndpointDiagnosticResult(
+            metadata=Metadata(
+                project_name="endpoint-diagnostics-lab",
+                version="0.1.0",
+                generated_at="2026-04-01T00:00:00+00:00",
+                elapsed_ms=100,
+                selected_checks=["vpn", "services"],
+            ),
+            platform=PlatformInfo(
+                system="macOS",
+                release="15.0",
+                version="demo",
+                machine="arm64",
+                python_version="3.11.9",
+            ),
+            facts=CollectedFacts(
+                host=HostBasics(
+                    hostname="demo-host",
+                    operating_system="Darwin",
+                    kernel="24.0.0",
+                    current_user="operator",
+                    uptime_seconds=600,
+                ),
+                resources=ResourceState(
+                    cpu=CpuState(logical_cpus=4),
+                    memory=MemoryState(total_bytes=None, available_bytes=None, free_bytes=None),
+                    disks=[],
+                ),
+                network=NetworkState(
+                    interfaces=[
+                        NetworkInterface(name="utun2", is_up=True, mtu=1380)
+                    ],
+                    local_addresses=["10.8.0.10"],
+                    active_interfaces=["utun2"],
+                    route_summary=RouteSummary(
+                        default_gateway="10.8.0.1",
+                        default_interface="utun2",
+                        has_default_route=True,
+                        routes=[],
+                    ),
+                ),
+                dns=DnsState(),
+                connectivity=ConnectivityState(internet_reachable=False),
+                vpn=VpnState(),
+                services=ServiceState(),
+            ),
+            findings=[
+                Finding(
+                    identifier="vpn-signal-private-resource-failure",
+                    severity="medium",
+                    title="VPN or tunnel appears active while private targets remain unreachable",
+                    summary="A VPN-like interface is present, but private resource checks still failed.",
+                    evidence=[
+                        "VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.75, 1 usable address)."
+                    ],
+                    probable_cause="The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.",
+                    fault_domain="vpn",
+                    confidence=0.82,
+                    heuristic=True,
+                )
+            ],
+            probable_fault_domain="vpn",
+        )
+
+        text = render_report(result)
+
+        self.assertIn("Heuristic conclusion:", text)
+        self.assertIn("heuristic", text)
+        self.assertIn("Internet reachable: not collected", text)
+        self.assertIn("Default route present: not collected", text)
 
 
 if __name__ == "__main__":

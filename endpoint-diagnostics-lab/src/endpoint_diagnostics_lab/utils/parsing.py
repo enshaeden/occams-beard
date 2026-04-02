@@ -53,6 +53,33 @@ def parse_linux_ip_route(output: str) -> dict[str, object]:
     }
 
 
+def parse_route_get_default(output: str) -> dict[str, object]:
+    """Parse macOS `route -n get default` output."""
+
+    gateway_match = re.search(r"^\s*gateway:\s+(\S+)", output, re.MULTILINE)
+    interface_match = re.search(r"^\s*interface:\s+(\S+)", output, re.MULTILINE)
+    gateway = gateway_match.group(1) if gateway_match else None
+    interface = interface_match.group(1) if interface_match else None
+
+    routes = []
+    if gateway or interface:
+        routes.append(
+            {
+                "destination": "default",
+                "gateway": gateway,
+                "interface": interface,
+                "metric": None,
+            }
+        )
+
+    return {
+        "default_gateway": gateway,
+        "default_interface": interface,
+        "has_default_route": gateway is not None or interface is not None,
+        "routes": routes,
+    }
+
+
 def parse_route_print(output: str) -> dict[str, object]:
     """Parse Windows `route print` output into a compact structure."""
 
@@ -301,7 +328,7 @@ def parse_ipconfig(output: str) -> list[dict[str, object]]:
                 }
             )
             current["is_up"] = True
-        elif "IPv6 Address" in stripped:
+        elif "IPv6 Address" in stripped or "Link-local IPv6 Address" in stripped:
             _, _, value = stripped.partition(":")
             address = value.replace("(Preferred)", "").strip()
             current["addresses"].append(
@@ -313,8 +340,8 @@ def parse_ipconfig(output: str) -> list[dict[str, object]]:
                 }
             )
             current["is_up"] = True
-        elif "Media State" in stripped and "disconnected" not in stripped.lower():
-            current["is_up"] = True
+        elif "Media State" in stripped:
+            current["is_up"] = "disconnected" not in stripped.lower()
 
     if current:
         interfaces.append(current)
@@ -354,12 +381,22 @@ def parse_traceroute_output(output: str) -> list[dict[str, object]]:
 
         tokens = line.split()
         hop_number = int(tokens[0])
-        latency_match = re.search(r"(\d+(?:\.\d+)?)\s*ms", line)
-        address_match = re.search(r"(\d+\.\d+\.\d+\.\d+)", line)
-        host = None
-        if address_match:
-            host = address_match.group(1)
-        note = "*" if "*" in line else None
+        latency_match = re.search(r"(\d+(?:\.\d+)?)\s*ms", line, re.IGNORECASE)
+        address_match = re.search(
+            r"\b((?:\d{1,3}\.){3}\d{1,3}|(?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f:]+)\b",
+            line,
+        )
+        host = address_match.group(1) if address_match else None
+        note = None
+        if "*" in line:
+            note = "timeout"
+        unreachable_match = re.search(
+            r"(![A-Z]+|request timed out\.|destination .*? unreachable)",
+            line,
+            re.IGNORECASE,
+        )
+        if unreachable_match:
+            note = unreachable_match.group(1)
         hops.append(
             {
                 "hop": hop_number,
@@ -371,6 +408,82 @@ def parse_traceroute_output(output: str) -> list[dict[str, object]]:
         )
 
     return hops
+
+
+def parse_ip_neigh(output: str) -> list[dict[str, object]]:
+    """Parse Linux `ip neigh show` output into neighbor entries."""
+
+    neighbors: list[dict[str, object]] = []
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        ip_match = re.match(r"^(\S+)\s+dev\s+(\S+)(?:\s+lladdr\s+(\S+))?(?:\s+router)?\s+(\S+)?", line)
+        if not ip_match:
+            continue
+
+        mac_address = _normalize_mac_address(ip_match.group(3))
+        state = ip_match.group(4)
+        neighbors.append(
+            {
+                "ip_address": ip_match.group(1),
+                "mac_address": mac_address,
+                "interface": ip_match.group(2),
+                "state": state,
+            }
+        )
+    return neighbors
+
+
+def parse_arp_table(output: str) -> list[dict[str, object]]:
+    """Parse `arp -a` output from macOS, Linux, or Windows."""
+
+    neighbors: list[dict[str, object]] = []
+    current_interface: str | None = None
+
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        interface_header_match = re.match(r"^Interface:\s+(\S+)", line, re.IGNORECASE)
+        if interface_header_match:
+            current_interface = interface_header_match.group(1)
+            continue
+
+        named_entry_match = re.search(
+            r"\(([^)]+)\)\s+at\s+(\S+)(?:\s+on\s+(\S+))?",
+            line,
+            re.IGNORECASE,
+        )
+        if named_entry_match:
+            raw_mac = named_entry_match.group(2)
+            neighbors.append(
+                {
+                    "ip_address": named_entry_match.group(1),
+                    "mac_address": _normalize_mac_address(raw_mac),
+                    "interface": named_entry_match.group(3),
+                    "state": "incomplete" if raw_mac.lower() == "<incomplete>" else None,
+                }
+            )
+            continue
+
+        windows_entry_match = re.match(
+            r"^((?:\d{1,3}\.){3}\d{1,3})\s+(\S+)\s+(\S+)$",
+            line,
+        )
+        if windows_entry_match:
+            neighbors.append(
+                {
+                    "ip_address": windows_entry_match.group(1),
+                    "mac_address": _normalize_mac_address(windows_entry_match.group(2)),
+                    "interface": current_interface,
+                    "state": windows_entry_match.group(3).lower(),
+                }
+            )
+
+    return neighbors
 
 
 def parse_resolv_conf(output: str) -> list[str]:
@@ -401,3 +514,12 @@ def _extract_packet_loss(output: str) -> float | None:
     if windows_match:
         return float(windows_match.group(1))
     return None
+
+
+def _normalize_mac_address(value: str | None) -> str | None:
+    if not value:
+        return None
+    lowered = value.strip().lower()
+    if lowered in {"<incomplete>", "incomplete"}:
+        return None
+    return lowered.replace("-", ":")

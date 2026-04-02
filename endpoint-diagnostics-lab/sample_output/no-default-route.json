@@ -119,7 +119,8 @@
       "summary": "The endpoint lacks a default route and could not establish external TCP connectivity.",
       "evidence": [
         "Routing summary shows no default route.",
-        "All configured external TCP connectivity checks failed."
+        "External TCP checks failed: github.com:443 (Network is unreachable), 1.1.1.1:53 (Network is unreachable).",
+        "Active non-loopback interfaces are present: eth0."
       ],
       "probable_cause": "The most likely failure domain is the local network configuration on the host or access segment.",
       "fault_domain": "local_network",

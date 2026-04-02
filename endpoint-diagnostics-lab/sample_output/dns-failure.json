@@ -97,8 +97,8 @@
       "title": "DNS resolution failed but raw IP connectivity succeeded",
       "summary": "The endpoint can reach an external IP directly, but hostname resolution failed.",
       "evidence": [
-        "All configured DNS hostnames failed to resolve.",
-        "At least one TCP connectivity check to a numeric IP address succeeded."
+        "DNS hostnames that failed to resolve: github.com ([Errno 8] nodename nor servname provided, or not known), python.org ([Errno 8] nodename nor servname provided, or not known).",
+        "Numeric IP TCP success observed: 1.1.1.1:53 (ok)."
       ],
       "probable_cause": "The most likely failure domain is the local or upstream DNS resolver path.",
       "fault_domain": "dns",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from endpoint_diagnostics_lab.utils.parsing import parse_ipconfig, parse_route_print
+from endpoint_diagnostics_lab.utils.parsing import parse_arp_table, parse_ipconfig, parse_route_print
 from endpoint_diagnostics_lab.utils.subprocess import CommandResult, run_command
 
 
@@ -110,3 +110,12 @@ def read_resolvers() -> list[str]:
         return []
 
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def read_arp_neighbors() -> tuple[list[dict[str, object]], CommandResult]:
+    """Collect supplemental ARP cache data."""
+
+    result = run_command(["arp", "-a"], timeout=8.0)
+    if result.succeeded:
+        return parse_arp_table(result.stdout), result
+    return [], result

@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from endpoint_diagnostics_lab.utils.parsing import (
+    parse_arp_table,
     parse_ip_addr_show,
+    parse_ip_neigh,
     parse_linux_ip_route,
     parse_netstat_rn,
     parse_resolv_conf,
@@ -77,6 +79,19 @@ def read_routes() -> tuple[dict[str, object], CommandResult]:
         "has_default_route": False,
         "routes": [],
     }, fallback
+
+
+def read_arp_neighbors() -> tuple[list[dict[str, object]], CommandResult]:
+    """Collect supplemental ARP or neighbor-cache data."""
+
+    result = run_command(["ip", "neigh", "show"])
+    if result.succeeded:
+        return parse_ip_neigh(result.stdout), result
+
+    fallback = run_command(["arp", "-a"])
+    if fallback.succeeded:
+        return parse_arp_table(fallback.stdout), fallback
+    return [], fallback
 
 
 def read_resolvers() -> list[str]:
