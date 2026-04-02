@@ -76,6 +76,67 @@ def load_targets_file(path_text: str) -> list[TcpTarget]:
     return targets
 
 
+def parse_check_selection(
+    raw_value: str | None,
+    *,
+    allowed_checks: Iterable[str],
+    default_checks: Iterable[str],
+) -> list[str]:
+    """Parse and validate a comma-separated checks selection."""
+
+    allowed = list(allowed_checks)
+    defaults = list(default_checks)
+    if not raw_value:
+        return defaults
+
+    checks = dedupe_preserve_order(item.strip() for item in raw_value.split(",") if item.strip())
+    if not checks:
+        return defaults
+
+    invalid = [check for check in checks if check not in allowed]
+    if invalid:
+        raise ValueError(
+            "Unsupported diagnostic domains requested: "
+            + ", ".join(sorted(set(invalid)))
+            + ". Supported values: "
+            + ", ".join(allowed)
+        )
+    return checks
+
+
+def resolve_dns_hosts(
+    raw_hosts: Iterable[str],
+    *,
+    default_hosts: Iterable[str],
+) -> list[str]:
+    """Return operator-supplied DNS hosts or a copied default set."""
+
+    candidate_hosts = list(raw_hosts) or list(default_hosts)
+    normalized_hosts: list[str] = []
+    for host in candidate_hosts:
+        normalized_host = host.strip()
+        if not normalized_host:
+            raise ValueError("DNS host values must not be empty.")
+        normalized_hosts.append(normalized_host)
+    return dedupe_preserve_order(normalized_hosts)
+
+
+def resolve_tcp_targets(
+    raw_targets: Iterable[str],
+    target_file: str | None,
+    *,
+    default_targets: Iterable[TcpTarget],
+) -> list[TcpTarget]:
+    """Return operator-supplied TCP targets or copied defaults."""
+
+    targets = [parse_host_port_target(item) for item in raw_targets]
+    if target_file:
+        targets.extend(load_targets_file(target_file))
+    if targets:
+        return targets
+    return [_copy_target(target) for target in default_targets]
+
+
 def dedupe_preserve_order(values: Iterable[str]) -> list[str]:
     """Return unique values while preserving their first-seen order."""
 
@@ -96,3 +157,9 @@ def is_private_or_loopback_host(host: str) -> bool:
     except ValueError:
         return False
     return address.is_private or address.is_loopback
+
+
+def _copy_target(target: TcpTarget) -> TcpTarget:
+    """Return a detached copy of a target model."""
+
+    return TcpTarget(host=target.host, port=target.port, label=target.label)

@@ -2,6 +2,8 @@
 
 Endpoint Diagnostics Lab is a CLI-first, cross-platform endpoint diagnostics project built to demonstrate practical systems engineering capability at the host and network layer. It gathers local facts safely, evaluates deterministic findings rules, and produces both a concise operator report and structured JSON output.
 
+The operator-facing interface is centered on a single primary command: `run`.
+
 This project exists to answer real operator questions without becoming a platform:
 - Is the endpoint online and correctly routed?
 - Does DNS work, partially work, or fail outright?
@@ -52,6 +54,22 @@ The codebase uses a deliberately small layered design:
 
 This separation keeps reporting concerns out of collection code and keeps the findings engine free from CLI-specific behavior.
 
+## Main Command
+
+The normal way to run the tool is:
+
+```bash
+endpoint-diagnostics-lab run
+```
+
+The module form is equivalent:
+
+```bash
+python -m endpoint_diagnostics_lab.main run
+```
+
+With no flags, `run` executes the default diagnostic suite, uses built-in DNS and TCP targets, prints the human-readable report, and exits `0` when diagnostics complete even if findings are present.
+
 ## Connectivity vs. Service Checks
 
 The project keeps two closely related but distinct concepts:
@@ -96,16 +114,64 @@ Runtime dependencies are Python standard library only. The optional `dev` extras
 
 ## Example Commands
 
+1. Plain default run
+
 ```bash
-python -m endpoint_diagnostics_lab.main run
-python -m endpoint_diagnostics_lab.main run --json-out report.json
-python -m endpoint_diagnostics_lab.main run --checks network,dns,connectivity
-python -m endpoint_diagnostics_lab.main run --target github.com:443 --target 1.1.1.1:53
-python -m endpoint_diagnostics_lab.main run --target-file sample_output/example-targets.json
-python -m endpoint_diagnostics_lab.main run --enable-ping --enable-trace --verbose
+endpoint-diagnostics-lab run
 ```
 
+2. Save JSON
+
+```bash
+endpoint-diagnostics-lab run --json-out report.json
+```
+
+3. Limit checks
+
+```bash
+endpoint-diagnostics-lab run --checks network,dns,connectivity
+```
+
+4. Add custom targets
+
+```bash
+endpoint-diagnostics-lab run --target github.com:443 --target 1.1.1.1:53
+```
+
+5. Use a target file
+
+```bash
+endpoint-diagnostics-lab run --target-file sample_output/example-targets.json
+```
+
+6. Enable ping and trace
+
+```bash
+endpoint-diagnostics-lab run --enable-ping --enable-trace --verbose
+```
+
+7. Suppress the human-readable report
+
+```bash
+endpoint-diagnostics-lab run --suppress-report --json-out report.json
+```
+
+The `python -m endpoint_diagnostics_lab.main run ...` form is equivalent for every example above.
+
 `--target-file` accepts a JSON array of either `host:port` strings or objects shaped like `{"host": "github.com", "port": 443, "label": "github-https"}` so repeated service checks can stay config-driven without introducing a database or service layer.
+
+## Run Options
+
+- `--checks`: comma-separated diagnostic domains to run. Supported values are `host`, `resources`, `storage`, `network`, `routing`, `dns`, `connectivity`, `vpn`, and `services`.
+- `--json-out`: write structured JSON output to a file.
+- `--suppress-report`: skip the human-readable terminal report for machine-oriented workflows.
+- `--target`: repeat to add TCP targets as `host:port`.
+- `--target-file`: load TCP targets from a JSON array of `host:port` strings or `{host, port, label}` objects.
+- `--dns-host`: repeat to add DNS resolution hostnames.
+- `--enable-ping`: add best-effort ping checks.
+- `--enable-trace`: add best-effort traceroute or tracert checks.
+- `--verbose`: enable INFO-level logging.
+- `--debug`: enable DEBUG-level logging.
 
 ## Example Human-Readable Output
 

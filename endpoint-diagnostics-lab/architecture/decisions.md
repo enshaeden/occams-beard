@@ -67,6 +67,18 @@ Consequence:
 - target management stays simple and portable
 - richer environment profiles are intentionally deferred
 
+### Decision: Center the public CLI on a single `run` command
+
+Reason:
+- endpoint operators should not have to learn a subcommand tree to execute the normal diagnostics workflow
+- the CLI should make the default path obvious while keeping orchestration thin and auditable
+- one primary command keeps documentation, automation, and support handoffs easier to explain
+
+Consequence:
+- `run` is the canonical operator-facing interface for diagnostics execution
+- help text, examples, and defaults are optimized around `endpoint-diagnostics-lab run`
+- internal parsing and default target selection are handled through small helpers instead of spreading CLI heuristics across the codebase
+
 ## Security Review
 
 - Inputs from the CLI are validated before use.
@@ -386,6 +398,36 @@ The initial sample artifact set prioritized machine-readable examples before ter
 
 RECOMMENDED RESOLUTION:
 Commit representative terminal-style report artifacts alongside scenario JSON samples.
+
+STATUS:
+RESOLVED
+----------------------------------------
+
+----------------------------------------
+TYPE: Workflow inefficiency
+SEVERITY: Medium
+
+DESCRIPTION:
+The operator-facing CLI exposed `run`, but the public surface still felt like a generic subcommand parser because help text was sparse and the default TCP target behavior was split across layers.
+
+IMPACT:
+Operators had to infer the intended execution model, and a no-flag run did not consistently exercise both connectivity and configured service checks with the same default targets.
+
+AFFECTED COMPONENTS:
+src/endpoint_diagnostics_lab/cli.py
+src/endpoint_diagnostics_lab/defaults.py
+src/endpoint_diagnostics_lab/utils/validation.py
+src/endpoint_diagnostics_lab/collectors/connectivity.py
+README.md
+docs/diagnostic-model.md
+tests/test_cli.py
+tests/test_validation.py
+
+ROOT CAUSE:
+The initial implementation added the `run` command correctly but left defaults, help copy, and parser-facing validation distributed across the CLI and collector layers.
+
+RECOMMENDED RESOLUTION:
+Centralize shared defaults, keep `run` as the obvious public command, validate selection inputs clearly, and cover the run-first behavior with dedicated CLI tests.
 
 STATUS:
 RESOLVED

@@ -6,6 +6,7 @@ import logging
 import socket
 import time
 
+from endpoint_diagnostics_lab.defaults import DEFAULT_TCP_TARGETS
 from endpoint_diagnostics_lab.models import (
     ConnectivityState,
     DiagnosticWarning,
@@ -21,11 +22,6 @@ from endpoint_diagnostics_lab.utils.subprocess import run_command
 
 
 LOGGER = logging.getLogger(__name__)
-
-DEFAULT_TCP_TARGETS = [
-    TcpTarget(host="github.com", port=443, label="github-https"),
-    TcpTarget(host="1.1.1.1", port=53, label="cloudflare-dns"),
-]
 
 
 def collect_connectivity_state(

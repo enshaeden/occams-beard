@@ -17,6 +17,12 @@ from endpoint_diagnostics_lab.collectors.services import collect_service_state
 from endpoint_diagnostics_lab.collectors.storage import collect_storage_state
 from endpoint_diagnostics_lab.collectors.system import collect_host_basics, collect_resource_state
 from endpoint_diagnostics_lab.collectors.vpn import collect_vpn_state
+from endpoint_diagnostics_lab.defaults import (
+    ALLOWED_CHECKS,
+    DEFAULT_CHECKS,
+    DEFAULT_DNS_HOSTS,
+    DEFAULT_TCP_TARGETS,
+)
 from endpoint_diagnostics_lab.findings import evaluate_selected_findings
 from endpoint_diagnostics_lab.models import (
     CollectedFacts,
@@ -31,59 +37,98 @@ from endpoint_diagnostics_lab.models import (
 from endpoint_diagnostics_lab.report import render_report
 from endpoint_diagnostics_lab.serializers import write_json_file
 from endpoint_diagnostics_lab.utils.time import utc_now_iso
-from endpoint_diagnostics_lab.utils.validation import load_targets_file, parse_host_port_target
+from endpoint_diagnostics_lab.utils.validation import (
+    parse_check_selection,
+    resolve_dns_hosts,
+    resolve_tcp_targets,
+)
 
 
-DEFAULT_CHECKS = ["host", "resources", "storage", "network", "routing", "dns", "connectivity", "vpn", "services"]
-DEFAULT_DNS_HOSTS = ["github.com", "python.org"]
-ALLOWED_CHECKS = set(DEFAULT_CHECKS)
+LOGGER = logging.getLogger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser."""
 
-    parser = argparse.ArgumentParser(prog="endpoint-diagnostics-lab")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(
+        prog="endpoint-diagnostics-lab",
+        usage="endpoint-diagnostics-lab run [options]",
+        description="Single operator-facing command for endpoint diagnostics.",
+        epilog="Use 'endpoint-diagnostics-lab run --help' for the full run workflow and options.",
+    )
+    subparsers = parser.add_subparsers(dest="command", metavar="command")
 
-    run_parser = subparsers.add_parser("run", help="Run diagnostics")
-    run_parser.add_argument("--json-out", help="Write machine-readable output to a JSON file.")
-    run_parser.add_argument(
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Run the default diagnostic suite.",
+        description=(
+            "Run endpoint diagnostics.\n"
+            "With no flags, the default suite runs against built-in DNS and TCP targets "
+            "and prints a human-readable report."
+        ),
+        epilog=_run_examples_text(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    run_parser.set_defaults(handler=_run_command)
+
+    scope_group = run_parser.add_argument_group("Scope")
+    scope_group.add_argument(
+        "--checks",
+        metavar="LIST",
+        help=(
+            "Comma-separated diagnostic domains. "
+            f"Supported values: {', '.join(ALLOWED_CHECKS)}."
+        ),
+    )
+
+    target_group = run_parser.add_argument_group("Targets")
+    target_group.add_argument(
+        "--target",
+        metavar="HOST:PORT",
+        action="append",
+        default=[],
+        help="Repeat to add TCP targets as host:port.",
+    )
+    target_group.add_argument(
+        "--target-file",
+        metavar="PATH",
+        help="Load TCP targets from a JSON array of host:port strings or {host, port, label} objects.",
+    )
+    target_group.add_argument(
+        "--dns-host",
+        metavar="HOST",
+        action="append",
+        default=[],
+        help="Repeat to add DNS resolution hostnames.",
+    )
+
+    output_group = run_parser.add_argument_group("Output")
+    output_group.add_argument(
+        "--json-out",
+        metavar="PATH",
+        help="Write structured JSON output to PATH.",
+    )
+    output_group.add_argument(
         "--suppress-report",
         action="store_true",
-        help="Do not print the human-readable report to stdout.",
+        help="Skip the human-readable terminal report.",
     )
-    run_parser.add_argument(
-        "--checks",
-        help="Comma-separated diagnostic domains to run.",
-    )
-    run_parser.add_argument(
-        "--target",
-        action="append",
-        default=[],
-        help="Repeatable host:port TCP or service target.",
-    )
-    run_parser.add_argument(
-        "--target-file",
-        help="JSON file containing a list of host:port strings or {host, port, label} objects.",
-    )
-    run_parser.add_argument(
-        "--dns-host",
-        action="append",
-        default=[],
-        help="Repeatable hostname for DNS resolution checks.",
-    )
-    run_parser.add_argument(
+
+    probe_group = run_parser.add_argument_group("Optional probes")
+    probe_group.add_argument(
         "--enable-ping",
         action="store_true",
         help="Enable best-effort ping checks.",
     )
-    run_parser.add_argument(
+    probe_group.add_argument(
         "--enable-trace",
         action="store_true",
         help="Enable best-effort traceroute or tracert checks.",
     )
-    run_parser.add_argument("--verbose", action="store_true", help="Enable verbose logging.")
-    run_parser.add_argument("--debug", action="store_true", help="Enable debug logging.")
+
+    logging_group = run_parser.add_argument_group("Logging")
+    logging_group.add_argument("--verbose", action="store_true", help="Enable INFO-level logging.")
+    logging_group.add_argument("--debug", action="store_true", help="Enable DEBUG-level logging.")
     return parser
 
 
@@ -92,25 +137,52 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = build_parser()
     args = parser.parse_args(argv)
+    handler = getattr(args, "handler", None)
+    if handler is None:
+        parser.print_help(sys.stderr)
+        return 2
 
     _configure_logging(verbose=args.verbose, debug=args.debug)
 
-    if args.command == "run":
-        try:
-            return _run_command(args)
-        except ValueError as exc:
-            parser.error(str(exc))
-    parser.error(f"Unsupported command: {args.command}")
-    return 2
+    try:
+        return handler(args)
+    except ValueError as exc:
+        parser.error(str(exc))
+    except Exception as exc:  # pragma: no cover - exercised through exit path tests.
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            LOGGER.exception("Diagnostics execution failed.")
+        else:
+            LOGGER.error("Diagnostics execution failed: %s", exc)
+        return 1
 
 
 def _run_command(args: argparse.Namespace) -> int:
     start = time.perf_counter()
-    selected_checks = _parse_checks(args.checks)
+    selected_checks = parse_check_selection(
+        args.checks,
+        allowed_checks=ALLOWED_CHECKS,
+        default_checks=DEFAULT_CHECKS,
+    )
     warnings = []
 
-    targets = _load_targets(args.target, args.target_file)
-    dns_hosts = args.dns_host or list(DEFAULT_DNS_HOSTS)
+    targets = resolve_tcp_targets(
+        args.target,
+        args.target_file,
+        default_targets=DEFAULT_TCP_TARGETS,
+    )
+    dns_hosts = resolve_dns_hosts(args.dns_host, default_hosts=DEFAULT_DNS_HOSTS)
+
+    LOGGER.info("Running endpoint diagnostics for checks: %s", ", ".join(selected_checks))
+    LOGGER.debug(
+        "Diagnostics input summary: tcp_targets=%d dns_hosts=%d json_out=%s suppress_report=%s "
+        "enable_ping=%s enable_trace=%s",
+        len(targets),
+        len(dns_hosts),
+        bool(args.json_out),
+        args.suppress_report,
+        args.enable_ping,
+        args.enable_trace,
+    )
 
     host, host_warnings = collect_host_basics()
     warnings.extend(host_warnings)
@@ -193,22 +265,6 @@ def _run_command(args: argparse.Namespace) -> int:
     return 0
 
 
-def _parse_checks(raw_value: str | None) -> list[str]:
-    if not raw_value:
-        return list(DEFAULT_CHECKS)
-    checks = [item.strip() for item in raw_value.split(",") if item.strip()]
-    if not checks:
-        return list(DEFAULT_CHECKS)
-
-    invalid = [check for check in checks if check not in ALLOWED_CHECKS]
-    if invalid:
-        raise ValueError(
-            "Unsupported diagnostic domains requested: "
-            + ", ".join(sorted(set(invalid)))
-        )
-    return checks
-
-
 def _configure_logging(verbose: bool, debug: bool) -> None:
     level = logging.WARNING
     if verbose:
@@ -222,11 +278,19 @@ def _configure_logging(verbose: bool, debug: bool) -> None:
     )
 
 
-def _load_targets(raw_targets: list[str], target_file: str | None):
-    targets = [parse_host_port_target(item) for item in raw_targets]
-    if target_file:
-        targets.extend(load_targets_file(target_file))
-    return targets
+def _run_examples_text() -> str:
+    """Return operator-oriented example commands for run help output."""
+
+    return (
+        "Examples:\n"
+        "  endpoint-diagnostics-lab run\n"
+        "  endpoint-diagnostics-lab run --json-out report.json\n"
+        "  endpoint-diagnostics-lab run --checks network,dns,connectivity\n"
+        "  endpoint-diagnostics-lab run --target github.com:443 --target 1.1.1.1:53\n"
+        "  endpoint-diagnostics-lab run --target-file sample_output/example-targets.json\n"
+        "  endpoint-diagnostics-lab run --enable-ping --enable-trace --verbose\n"
+        "  endpoint-diagnostics-lab run --suppress-report --json-out report.json"
+    )
 
 
 def _empty_network_state():
