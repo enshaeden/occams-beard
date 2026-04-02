@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "endpoint-diagnostics-lab"
+version = "0.1.0"
+description = "Cross-platform endpoint diagnostics and lightweight remediation analysis for systems engineering portfolios."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Justin Sadow" }
+]
+license = { text = "MIT" }
+keywords = ["diagnostics", "endpoint", "networking", "systems-engineering", "python"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Environment :: Console",
+]
+dependencies = []
+
+[project.scripts]
+endpoint-diagnostics-lab = "endpoint_diagnostics_lab.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.unittest]
+test-paths = ["tests"]

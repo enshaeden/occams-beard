@@ -1,0 +1,115 @@
+{
+  "metadata": {
+    "project_name": "endpoint-diagnostics-lab",
+    "version": "0.1.0",
+    "generated_at": "2026-04-01T00:15:00+00:00",
+    "elapsed_ms": 166,
+    "selected_checks": ["host", "resources", "storage"]
+  },
+  "platform": {
+    "system": "Windows",
+    "release": "11",
+    "version": "demo-build",
+    "machine": "AMD64",
+    "python_version": "3.11.9"
+  },
+  "facts": {
+    "host": {
+      "hostname": "render-node-07",
+      "operating_system": "Windows",
+      "kernel": "10.0.26100",
+      "current_user": "operator",
+      "uptime_seconds": 14400
+    },
+    "resources": {
+      "cpu": {
+        "logical_cpus": 16,
+        "load_average_1m": null,
+        "load_average_5m": null,
+        "load_average_15m": null,
+        "utilization_percent_estimate": 96.5
+      },
+      "memory": {
+        "total_bytes": 34359738368,
+        "available_bytes": 1717986918,
+        "free_bytes": 1717986918,
+        "pressure_level": "high"
+      },
+      "disks": [
+        {
+          "path": "C:\\",
+          "total_bytes": 512000000000,
+          "used_bytes": 486400000000,
+          "free_bytes": 25600000000,
+          "percent_used": 95.0
+        }
+      ]
+    },
+    "network": {
+      "interfaces": [],
+      "local_addresses": [],
+      "active_interfaces": [],
+      "route_summary": {
+        "default_gateway": null,
+        "default_interface": null,
+        "has_default_route": false,
+        "routes": []
+      }
+    },
+    "dns": {
+      "resolvers": [],
+      "checks": []
+    },
+    "connectivity": {
+      "internet_reachable": false,
+      "tcp_checks": [],
+      "ping_checks": [],
+      "trace_results": []
+    },
+    "vpn": {
+      "signals": []
+    },
+    "services": {
+      "checks": []
+    }
+  },
+  "findings": [
+    {
+      "identifier": "low-disk-space-C:\\",
+      "severity": "medium",
+      "title": "Low disk free space on C:\\",
+      "summary": "A monitored filesystem is at or above the low-space threshold.",
+      "evidence": [
+        "Filesystem C:\\ is 95.0% utilized.",
+        "Free space ratio is 5.0%."
+      ],
+      "probable_cause": "Local storage exhaustion is likely to impact host stability, logging, or application writes.",
+      "fault_domain": "local_host",
+      "confidence": 0.9,
+      "heuristic": false
+    },
+    {
+      "identifier": "high-memory-pressure",
+      "severity": "medium",
+      "title": "High memory pressure detected",
+      "summary": "Available memory is critically low relative to total system memory.",
+      "evidence": [
+        "Available memory ratio is 5.0%.",
+        "Memory pressure classification is high.",
+        "CPU utilization estimate is 96.5%."
+      ],
+      "probable_cause": "Local host resource contention is likely affecting application or interactive performance.",
+      "fault_domain": "local_host",
+      "confidence": 0.82,
+      "heuristic": false
+    }
+  ],
+  "probable_fault_domain": "local_host",
+  "warnings": [
+    {
+      "domain": "resources",
+      "code": "load-average-unsupported",
+      "message": "Load average is not supported on this platform."
+    }
+  ]
+}
