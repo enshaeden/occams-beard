@@ -21,7 +21,9 @@ classifiers = [
   "Operating System :: POSIX :: Linux",
   "Environment :: Console",
 ]
-dependencies = []
+dependencies = [
+  "Flask>=3.1.0,<4.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -32,12 +34,16 @@ dev = [
 
 [project.scripts]
 endpoint-diagnostics-lab = "endpoint_diagnostics_lab.cli:main"
+endpoint-diagnostics-lab-web = "endpoint_diagnostics_lab.app:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+endpoint_diagnostics_lab = ["templates/*.html", "templates/partials/*.html", "static/*.css"]
 
 [tool.unittest]
 test-paths = ["tests"]

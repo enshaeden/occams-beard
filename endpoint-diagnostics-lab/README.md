@@ -1,8 +1,8 @@
 # Endpoint Diagnostics Lab
 
-Endpoint Diagnostics Lab is a CLI-first, cross-platform endpoint diagnostics project built to demonstrate practical systems engineering capability at the host and network layer. It gathers local facts safely, evaluates deterministic findings rules, and produces both a concise operator report and structured JSON output.
+Endpoint Diagnostics Lab is a local, cross-platform endpoint diagnostics project built to demonstrate practical systems engineering capability at the host and network layer. It gathers local facts safely, evaluates deterministic findings rules, and now exposes both a lightweight Flask operator console and a scripting-friendly CLI.
 
-The operator-facing interface is centered on a single primary command: `run`.
+The app exists to make the tool easier to run and easier to review than a flag-heavy terminal flow, while keeping the diagnostics core shared and local-only.
 
 This project exists to answer real operator questions without becoming a platform:
 - Is the endpoint online and correctly routed?
@@ -48,27 +48,37 @@ The codebase uses a deliberately small layered design:
 - `collectors/` gather raw system, network, DNS, generic connectivity, storage, service, and VPN facts
 - `models.py` normalizes facts into stable structures
 - `findings.py` applies deterministic, evidence-based rules
+- `runner.py` is the shared diagnostics execution path used by both interfaces
 - `serializers.py` emits machine-readable JSON
 - `report.py` renders a concise terminal-friendly operator report
-- `cli.py` orchestrates execution and output behavior
+- `cli.py` parses automation-oriented inputs and renders terminal output
+- `app.py` renders the local Flask interface with server-side templates
 
-This separation keeps reporting concerns out of collection code and keeps the findings engine free from CLI-specific behavior.
+This separation keeps reporting concerns out of collection code, keeps the findings engine free from UI logic, and avoids duplicating orchestration between the CLI and the web app.
 
-## Main Command
+## Interfaces
 
-The normal way to run the tool is:
+For normal human use, launch the local web app:
+
+```bash
+endpoint-diagnostics-lab-web
+```
+
+Or:
+
+```bash
+python -m endpoint_diagnostics_lab.app
+```
+
+Then open `http://127.0.0.1:5000`, review the prefilled defaults, click `Run Diagnostics`, inspect findings and supporting evidence, and download the JSON artifact if needed.
+
+The CLI remains available for scripting and automation. Its canonical execution path is still:
 
 ```bash
 endpoint-diagnostics-lab run
 ```
 
-The module form is equivalent:
-
-```bash
-python -m endpoint_diagnostics_lab.main run
-```
-
-With no flags, `run` executes the default diagnostic suite, uses built-in DNS and TCP targets, prints the human-readable report, and exits `0` when diagnostics complete even if findings are present.
+With no flags, the CLI executes the default diagnostic suite, uses built-in DNS and TCP targets, prints the human-readable report, and exits `0` when diagnostics complete even if findings are present.
 
 ## Connectivity vs. Service Checks
 
@@ -97,6 +107,11 @@ endpoint-diagnostics-lab/
 │   └── demo.sh
 ├── src/
 │   └── endpoint_diagnostics_lab/
+│       ├── app.py
+│       ├── cli.py
+│       ├── runner.py
+│       ├── templates/
+│       └── static/
 ├── tests/
 └── pyproject.toml
 ```
@@ -110,7 +125,37 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Runtime dependencies are Python standard library only. The optional `dev` extras install formatting, linting, and type-check tooling only.
+Runtime dependencies are intentionally small. Flask is used for the local operator interface, while the diagnostics engine itself remains built on the existing stdlib-first collectors and shared application runner. The optional `dev` extras install formatting, linting, and type-check tooling.
+
+## Local Web App
+
+Launch the local interface:
+
+```bash
+endpoint-diagnostics-lab-web
+```
+
+Or:
+
+```bash
+python -m endpoint_diagnostics_lab.app
+```
+
+By default the app binds to `127.0.0.1:5000`.
+
+The web workflow is intentionally small:
+
+1. Review or adjust the prefilled diagnostic domains, TCP targets, and DNS hosts.
+2. Optionally enable ping or traceroute.
+3. Run diagnostics with one button.
+4. Review the probable fault domain, findings, evidence, snapshots, and warnings.
+5. Download the JSON artifact for sharing or later analysis.
+
+The app is local-only and intentionally does not include authentication, persistence, user accounts, live updates, or remote fleet concepts.
+
+## CLI
+
+The CLI is still the right interface for scripting, automation, or terminal-only use.
 
 ## Example Commands
 
@@ -212,6 +257,8 @@ The JSON output includes:
 
 Representative samples are committed in [`sample_output/`](sample_output/), including both machine-readable JSON and terminal-style report artifacts for healthy, DNS-failure, no-route, resource-pressure, and VPN-heuristic scenarios.
 
+In the web app, the same structured result is rendered as HTML sections instead of piping the terminal report string into the browser.
+
 ## Exit Codes
 
 - `0`: diagnostics completed successfully, regardless of whether findings were present
@@ -229,7 +276,7 @@ python3 -m ruff check src tests
 python3 -m mypy src
 ```
 
-The test suite focuses on representative parser fixtures, deterministic findings, JSON serialization, report rendering, and collector normalization without depending on live endpoint state.
+The test suite focuses on runner behavior, Flask routes and rendering, parser fixtures, deterministic findings, JSON serialization, report rendering, and collector normalization without depending on live endpoint state.
 
 ## Design Tradeoffs
 

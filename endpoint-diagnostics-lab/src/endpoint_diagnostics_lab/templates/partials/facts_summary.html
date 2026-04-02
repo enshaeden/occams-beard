@@ -1,0 +1,75 @@
+<section class="two-column">
+  <article class="card stack-sm">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">System</p>
+        <h2>Host Snapshot</h2>
+      </div>
+    </div>
+    <dl class="detail-list">
+      <div>
+        <dt>Current user</dt>
+        <dd>{{ result.facts.host.current_user or "unknown" }}</dd>
+      </div>
+      <div>
+        <dt>Uptime</dt>
+        <dd>{{ result.facts.host.uptime_seconds if result.facts.host.uptime_seconds is not none else "unknown" }} seconds</dd>
+      </div>
+      <div>
+        <dt>CPU logical cores</dt>
+        <dd>{{ result.facts.resources.cpu.logical_cpus if result.facts.resources.cpu.logical_cpus is not none else "unknown" }}</dd>
+      </div>
+      <div>
+        <dt>CPU utilization</dt>
+        <dd>{{ result.facts.resources.cpu.utilization_percent_estimate | format_percent }}</dd>
+      </div>
+      <div>
+        <dt>Memory pressure</dt>
+        <dd>{{ result.facts.resources.memory.pressure_level or "unknown" }}</dd>
+      </div>
+      <div>
+        <dt>Available memory</dt>
+        <dd>{{ result.facts.resources.memory.available_bytes | format_bytes }} / {{ result.facts.resources.memory.total_bytes | format_bytes }}</dd>
+      </div>
+      <div>
+        <dt>Selected checks</dt>
+        <dd>{{ result.metadata.selected_checks | join(", ") }}</dd>
+      </div>
+    </dl>
+  </article>
+
+  <article class="card stack-sm">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Network</p>
+        <h2>Interface and Routing Snapshot</h2>
+      </div>
+    </div>
+    <dl class="detail-list">
+      <div>
+        <dt>Active interfaces</dt>
+        <dd>{{ result.facts.network.active_interfaces | join_addresses }}</dd>
+      </div>
+      <div>
+        <dt>Local addresses</dt>
+        <dd>{{ result.facts.network.local_addresses | join_addresses }}</dd>
+      </div>
+      <div>
+        <dt>Default route present</dt>
+        <dd>{{ result.facts.network.route_summary.has_default_route | yes_no }}</dd>
+      </div>
+      <div>
+        <dt>Default gateway</dt>
+        <dd>{{ result.facts.network.route_summary.default_gateway or "none" }}</dd>
+      </div>
+      <div>
+        <dt>Default interface</dt>
+        <dd>{{ result.facts.network.route_summary.default_interface or "none" }}</dd>
+      </div>
+      <div>
+        <dt>ARP or neighbor entries</dt>
+        <dd>{{ result.facts.network.arp_neighbors | length }}</dd>
+      </div>
+    </dl>
+  </article>
+</section>

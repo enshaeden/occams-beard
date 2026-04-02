@@ -18,7 +18,7 @@ Current collector domains:
 - `vpn`: heuristic tunnel and VPN signals
 - `services`: configured intended endpoint or application checks
 
-Configured targets can be provided directly on the CLI or loaded from a JSON file so repeated intended service checks remain explicit and portable. The primary operator workflow is `endpoint-diagnostics-lab run`, which uses built-in DNS and TCP targets when the operator does not supply overrides.
+Configured targets can be provided directly on the CLI or loaded from a JSON file so repeated intended service checks remain explicit and portable. The web app prefills the same built-in DNS and TCP targets for the default local workflow, and the CLI still uses those defaults when the operator does not supply overrides.
 
 Some collector heuristics were refined using patterns from an earlier personal troubleshooting script, but the implementation here was rebuilt to fit the project’s structured architecture and evidence model.
 
@@ -61,6 +61,10 @@ The findings model is intentionally evidence-first:
 
 `serializers.py` converts normalized result objects into machine-readable JSON suitable for storage, comparison, or later ingestion by external tooling.
 
+### Runner
+
+`runner.py` is the shared application service for diagnostics execution. It validates run options, invokes the collectors, assembles normalized facts, evaluates findings, and returns a single result object. Both the CLI and the Flask app call into this layer so the project has one execution path.
+
 ### Report
 
 `report.py` renders the human-readable operator view. It is intentionally concise and organized around troubleshooting usefulness rather than exhaustive raw dump formatting.
@@ -73,14 +77,17 @@ The report distinguishes:
 ## Data Flow
 
 ```text
-CLI
+CLI / Flask App
+  -> Runner
   -> Collectors
   -> Normalized Models
   -> Findings Engine
-  -> JSON Serializer / Human Report
+  -> JSON Serializer / Human Report / HTML Templates
 ```
 
-The CLI remains intentionally thin: it parses `run` options, resolves the selected checks and targets, invokes collectors, builds the normalized result object, and then hands off to the serializer and report renderer.
+The interface layers remain intentionally thin:
+- the CLI parses `run` options, calls the shared runner, and renders the terminal report
+- the Flask app parses form input, calls the shared runner, and renders structured HTML from the result object
 
 ## Failure Handling
 

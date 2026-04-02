@@ -9,7 +9,8 @@ from contextlib import redirect_stderr
 from unittest.mock import patch
 
 from endpoint_diagnostics_lab import cli
-from endpoint_diagnostics_lab.models import DnsState, Finding, HostBasics
+from endpoint_diagnostics_lab.runner import DiagnosticsRunOptions
+from support import build_sample_result
 
 
 class CliTests(unittest.TestCase):
@@ -105,35 +106,16 @@ class CliTests(unittest.TestCase):
             verbose=False,
             debug=False,
         )
-        finding = Finding(
-            identifier="dns-degraded",
-            severity="medium",
-            title="DNS is degraded",
-            summary="At least one hostname failed to resolve.",
-            evidence=["github.com failed to resolve."],
-            probable_cause="DNS resolution is partially failing.",
-            fault_domain="dns",
-            confidence=0.88,
+        options = DiagnosticsRunOptions(
+            selected_checks=["dns"],
+            targets=[],
+            dns_hosts=["github.com"],
         )
+        result_with_findings = build_sample_result()
 
-        with patch(
-            "endpoint_diagnostics_lab.cli.collect_host_basics",
-            return_value=(
-                HostBasics(
-                    hostname="demo-host",
-                    operating_system="Linux",
-                    kernel="6.8.0",
-                    current_user="operator",
-                    uptime_seconds=60,
-                ),
-                [],
-            ),
-        ), patch(
-            "endpoint_diagnostics_lab.cli.collect_dns_state",
-            return_value=(DnsState(), []),
-        ), patch(
-            "endpoint_diagnostics_lab.cli.evaluate_selected_findings",
-            return_value=([finding], "dns"),
+        with patch("endpoint_diagnostics_lab.cli.build_run_options", return_value=options), patch(
+            "endpoint_diagnostics_lab.cli.run_diagnostics",
+            return_value=result_with_findings,
         ), patch(
             "endpoint_diagnostics_lab.cli.render_report",
             return_value="report",

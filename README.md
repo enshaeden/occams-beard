@@ -4,7 +4,7 @@ This repository hosts focused systems engineering portfolio projects. Each proje
 
 ## Active Project
 
-- [`endpoint-diagnostics-lab/`](endpoint-diagnostics-lab/): a CLI-first endpoint diagnostics tool that gathers local host and network facts, applies deterministic findings rules, and renders a concise operator report.
+- [`endpoint-diagnostics-lab/`](endpoint-diagnostics-lab/): a local endpoint diagnostics tool with a lightweight Flask operator console, a scripting-friendly CLI, shared diagnostics execution, and deterministic findings.
 
 ## Repository Structure
 

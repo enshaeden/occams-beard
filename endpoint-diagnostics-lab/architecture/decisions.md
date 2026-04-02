@@ -79,9 +79,22 @@ Consequence:
 - help text, examples, and defaults are optimized around `endpoint-diagnostics-lab run`
 - internal parsing and default target selection are handled through small helpers instead of spreading CLI heuristics across the codebase
 
+### Decision: Use one shared diagnostics runner for both CLI and web app interfaces
+
+Reason:
+- the project needed a better operator front door without forking the execution model
+- diagnostics collection and findings evaluation should remain testable and interface-agnostic
+- a thin Flask layer is acceptable only if it stays above the same service used by the CLI
+
+Consequence:
+- `runner.py` owns validated execution flow for selected checks and options
+- the Flask app renders structured results instead of reusing the terminal report string
+- route handlers and CLI commands remain thin wrappers around the same diagnostics core
+
 ## Security Review
 
 - Inputs from the CLI are validated before use.
+- The local Flask app binds to `127.0.0.1` by default and does not introduce authentication because it is intentionally scoped to single-operator localhost use.
 - Host:port targets are parsed and range-checked.
 - No secrets are logged or required for baseline operation.
 - The project avoids shell interpolation and uses argument lists for subprocess execution.
@@ -292,6 +305,36 @@ The initial report renderer optimized for brevity before adding enough evidence 
 
 RECOMMENDED RESOLUTION:
 Render concise finding blocks that distinguish observed facts, derived findings, and heuristic conclusions while keeping the output terminal-friendly.
+
+STATUS:
+RESOLVED
+----------------------------------------
+
+----------------------------------------
+TYPE: Workflow inefficiency
+SEVERITY: Medium
+
+DESCRIPTION:
+Diagnostics execution lived only in the CLI layer, which blocked a proper local app interface and risked duplicating orchestration when a second front end was introduced.
+
+IMPACT:
+Adding a better operator-facing interface would have increased drift risk between CLI and web behavior, defaults, and findings output.
+
+AFFECTED COMPONENTS:
+src/endpoint_diagnostics_lab/cli.py
+src/endpoint_diagnostics_lab/runner.py
+src/endpoint_diagnostics_lab/app.py
+src/endpoint_diagnostics_lab/templates/
+tests/test_runner.py
+tests/test_app.py
+README.md
+docs/diagnostic-model.md
+
+ROOT CAUSE:
+The initial project was intentionally CLI-first, so orchestration stayed local to the CLI until a second interface became necessary.
+
+RECOMMENDED RESOLUTION:
+Extract a shared diagnostics runner, keep the Flask app thin and local-only, and make both interfaces use the same validated execution path.
 
 STATUS:
 RESOLVED
