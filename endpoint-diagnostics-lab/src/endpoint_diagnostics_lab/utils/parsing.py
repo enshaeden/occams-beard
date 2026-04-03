@@ -430,32 +430,35 @@ def parse_ipconfig(output: str) -> list[dict[str, object]]:
     return interfaces
 
 
-def parse_ping_output(output: str) -> dict[str, float | None]:
+def parse_ping_output(output: str | bytes) -> dict[str, float | None]:
     """Extract latency and packet loss from ping output."""
 
-    latency_match = re.search(r"=\s*[\d.]+/([\d.]+)/[\d.]+/[\d.]+\s*ms", output)
+    normalized_output = _coerce_text_output(output)
+
+    latency_match = re.search(r"=\s*[\d.]+/([\d.]+)/[\d.]+/[\d.]+\s*ms", normalized_output)
     if latency_match:
         return {
             "average_latency_ms": float(latency_match.group(1)),
-            "packet_loss_percent": _extract_packet_loss(output),
+            "packet_loss_percent": _extract_packet_loss(normalized_output),
         }
 
-    windows_latency_match = re.search(r"Average = (\d+)ms", output)
+    windows_latency_match = re.search(r"Average = (\d+)ms", normalized_output)
     if windows_latency_match:
         return {
             "average_latency_ms": float(windows_latency_match.group(1)),
-            "packet_loss_percent": _extract_packet_loss(output),
+            "packet_loss_percent": _extract_packet_loss(normalized_output),
         }
 
-    return {"average_latency_ms": None, "packet_loss_percent": _extract_packet_loss(output)}
+    return {"average_latency_ms": None, "packet_loss_percent": _extract_packet_loss(normalized_output)}
 
 
-def parse_traceroute_output(output: str) -> list[dict[str, object]]:
+def parse_traceroute_output(output: str | bytes) -> list[dict[str, object]]:
     """Parse a traceroute or tracert output into hops."""
 
+    normalized_output = _coerce_text_output(output)
     hops: list[dict[str, object]] = []
 
-    for raw_line in output.splitlines():
+    for raw_line in normalized_output.splitlines():
         line = raw_line.strip()
         if not line or not re.match(r"^\d+", line):
             continue
@@ -501,6 +504,14 @@ def parse_traceroute_output(output: str) -> list[dict[str, object]]:
         )
 
     return hops
+
+
+def _coerce_text_output(output: str | bytes) -> str:
+    """Normalize subprocess output into text for parser regex handling."""
+
+    if isinstance(output, bytes):
+        return output.decode("utf-8", errors="replace")
+    return output
 
 
 def parse_ip_neigh(output: str) -> list[dict[str, object]]:

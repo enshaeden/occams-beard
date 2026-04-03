@@ -14,6 +14,7 @@ from endpoint_diagnostics_lab.utils.parsing import (
     parse_ip_neigh,
     parse_linux_ip_route,
     parse_netstat_rn,
+    parse_ping_output,
     parse_route_get_default,
     parse_route_print,
     parse_traceroute_output,
@@ -153,6 +154,46 @@ destination: default
         self.assertEqual(parsed[1]["address"], "203.0.113.10")
         self.assertEqual(parsed[2]["note"], "request timed out.")
         self.assertEqual(parsed[3]["note"], "destination net unreachable.")
+
+    def test_parse_traceroute_output_accepts_bytes_output(self) -> None:
+        output = (
+            b"  1  192.168.1.1  1.123 ms  1.234 ms  1.345 ms\n"
+            b"  2  * * *\n"
+            b"  3  203.0.113.10  10.000 ms  11.000 ms  12.000 ms\n"
+        )
+
+        parsed = parse_traceroute_output(output)
+
+        self.assertEqual(len(parsed), 3)
+        self.assertEqual(parsed[0]["address"], "192.168.1.1")
+        self.assertEqual(parsed[1]["note"], "timeout")
+        self.assertEqual(parsed[2]["latency_ms"], 11.0)
+
+    def test_parse_ping_output_extracts_unix_latency_and_packet_loss(self) -> None:
+        output = """
+PING github.com (140.82.112.3): 56 data bytes
+--- github.com ping statistics ---
+10 packets transmitted, 10 packets received, 0.0% packet loss
+round-trip min/avg/max/stddev = 12.111/15.222/22.333/1.444 ms
+""".strip()
+
+        parsed = parse_ping_output(output)
+
+        self.assertEqual(parsed["average_latency_ms"], 15.222)
+        self.assertEqual(parsed["packet_loss_percent"], 0.0)
+
+    def test_parse_ping_output_accepts_bytes_output(self) -> None:
+        output = (
+            b"PING github.com (140.82.112.3): 56 data bytes\n"
+            b"--- github.com ping statistics ---\n"
+            b"10 packets transmitted, 9 packets received, 10.0% packet loss\n"
+            b"round-trip min/avg/max/stddev = 12.111/15.222/22.333/1.444 ms\n"
+        )
+
+        parsed = parse_ping_output(output)
+
+        self.assertEqual(parsed["average_latency_ms"], 15.222)
+        self.assertEqual(parsed["packet_loss_percent"], 10.0)
 
     def test_parse_ip_neigh_extracts_neighbor_cache(self) -> None:
         output = """

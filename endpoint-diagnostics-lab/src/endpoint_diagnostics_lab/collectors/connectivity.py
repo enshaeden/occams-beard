@@ -174,10 +174,10 @@ def _ping_command_args(host: str) -> list[str]:
 
     platform_name = current_platform()
     if platform_name == "windows":
-        return ["ping", "-n", "1", "-w", "1000", host]
+        return ["ping", "-n", "10", "-w", "1000", host]
     if platform_name == "macos":
-        return ["ping", "-c", "1", "-W", "1000", host]
-    return ["ping", "-c", "1", "-W", "1", host]
+        return ["ping", "-c", "10", "-W", "1000", host]
+    return ["ping", "-c", "10", "-W", "1000", host]
 
 
 def _trace_command_args(host: str) -> list[str]:
@@ -185,8 +185,8 @@ def _trace_command_args(host: str) -> list[str]:
 
     platform_name = current_platform()
     if platform_name == "windows":
-        return ["tracert", "-d", "-h", "5", "-w", "1000", host]
-    return ["traceroute", "-n", "-m", "5", "-w", "1", host]
+        return ["tracert", "-d", "-h", "30", "-w", "1000", host]
+    return ["traceroute", "-n", "-m", "30", "-w", "1000", host]
 
 
 def _resolve_trace_target(host: str) -> str | None:
