@@ -1,0 +1,52 @@
+Occam's Beard Report
+================================
+
+Summary
+- Host: field-macbook
+- Platform: macOS 15.0 (arm64)
+- Internet reachable: yes
+- Default route present: yes
+- Probable fault domain: dns
+- Fault-domain basis: DNS resolution failed but raw IP connectivity succeeded (0.92 confidence)
+
+Key Findings
+1. [HIGH] DNS resolution failed but raw IP connectivity succeeded
+   Derived finding: The endpoint can reach an external IP directly, but hostname resolution failed.
+   Observed fact: DNS hostnames that failed to resolve: github.com ([Errno 8] nodename nor servname provided, or not known), python.org ([Errno 8] nodename nor servname provided, or not known).
+   Observed fact: Numeric IP TCP success observed: 1.1.1.1:53 (ok).
+   Probable cause: The most likely failure domain is the local or upstream DNS resolver path.
+   Fault domain: dns (0.92 confidence, evidence-based)
+
+System Snapshot
+- Current user: operator
+- Uptime (seconds): 9200
+- CPU logical cores: 10
+- CPU utilization estimate: 12.0%
+- Memory pressure: normal
+- Memory available: 8.4 GiB / 16.0 GiB
+
+Network Snapshot
+- Active interfaces: en0
+- Local addresses: 192.168.0.25
+- Interface MTUs: none detected
+- ARP neighbors: none collected
+- Default gateway: 192.168.0.1
+- Default interface: en0
+- Default route state: present
+- Route entries collected: 0
+- Route observations: none
+
+Generic Reachability Checks
+- 1.1.1.1:53 [cloudflare-dns]: ok, 14.2 ms, via 1.1.1.1
+
+DNS Resolution
+- Resolvers: 192.168.0.1
+- github.com: failed ([Errno 8] nodename nor servname provided, or not known)
+- python.org: failed ([Errno 8] nodename nor servname provided, or not known)
+
+Configured Service Checks
+- Service checks were not collected.
+
+Probable Fault Domain
+- dns
+- Justification: The most likely failure domain is the local or upstream DNS resolver path.

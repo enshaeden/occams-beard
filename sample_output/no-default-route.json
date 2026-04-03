@@ -1,0 +1,135 @@
+{
+  "metadata": {
+    "project_name": "occams-beard",
+    "version": "0.1.0",
+    "generated_at": "2026-04-01T00:10:00+00:00",
+    "elapsed_ms": 175,
+    "selected_checks": ["host", "network", "routing", "dns", "connectivity"]
+  },
+  "platform": {
+    "system": "Linux",
+    "release": "6.8.0",
+    "version": "demo-build",
+    "machine": "x86_64",
+    "python_version": "3.11.9"
+  },
+  "facts": {
+    "host": {
+      "hostname": "branch-office-thinclient",
+      "operating_system": "Linux",
+      "kernel": "6.8.0",
+      "current_user": "operator",
+      "uptime_seconds": 3600
+    },
+    "resources": {
+      "cpu": {
+        "logical_cpus": null,
+        "load_average_1m": null,
+        "load_average_5m": null,
+        "load_average_15m": null,
+        "utilization_percent_estimate": null
+      },
+      "memory": {
+        "total_bytes": null,
+        "available_bytes": null,
+        "free_bytes": null,
+        "pressure_level": null
+      },
+      "disks": []
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "eth0",
+          "is_up": true,
+          "mac_address": "52:54:00:12:34:56",
+          "addresses": [
+            {
+              "family": "ipv4",
+              "address": "169.254.10.20",
+              "netmask": "16",
+              "is_loopback": false
+            }
+          ],
+          "mtu": 1500,
+          "type_hint": "ethernet"
+        }
+      ],
+      "local_addresses": ["169.254.10.20"],
+      "active_interfaces": ["eth0"],
+      "route_summary": {
+        "default_gateway": null,
+        "default_interface": null,
+        "has_default_route": false,
+        "routes": [],
+        "default_route_state": "missing",
+        "observations": []
+      }
+    },
+    "dns": {
+      "resolvers": ["192.168.1.1"],
+      "checks": [
+        {
+          "hostname": "github.com",
+          "success": false,
+          "resolved_addresses": [],
+          "error": "[Errno -3] Temporary failure in name resolution"
+        }
+      ]
+    },
+    "connectivity": {
+      "internet_reachable": false,
+      "tcp_checks": [
+        {
+          "target": {
+            "host": "github.com",
+            "port": 443,
+            "label": "github-https"
+          },
+          "success": false,
+          "latency_ms": null,
+          "error": "Network is unreachable",
+          "ip_used": null
+        },
+        {
+          "target": {
+            "host": "1.1.1.1",
+            "port": 53,
+            "label": "cloudflare-dns"
+          },
+          "success": false,
+          "latency_ms": null,
+          "error": "Network is unreachable",
+          "ip_used": null
+        }
+      ],
+      "ping_checks": [],
+      "trace_results": []
+    },
+    "vpn": {
+      "signals": []
+    },
+    "services": {
+      "checks": []
+    }
+  },
+  "findings": [
+    {
+      "identifier": "no-default-route-no-internet",
+      "severity": "high",
+      "title": "No default route and no external reachability",
+      "summary": "The endpoint lacks a default route and could not establish external TCP connectivity.",
+      "evidence": [
+        "Routing summary shows no default route.",
+        "External TCP checks failed: github.com:443 (Network is unreachable), 1.1.1.1:53 (Network is unreachable).",
+        "Active non-loopback interfaces are present: eth0."
+      ],
+      "probable_cause": "The most likely failure domain is the local network configuration on the host or access segment.",
+      "fault_domain": "local_network",
+      "confidence": 0.95,
+      "heuristic": false
+    }
+  ],
+  "probable_fault_domain": "local_network",
+  "warnings": []
+}

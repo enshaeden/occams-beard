@@ -1,0 +1,113 @@
+{
+  "metadata": {
+    "project_name": "occams-beard",
+    "version": "0.1.0",
+    "generated_at": "2026-04-01T00:05:00+00:00",
+    "elapsed_ms": 201,
+    "selected_checks": ["host", "resources", "network", "routing", "dns", "connectivity"]
+  },
+  "platform": {
+    "system": "macOS",
+    "release": "15.0",
+    "version": "demo-build",
+    "machine": "arm64",
+    "python_version": "3.11.9"
+  },
+  "facts": {
+    "host": {
+      "hostname": "field-macbook",
+      "operating_system": "Darwin",
+      "kernel": "24.0.0",
+      "current_user": "operator",
+      "uptime_seconds": 9200
+    },
+    "resources": {
+      "cpu": {
+        "logical_cpus": 10,
+        "load_average_1m": 1.2,
+        "load_average_5m": 1.0,
+        "load_average_15m": 0.9,
+        "utilization_percent_estimate": 12.0
+      },
+      "memory": {
+        "total_bytes": 17179869184,
+        "available_bytes": 9000000000,
+        "free_bytes": 4000000000,
+        "pressure_level": "normal"
+      },
+      "disks": []
+    },
+    "network": {
+      "interfaces": [],
+      "local_addresses": ["192.168.0.25"],
+      "active_interfaces": ["en0"],
+      "route_summary": {
+        "default_gateway": "192.168.0.1",
+        "default_interface": "en0",
+        "has_default_route": true,
+        "routes": [],
+        "default_route_state": "present",
+        "observations": []
+      }
+    },
+    "dns": {
+      "resolvers": ["192.168.0.1"],
+      "checks": [
+        {
+          "hostname": "github.com",
+          "success": false,
+          "resolved_addresses": [],
+          "error": "[Errno 8] nodename nor servname provided, or not known"
+        },
+        {
+          "hostname": "python.org",
+          "success": false,
+          "resolved_addresses": [],
+          "error": "[Errno 8] nodename nor servname provided, or not known"
+        }
+      ]
+    },
+    "connectivity": {
+      "internet_reachable": true,
+      "tcp_checks": [
+        {
+          "target": {
+            "host": "1.1.1.1",
+            "port": 53,
+            "label": "cloudflare-dns"
+          },
+          "success": true,
+          "latency_ms": 14.2,
+          "error": null,
+          "ip_used": "1.1.1.1"
+        }
+      ],
+      "ping_checks": [],
+      "trace_results": []
+    },
+    "vpn": {
+      "signals": []
+    },
+    "services": {
+      "checks": []
+    }
+  },
+  "findings": [
+    {
+      "identifier": "dns-failure-raw-ip-success",
+      "severity": "high",
+      "title": "DNS resolution failed but raw IP connectivity succeeded",
+      "summary": "The endpoint can reach an external IP directly, but hostname resolution failed.",
+      "evidence": [
+        "DNS hostnames that failed to resolve: github.com ([Errno 8] nodename nor servname provided, or not known), python.org ([Errno 8] nodename nor servname provided, or not known).",
+        "Numeric IP TCP success observed: 1.1.1.1:53 (ok)."
+      ],
+      "probable_cause": "The most likely failure domain is the local or upstream DNS resolver path.",
+      "fault_domain": "dns",
+      "confidence": 0.92,
+      "heuristic": false
+    }
+  ],
+  "probable_fault_domain": "dns",
+  "warnings": []
+}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} | Occam's Beard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <header class="page-shell page-header">
+      <div>
+        <p class="eyebrow">Local Operator Console</p>
+        <h1>Occam's Beard</h1>
+        <p class="subtitle">Run local diagnostics, review evidence, and export structured results without leaving the host.</p>
+      </div>
+      <nav class="header-actions">
+        <a class="ghost-button" href="{{ url_for('index') }}">New Run</a>
+      </nav>
+    </header>
+    <main class="page-shell">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

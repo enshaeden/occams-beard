@@ -1,0 +1,53 @@
+Occam's Beard Report
+================================
+
+Summary
+- Host: remote-access-mac
+- Platform: macOS 15.0 (arm64)
+- Internet reachable: yes
+- Default route present: yes
+- Probable fault domain: vpn
+- Fault-domain basis: VPN or tunnel appears active while private targets remain unreachable (0.85 confidence)
+
+Key Findings
+1. [MEDIUM] VPN or tunnel appears active while private targets remain unreachable
+   Derived finding: A VPN-like interface is present, but private resource checks still failed.
+   Observed fact: VPN heuristic matched interface utun2 (interface-name-heuristic, confidence 0.75).
+   Observed fact: VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.85).
+   Observed fact: Default route uses interface utun2.
+   Observed fact: 1 more supporting signal(s) not shown
+   Heuristic conclusion: The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.
+   Fault domain: vpn (0.85 confidence, heuristic)
+
+System Snapshot
+- Current user: operator
+- Uptime (seconds): 28800
+- CPU logical cores: 10
+- CPU utilization estimate: 9.0%
+- Memory pressure: normal
+- Memory available: 8.0 GiB / 16.0 GiB
+
+Network Snapshot
+- Active interfaces: en0, utun2
+- Local addresses: 192.168.0.25, 10.8.0.10
+- Interface MTUs: en0=1500, utun2=1380
+- ARP neighbors: none collected
+- Default gateway: 10.8.0.1
+- Default interface: utun2
+- Default route state: present
+- Route entries collected: 1
+- Route observations: none
+
+Generic Reachability Checks
+- github.com:443 [github-https]: ok, 31.2 ms, via 140.82.112.4
+
+DNS Resolution
+- Resolvers: 192.168.0.1
+- github.com: ok (140.82.112.4)
+
+Configured Service Checks
+- private-api -> 10.20.30.40:443: failed (timeout)
+
+Probable Fault Domain
+- vpn
+- Justification: The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.
