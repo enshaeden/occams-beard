@@ -74,7 +74,15 @@ Or:
 python -m endpoint_diagnostics_lab.app
 ```
 
-Then open `http://127.0.0.1:5000`, review the prefilled defaults, click `Run Diagnostics`, inspect findings and supporting evidence, and download the JSON artifact if needed.
+Then open the printed local URL, usually `http://127.0.0.1:5000`, review the prefilled defaults, click `Run Diagnostics`, inspect findings and supporting evidence, and download the JSON artifact if needed.
+
+If you want the operator interface to start the local server and open the browser for you in one step, use:
+
+```bash
+endpoint-diagnostics-lab-operator
+```
+
+On macOS, you can also double-click [`scripts/open-operator-interface.command`](scripts/open-operator-interface.command) from Finder. The script prefers the project-local virtual environment when present and, on a fresh checkout, bootstraps a local `.venv` plus package install before starting the server and opening the operator interface automatically.
 
 The CLI remains available for scripting and automation. Its canonical execution path is still:
 
@@ -147,6 +155,16 @@ python -m endpoint_diagnostics_lab.app
 
 By default the app binds to `127.0.0.1:5000`.
 
+For an operator-oriented launcher that opens the browser automatically, run:
+
+```bash
+endpoint-diagnostics-lab-operator
+```
+
+On macOS Finder, double-click [`scripts/open-operator-interface.command`](scripts/open-operator-interface.command). The terminal window stays open while the local server is running so the process remains explicit and easy to stop. On first launch, the script may create `.venv` and install the project dependencies if they are not available yet.
+
+If port `5000` is already occupied by another local process, the dedicated launcher automatically selects another open localhost port and opens that URL instead.
+
 The web workflow is intentionally small:
 
 1. Review or adjust the prefilled diagnostic domains, TCP targets, and DNS hosts.
@@ -156,6 +174,32 @@ The web workflow is intentionally small:
 5. Download the JSON artifact for sharing or later analysis.
 
 The app is local-only and intentionally does not include authentication, persistence, user accounts, live updates, or remote fleet concepts.
+
+## Recent Hardening Notes
+
+Purpose and scope:
+- macOS storage collection now ignores pseudo-filesystem mounts that are not meaningful operator storage signals, including `/dev` and iOS Simulator CoreSimulator volume mounts.
+- The operator interface now has a dedicated launcher path so users do not have to start the Flask server manually before opening the UI.
+
+Technical approach:
+- storage filtering is applied only to macOS mount discovery before `disk_usage` is evaluated, which prevents simulator and `devfs` mounts from producing false low-space findings
+- the new launcher uses the same Flask app factory, starts a local WSGI server, waits for readiness, and then opens the browser
+- if port `5000` is unavailable, the launcher selects a free localhost fallback port and opens the actual bound URL
+- the Finder-friendly `.command` shim stays thin and delegates to the Python launcher module
+- the Finder-friendly `.command` shim can self-bootstrap a local virtual environment when dependencies are missing
+
+Dependencies introduced or modified:
+- no new runtime dependencies were added
+- the existing Flask/Werkzeug dependency already present in the project now also backs the explicit operator launcher
+
+Known limitations and tradeoffs:
+- macOS pseudo-filesystems that are ignored will not produce storage findings, by design, because they are poor signals for host-capacity troubleshooting
+- the Finder launcher still opens a Terminal session while the local server is alive; this keeps shutdown and logs visible without adding a packaged macOS app bundle
+- first-run bootstrap still depends on `python3`, `venv`, and `pip` being available locally, and package installation may require network access if Flask is not already installed
+
+Rollback strategy:
+- continue using `endpoint-diagnostics-lab-web` or `python -m endpoint_diagnostics_lab.app` if you want the previous manual launch path
+- reverting the launcher entrypoint and macOS mount filter cleanly restores prior behavior because no persistent state or host configuration is modified
 
 ## CLI
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import string
@@ -9,6 +10,18 @@ import string
 from endpoint_diagnostics_lab.models import DiagnosticWarning, DiskVolume
 from endpoint_diagnostics_lab.platform import current_platform
 from endpoint_diagnostics_lab.utils.subprocess import run_command
+
+
+LOGGER = logging.getLogger(__name__)
+
+_MACOS_IGNORED_MOUNT_POINTS = frozenset(
+    {
+        "/dev",
+    }
+)
+_MACOS_IGNORED_MOUNT_PREFIXES = (
+    "/Library/Developer/CoreSimulator/Volumes/",
+)
 
 
 def collect_storage_state() -> tuple[list[DiskVolume], list[DiagnosticWarning]]:
@@ -65,8 +78,23 @@ def _discover_mount_points() -> list[str]:
             parts = line.split()
             if len(parts) >= 6:
                 mount_points.append(parts[5])
-        return sorted(set(mount_points))
+        return _filter_mount_points(sorted(set(mount_points)), platform_name=platform_name)
     return ["/"]
+
+
+def _filter_mount_points(mount_points: list[str], platform_name: str) -> list[str]:
+    """Filter pseudo-filesystems that should not drive operator findings."""
+
+    if platform_name != "macos":
+        return mount_points
+
+    filtered_mount_points: list[str] = []
+    for path in mount_points:
+        if path in _MACOS_IGNORED_MOUNT_POINTS or path.startswith(_MACOS_IGNORED_MOUNT_PREFIXES):
+            LOGGER.debug("Skipping macOS pseudo filesystem from storage findings: path=%s", path)
+            continue
+        filtered_mount_points.append(path)
+    return filtered_mount_points
 
 
 def _windows_roots() -> list[str]:

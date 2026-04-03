@@ -45,6 +45,7 @@ Tradeoffs:
 - Memory pressure is approximated from free, inactive, and speculative pages rather than using proprietary pressure metrics.
 - macOS interface names such as `utun*` are useful for tunnel heuristics but are still not proof of an active VPN session.
 - `route -n get default` is used to sharpen default-gateway detection, while `netstat -rn` remains the broader route-table source.
+- Storage collection intentionally ignores pseudo-filesystem mounts such as `/dev` and CoreSimulator device volumes because they can report misleading capacity states that do not reflect host disk exhaustion.
 - Some sandboxed or privacy-restricted execution contexts can return partial uptime or resolver data even when the host itself is healthy.
 - `ping` and `traceroute` flags differ from Linux, so the collector uses macOS-specific argument sets and still treats those checks as optional.
 

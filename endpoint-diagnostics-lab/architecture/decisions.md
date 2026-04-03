@@ -91,6 +91,18 @@ Consequence:
 - the Flask app renders structured results instead of reusing the terminal report string
 - route handlers and CLI commands remain thin wrappers around the same diagnostics core
 
+### Decision: Add a dedicated operator launcher instead of requiring manual server startup
+
+Reason:
+- the local web interface was easier to use than the CLI for human troubleshooting, but it still required a separate terminal-first startup step
+- a launch path that starts the server and opens the browser reduces operator friction without introducing a daemon, installer, or background service
+- keeping the launcher in Python preserves the shared app factory and avoids duplicating environment resolution logic in a larger platform-specific wrapper
+
+Consequence:
+- `launcher.py` now owns the start-and-open workflow for the local operator experience
+- macOS can use a thin Finder-friendly `.command` shim without changing the underlying diagnostics runtime model
+- the server remains explicit and local-only; closing the process cleanly stops the interface
+
 ## Security Review
 
 - Inputs from the CLI are validated before use.
@@ -305,6 +317,59 @@ The initial report renderer optimized for brevity before adding enough evidence 
 
 RECOMMENDED RESOLUTION:
 Render concise finding blocks that distinguish observed facts, derived findings, and heuristic conclusions while keeping the output terminal-friendly.
+
+STATUS:
+RESOLVED
+----------------------------------------
+
+----------------------------------------
+TYPE: Bug
+SEVERITY: Medium
+
+DESCRIPTION:
+macOS storage collection treated pseudo-filesystem mounts such as `/dev` and iOS Simulator CoreSimulator volumes like normal host disks, which produced false low-space findings during development workflows.
+
+IMPACT:
+Operators could be told that local storage was critically full even when the reported mount was a simulator or device-backed pseudo-filesystem unrelated to actual host disk exhaustion.
+
+AFFECTED COMPONENTS:
+src/endpoint_diagnostics_lab/collectors/storage.py
+src/endpoint_diagnostics_lab/findings.py
+tests/test_storage_collection.py
+docs/platform-notes.md
+
+ROOT CAUSE:
+Mount discovery accepted every `df -kP` mount point on macOS without filtering out pseudo-filesystems that are poor signals for endpoint-capacity health.
+
+RECOMMENDED RESOLUTION:
+Filter `/dev` and CoreSimulator volume mounts out of macOS storage findings before disk-usage evaluation.
+
+STATUS:
+RESOLVED
+----------------------------------------
+
+----------------------------------------
+TYPE: Workflow inefficiency
+SEVERITY: Medium
+
+DESCRIPTION:
+The operator interface required users to launch the local server manually before they could use the browser UI, which made the intended human workflow feel more fragile than necessary.
+
+IMPACT:
+Normal troubleshooting use had unnecessary startup friction and was harder to hand off to non-terminal-first operators.
+
+AFFECTED COMPONENTS:
+src/endpoint_diagnostics_lab/launcher.py
+scripts/open-operator-interface.command
+pyproject.toml
+tests/test_launcher.py
+README.md
+
+ROOT CAUSE:
+The project had a thin Flask app entry point but no dedicated launcher responsible for browser opening, readiness checks, or Finder-friendly startup.
+
+RECOMMENDED RESOLUTION:
+Add a dedicated launcher command plus a macOS double-clickable shim that starts the local server, waits for readiness, and opens the operator interface automatically.
 
 STATUS:
 RESOLVED

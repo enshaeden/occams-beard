@@ -35,6 +35,7 @@ dev = [
 [project.scripts]
 endpoint-diagnostics-lab = "endpoint_diagnostics_lab.cli:main"
 endpoint-diagnostics-lab-web = "endpoint_diagnostics_lab.app:main"
+endpoint-diagnostics-lab-operator = "endpoint_diagnostics_lab.launcher:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
