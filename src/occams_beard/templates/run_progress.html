@@ -1,0 +1,88 @@
+{% extends "layout.html" %}
+
+{% block content %}
+  <section
+    class="progress-page stack-lg"
+    data-run-progress
+    data-status-url="{{ url_for('run_status', run_id=session.run_id) }}"
+    data-results-url="{{ url_for('results', run_id=session.run_id) }}"
+  >
+    <article class="card progress-summary-card stack-lg">
+      <div class="result-status-line">
+        <span class="mode-chip">{{ view.mode_label }}</span>
+        <span class="status-pill status-{{ view.status_tone }}" data-run-status-label>{{ view.status_label }}</span>
+      </div>
+
+      <div class="stack-sm">
+        <p class="eyebrow">Running locally</p>
+        <h2 data-run-headline>{{ view.headline }}</h2>
+        <p class="muted" data-run-body>{{ view.body }}</p>
+      </div>
+
+      <div
+        class="progress-meter"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="{{ view.total_count }}"
+        aria-valuenow="{{ view.completed_count }}"
+        aria-valuetext="{{ view.progress_text }}"
+        data-progressbar
+      >
+        <div class="progress-meter-fill" data-progress-fill style="width: {{ view.progress_percent }}%;"></div>
+      </div>
+
+      <dl class="summary-list">
+        <div>
+          <dt>Progress</dt>
+          <dd data-progress-count>{{ view.completed_count }} of {{ view.total_count }}</dd>
+        </div>
+        <div>
+          <dt>Current step</dt>
+          <dd data-current-domain>{{ view.current_domain_label or "Preparing the next step" }}</dd>
+        </div>
+      </dl>
+
+      <div class="progress-guidance stack-xs" {% if view.status == "failed" %}hidden{% endif %} data-run-guidance>
+        <p class="field-help" data-run-update-note>{{ view.update_notice }}</p>
+        <p class="field-help" data-run-presence-note>{{ view.presence_notice }}</p>
+        <p class="field-help" data-run-mode-note>{{ view.mode_notice }}</p>
+      </div>
+
+      <div class="alert alert-error" data-run-error-shell {% if view.status != "failed" %}hidden{% endif %} role="alert">
+        <strong>Run stopped.</strong>
+        <span data-run-error>{{ view.error }}</span>
+      </div>
+      <div class="actions" data-run-failure-actions {% if view.status != "failed" %}hidden{% endif %}>
+        <a class="primary-button" href="{{ rerun_url }}">Review or Run Again</a>
+        <a class="ghost-button" href="{{ url_for('index') }}">Start Over</a>
+      </div>
+    </article>
+
+    <article class="card stack-sm">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Live Progress</p>
+          <h2>Run status by check area</h2>
+        </div>
+      </div>
+      <ul class="progress-domain-list" data-progress-rows>
+        {% for row in view.rows %}
+          <li class="progress-domain-row {% if row.subdued %}progress-domain-row-subdued{% endif %}">
+            <div class="stack-xs">
+              <div class="row-inline">
+                <strong>{{ row.label }}</strong>
+                <span class="summary-meta" data-progress-step-count>{{ row.step_progress_label }}</span>
+                <span class="status-pill status-{{ row.status }}" data-progress-phase>{{ row.status_label }}</span>
+              </div>
+              <p class="muted">{{ row.summary }}</p>
+            </div>
+            <div class="domain-meta">
+              <span>{{ row.duration_label }}</span>
+              <span>{{ row.scope_label }}</span>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </article>
+  </section>
+{% endblock %}

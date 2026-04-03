@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import io
+import os
+import tempfile
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
 from occams_beard import cli
@@ -37,6 +39,14 @@ class CliTests(unittest.TestCase):
                 "github.com",
                 "--dns-host",
                 "python.org",
+                "--profile",
+                "no-internet",
+                "--list-profiles",
+                "--support-bundle",
+                "bundle.zip",
+                "--redaction-level",
+                "strict",
+                "--bundle-include-raw",
                 "--enable-ping",
                 "--enable-trace",
                 "--verbose",
@@ -51,6 +61,11 @@ class CliTests(unittest.TestCase):
         self.assertEqual(args.target, ["github.com:443", "1.1.1.1:53"])
         self.assertEqual(args.target_file, "targets.json")
         self.assertEqual(args.dns_host, ["github.com", "python.org"])
+        self.assertEqual(args.profile, "no-internet")
+        self.assertTrue(args.list_profiles)
+        self.assertEqual(args.support_bundle, "bundle.zip")
+        self.assertEqual(args.redaction_level, "strict")
+        self.assertTrue(args.bundle_include_raw)
         self.assertTrue(args.enable_ping)
         self.assertTrue(args.enable_trace)
         self.assertTrue(args.verbose)
@@ -67,6 +82,11 @@ class CliTests(unittest.TestCase):
         self.assertEqual(args.target, [])
         self.assertIsNone(args.target_file)
         self.assertEqual(args.dns_host, [])
+        self.assertIsNone(args.profile)
+        self.assertFalse(args.list_profiles)
+        self.assertIsNone(args.support_bundle)
+        self.assertEqual(args.redaction_level, "safe")
+        self.assertFalse(args.bundle_include_raw)
         self.assertFalse(args.enable_ping)
         self.assertFalse(args.enable_trace)
         self.assertFalse(args.suppress_report)
@@ -92,6 +112,74 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn("Diagnostics execution failed: boom", captured.output[0])
 
+    def test_run_command_lists_profiles_without_running_diagnostics(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        args = argparse.Namespace(
+            command="run",
+            checks=None,
+            json_out=None,
+            support_bundle=None,
+            redaction_level="safe",
+            bundle_include_raw=False,
+            suppress_report=False,
+            target=[],
+            target_file=None,
+            dns_host=[],
+            profile=None,
+            list_profiles=True,
+            enable_ping=False,
+            enable_trace=False,
+            verbose=False,
+            debug=False,
+        )
+
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            result = cli._run_command(args)
+
+        self.assertEqual(result, 0)
+        self.assertIn("no-internet", stdout.getvalue())
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_run_command_lists_profiles_and_surfaces_skipped_local_files(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        args = argparse.Namespace(
+            command="run",
+            checks=None,
+            json_out=None,
+            support_bundle=None,
+            redaction_level="safe",
+            bundle_include_raw=False,
+            suppress_report=False,
+            target=[],
+            target_file=None,
+            dns_host=[],
+            profile=None,
+            list_profiles=True,
+            enable_ping=False,
+            enable_trace=False,
+            verbose=False,
+            debug=False,
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            broken_profile = os.path.join(tempdir, "broken.toml")
+            with open(broken_profile, "w", encoding="utf-8") as handle:
+                handle.write("id = [\n")
+
+            with (
+                patch.dict(os.environ, {"OCCAMS_BEARD_PROFILE_DIR": tempdir}, clear=False),
+                redirect_stdout(stdout),
+                redirect_stderr(stderr),
+            ):
+                result = cli._run_command(args)
+
+        self.assertEqual(result, 0)
+        self.assertIn("no-internet", stdout.getvalue())
+        self.assertIn("Skipped env profile file", stderr.getvalue())
+        self.assertIn(broken_profile, stderr.getvalue())
+
     def test_run_command_returns_zero_when_findings_are_present(self) -> None:
         args = argparse.Namespace(
             command="run",
@@ -113,13 +201,18 @@ class CliTests(unittest.TestCase):
         )
         result_with_findings = build_sample_result()
 
-        with patch("occams_beard.cli.build_run_options", return_value=options), patch(
-            "occams_beard.cli.run_diagnostics",
-            return_value=result_with_findings,
-        ), patch(
-            "occams_beard.cli.render_report",
-            return_value="report",
-        ), patch("builtins.print"):
+        with (
+            patch("occams_beard.cli.build_run_options", return_value=options),
+            patch(
+                "occams_beard.cli.run_diagnostics",
+                return_value=result_with_findings,
+            ),
+            patch(
+                "occams_beard.cli.render_report",
+                return_value="report",
+            ),
+            patch("builtins.print"),
+        ):
             result = cli._run_command(args)
 
         self.assertEqual(result, 0)

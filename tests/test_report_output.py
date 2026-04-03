@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 
 from occams_beard.models import (
+    BatteryState,
     CollectedFacts,
     ConnectivityState,
     CpuState,
@@ -15,19 +16,20 @@ from occams_beard.models import (
     Finding,
     HostBasics,
     InterfaceAddress,
-    NetworkInterface,
     MemoryState,
     Metadata,
+    NetworkInterface,
     NetworkState,
     PlatformInfo,
     ResourceState,
     RouteSummary,
     ServiceCheck,
     ServiceState,
-    TraceHop,
-    TraceResult,
+    StorageDeviceHealth,
     TcpConnectivityCheck,
     TcpTarget,
+    TraceHop,
+    TraceResult,
     VpnState,
 )
 from occams_beard.report import render_report
@@ -99,7 +101,11 @@ class ReportOutputTests(unittest.TestCase):
                 ),
                 dns=DnsState(
                     resolvers=["1.1.1.1"],
-                    checks=[DnsResolutionCheck(hostname="github.com", success=True, resolved_addresses=["140.82.114.3"])],
+                    checks=[
+                        DnsResolutionCheck(
+                            hostname="github.com", success=True, resolved_addresses=["140.82.114.3"]
+                        )
+                    ],
                 ),
                 connectivity=ConnectivityState(
                     internet_reachable=True,
@@ -120,9 +126,15 @@ class ReportOutputTests(unittest.TestCase):
                             target_address="140.82.114.3",
                             last_responding_hop=2,
                             hops=[
-                                TraceHop(hop=1, host="192.168.1.1", address="192.168.1.1", latency_ms=1.0),
-                                TraceHop(hop=2, host="10.0.0.1", address="10.0.0.1", latency_ms=4.0),
-                                TraceHop(hop=3, host=None, address=None, latency_ms=None, note="timeout"),
+                                TraceHop(
+                                    hop=1, host="192.168.1.1", address="192.168.1.1", latency_ms=1.0
+                                ),
+                                TraceHop(
+                                    hop=2, host="10.0.0.1", address="10.0.0.1", latency_ms=4.0
+                                ),
+                                TraceHop(
+                                    hop=3, host=None, address=None, latency_ms=None, note="timeout"
+                                ),
                             ],
                         )
                     ],
@@ -131,7 +143,9 @@ class ReportOutputTests(unittest.TestCase):
                 services=ServiceState(
                     checks=[
                         ServiceCheck(
-                            target=TcpTarget(host="status.example.com", port=443, label="status-api"),
+                            target=TcpTarget(
+                                host="status.example.com", port=443, label="status-api"
+                            ),
                             success=False,
                             error="timeout",
                         )
@@ -143,12 +157,18 @@ class ReportOutputTests(unittest.TestCase):
                     identifier="internet-ok-selected-service-failure",
                     severity="medium",
                     title="Generic internet reachability works but selected service checks fail",
-                    summary="Baseline external path checks succeeded, but every configured public service check failed.",
+                    summary=(
+                        "Baseline external path checks succeeded, but every "
+                        "configured public service check failed."
+                    ),
                     evidence=[
                         "Generic internet reachability checks succeeded.",
                         "Failed configured public services: status-api (timeout).",
                     ],
-                    probable_cause="The failure is more likely isolated to the intended service path than to general internet access.",
+                    probable_cause=(
+                        "The failure is more likely isolated to the intended "
+                        "service path than to general internet access."
+                    ),
                     fault_domain="upstream_network",
                     confidence=0.79,
                 )
@@ -178,7 +198,10 @@ class ReportOutputTests(unittest.TestCase):
         self.assertIn("Interface MTUs: eth0=1500", text)
         self.assertIn("ARP neighbors: none collected", text)
         self.assertIn("Default route state: not collected", text)
-        self.assertIn("Trace github.com: partial, last response at hop 2, target 140.82.114.3 not reached", text)
+        self.assertIn(
+            "Trace github.com: partial, last response at hop 2, target 140.82.114.3 not reached",
+            text,
+        )
         self.assertIn("/tmp/report.json", text)
 
     def test_render_report_marks_heuristic_findings(self) -> None:
@@ -207,13 +230,15 @@ class ReportOutputTests(unittest.TestCase):
                 ),
                 resources=ResourceState(
                     cpu=CpuState(logical_cpus=4),
-                    memory=MemoryState(total_bytes=None, available_bytes=None, free_bytes=None),
+                    memory=MemoryState(
+                        total_bytes=None,
+                        available_bytes=None,
+                        free_bytes=None,
+                    ),
                     disks=[],
                 ),
                 network=NetworkState(
-                    interfaces=[
-                        NetworkInterface(name="utun2", is_up=True, mtu=1380)
-                    ],
+                    interfaces=[NetworkInterface(name="utun2", is_up=True, mtu=1380)],
                     local_addresses=["10.8.0.10"],
                     active_interfaces=["utun2"],
                     route_summary=RouteSummary(
@@ -222,7 +247,13 @@ class ReportOutputTests(unittest.TestCase):
                         has_default_route=True,
                         routes=[],
                         default_route_state="suspect",
-                        observations=["Default route uses link-scoped gateway link#15, so next-hop reachability is less explicit."],
+                        observations=[
+                            (
+                                "Default route uses link-scoped gateway "
+                                "link#15, so next-hop reachability is less "
+                                "explicit."
+                            )
+                        ],
                     ),
                 ),
                 dns=DnsState(),
@@ -235,11 +266,21 @@ class ReportOutputTests(unittest.TestCase):
                     identifier="vpn-signal-private-resource-failure",
                     severity="medium",
                     title="VPN or tunnel appears active while private targets remain unreachable",
-                    summary="A VPN-like interface is present, but private resource checks still failed.",
+                    summary=(
+                        "A VPN-like interface is present, but private resource checks still failed."
+                    ),
                     evidence=[
-                        "VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.75, 1 usable address)."
+                        (
+                            "VPN heuristic matched interface utun2 "
+                            "(interface-name-and-address-heuristic, confidence "
+                            "0.75, 1 usable address)."
+                        )
                     ],
-                    probable_cause="The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.",
+                    probable_cause=(
+                        "The tunnel may be established, but its routes, "
+                        "security policy, or remote network path may be "
+                        "incomplete."
+                    ),
                     fault_domain="vpn",
                     confidence=0.82,
                     heuristic=True,
@@ -254,6 +295,72 @@ class ReportOutputTests(unittest.TestCase):
         self.assertIn("heuristic", text)
         self.assertIn("Internet reachable: not collected", text)
         self.assertIn("Default route present: not collected", text)
+
+    def test_render_report_includes_battery_and_storage_health_sections(self) -> None:
+        result = EndpointDiagnosticResult(
+            metadata=Metadata(
+                project_name="occams-beard",
+                version="0.1.0",
+                generated_at="2026-04-01T00:00:00+00:00",
+                elapsed_ms=100,
+                selected_checks=["resources", "storage"],
+            ),
+            platform=PlatformInfo(
+                system="macOS",
+                release="15.0",
+                version="demo",
+                machine="arm64",
+                python_version="3.11.9",
+            ),
+            facts=CollectedFacts(
+                host=HostBasics(
+                    hostname="demo-host",
+                    operating_system="Darwin",
+                    kernel="24.0.0",
+                    current_user="operator",
+                    uptime_seconds=600,
+                ),
+                resources=ResourceState(
+                    cpu=CpuState(logical_cpus=8, utilization_percent_estimate=11.0),
+                    memory=MemoryState(
+                        total_bytes=16 * 1024**3,
+                        available_bytes=8 * 1024**3,
+                        free_bytes=7 * 1024**3,
+                        pressure_level="normal",
+                    ),
+                    disks=[],
+                    battery=BatteryState(
+                        present=True,
+                        charge_percent=91,
+                        status="Charging",
+                        condition="Normal",
+                        health_percent=98.0,
+                    ),
+                    storage_devices=[
+                        StorageDeviceHealth(
+                            device_id="disk0",
+                            model="Demo SSD",
+                            protocol="NVMe",
+                            medium="SSD",
+                            health_status="Verified",
+                            operational_status=None,
+                        )
+                    ],
+                ),
+                network=NetworkState(route_summary=RouteSummary(None, None, False, [])),
+                dns=DnsState(),
+                connectivity=ConnectivityState(internet_reachable=False),
+                vpn=VpnState(),
+                services=ServiceState(),
+            ),
+            probable_fault_domain="healthy",
+        )
+
+        text = render_report(result)
+
+        self.assertIn("Battery health: 91%, Charging, condition Normal, health 98.0%", text)
+        self.assertIn("Storage Snapshot", text)
+        self.assertIn("Storage device health: disk0=Verified", text)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 
 from occams_beard.models import (
     ArpNeighbor,
@@ -12,15 +13,17 @@ from occams_beard.models import (
     NetworkInterface,
     NetworkState,
 )
-from occams_beard.platform import current_platform
-from occams_beard.platform import linux, macos, windows
+from occams_beard.platform import current_platform, linux, macos, windows
+from occams_beard.utils.parsing import ParsedInterface, ParsedNeighbor
 from occams_beard.utils.validation import dedupe_preserve_order
-
 
 LOGGER = logging.getLogger(__name__)
 
 
-def collect_network_state() -> tuple[NetworkState, list[DiagnosticWarning]]:
+def collect_network_state(
+    *,
+    progress_callback: Callable[[int], None] | None = None,
+) -> tuple[NetworkState, list[DiagnosticWarning]]:
     """Collect interface inventory and local addresses."""
 
     warnings: list[DiagnosticWarning] = []
@@ -48,12 +51,15 @@ def collect_network_state() -> tuple[NetworkState, list[DiagnosticWarning]]:
                 domain="network",
                 code="interface-command-failed",
                 message=(
-                    f"Interface inventory command failed: {command_result.error or command_result.stderr.strip() or 'unknown-error'}"
+                    "Interface inventory command failed: "
+                    f"{command_result.error or command_result.stderr.strip() or 'unknown-error'}"
                 ),
             )
         )
 
     interfaces = [_normalize_interface(item) for item in raw_interfaces]
+    if progress_callback is not None:
+        progress_callback(1)
     arp_neighbors, arp_warnings = _collect_arp_neighbors(platform_name)
     warnings.extend(arp_warnings)
     local_addresses = dedupe_preserve_order(
@@ -63,6 +69,8 @@ def collect_network_state() -> tuple[NetworkState, list[DiagnosticWarning]]:
         if not address.is_loopback
     )
     active_interfaces = [interface.name for interface in interfaces if interface.is_up]
+    if progress_callback is not None:
+        progress_callback(2)
     return (
         NetworkState(
             interfaces=interfaces,
@@ -74,7 +82,7 @@ def collect_network_state() -> tuple[NetworkState, list[DiagnosticWarning]]:
     )
 
 
-def _normalize_interface(raw_item: dict[str, object]) -> NetworkInterface:
+def _normalize_interface(raw_item: ParsedInterface) -> NetworkInterface:
     addresses = [
         InterfaceAddress(
             family=str(address.get("family")),
@@ -89,7 +97,7 @@ def _normalize_interface(raw_item: dict[str, object]) -> NetworkInterface:
         is_up=bool(raw_item.get("is_up", False)),
         mac_address=str(raw_item.get("mac_address")) if raw_item.get("mac_address") else None,
         addresses=addresses,
-        mtu=int(raw_item["mtu"]) if raw_item.get("mtu") is not None else None,
+        mtu=raw_item["mtu"],
         type_hint=_infer_interface_type(str(raw_item.get("name"))),
     )
 
@@ -113,7 +121,9 @@ def _infer_interface_type(name: str) -> str:
     return "unknown"
 
 
-def _collect_arp_neighbors(platform_name: str) -> tuple[list[ArpNeighbor], list[DiagnosticWarning]]:
+def _collect_arp_neighbors(
+    platform_name: str,
+) -> tuple[list[ArpNeighbor], list[DiagnosticWarning]]:
     warnings: list[DiagnosticWarning] = []
 
     if platform_name == "linux":
@@ -138,16 +148,15 @@ def _collect_arp_neighbors(platform_name: str) -> tuple[list[ArpNeighbor], list[
         )
 
     return (
-        [
-            ArpNeighbor(
-                ip_address=str(neighbor.get("ip_address")),
-                mac_address=(
-                    str(neighbor.get("mac_address")) if neighbor.get("mac_address") else None
-                ),
-                interface=str(neighbor.get("interface")) if neighbor.get("interface") else None,
-                state=str(neighbor.get("state")) if neighbor.get("state") else None,
-            )
-            for neighbor in raw_neighbors
-        ],
+        [_normalize_neighbor(neighbor) for neighbor in raw_neighbors],
         warnings,
+    )
+
+
+def _normalize_neighbor(raw_neighbor: ParsedNeighbor) -> ArpNeighbor:
+    return ArpNeighbor(
+        ip_address=raw_neighbor["ip_address"],
+        mac_address=raw_neighbor["mac_address"],
+        interface=raw_neighbor["interface"],
+        state=raw_neighbor["state"],
     )

@@ -1,78 +1,333 @@
 {% extends "layout.html" %}
 
 {% block content %}
-  <section class="card">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Run</p>
-        <h2>Diagnostics Configuration</h2>
-      </div>
-      <p class="muted">The default suite, DNS hosts, and TCP targets are prefilled so a normal run is one click.</p>
+  <section class="entry-shell stack-md">
+    <div class="stack-sm">
+      <p class="eyebrow">Choose Your Path</p>
+      <h2>Start with the level of help you need right now.</h2>
+      <p class="lede">
+        Use the employee-safe path for a quick local device check, or open the
+        support path when IT asked for a deeper guided run and a support-ready handoff.
+      </p>
     </div>
-
-    {% if form_state.error %}
-      <div class="alert alert-error">
-        <strong>Unable to start diagnostics.</strong>
-        <span>{{ form_state.error }}</span>
-      </div>
-    {% endif %}
-
-    <form method="post" action="{{ url_for('run') }}" class="stack-lg">
-      <section class="stack-sm">
-        <h3>Diagnostic Domains</h3>
-        <div class="check-grid">
-          {% for check in checks_catalog %}
-            <label class="check-tile">
-              <input
-                type="checkbox"
-                name="checks"
-                value="{{ check }}"
-                {% if check in form_state.selected_checks %}checked{% endif %}
-              >
-              <span>{{ check }}</span>
-            </label>
-          {% endfor %}
-        </div>
-        <p class="field-help">If none are selected, the default suite runs.</p>
-      </section>
-
-      <div class="two-column">
-        <section class="stack-sm">
-          <h3>TCP Targets</h3>
-          <label class="stack-xs">
-            <span class="field-label">One <code>host:port</code> target per line</span>
-            <textarea name="targets" rows="7">{{ form_state.targets_text }}</textarea>
-          </label>
-          <p class="field-help">These targets drive both generic connectivity checks and configured service checks.</p>
-        </section>
-
-        <section class="stack-sm">
-          <h3>DNS Hosts</h3>
-          <label class="stack-xs">
-            <span class="field-label">One hostname per line</span>
-            <textarea name="dns_hosts" rows="7">{{ form_state.dns_hosts_text }}</textarea>
-          </label>
-          <p class="field-help">Leave the defaults in place for a baseline run or replace them with operator-specific hosts.</p>
-        </section>
-      </div>
-
-      <section class="stack-sm">
-        <h3>Optional Probes</h3>
-        <div class="toggle-row">
-          <label class="toggle">
-            <input type="checkbox" name="enable_ping" {% if form_state.enable_ping %}checked{% endif %}>
-            <span>Enable ping</span>
-          </label>
-          <label class="toggle">
-            <input type="checkbox" name="enable_trace" {% if form_state.enable_trace %}checked{% endif %}>
-            <span>Enable traceroute</span>
-          </label>
-        </div>
-      </section>
-
-      <div class="actions">
-        <button type="submit" class="primary-button">Run Diagnostics</button>
-      </div>
-    </form>
+    <div class="door-grid">
+      {% for option in mode_options %}
+        <article class="door-card {% if form_state.mode == option.id %}door-card-active{% endif %}">
+          <p class="eyebrow">{{ option.badge }}</p>
+          <h3>{{ option.label }}</h3>
+          <p class="muted">{{ option.description }}</p>
+          <a
+            class="{% if form_state.mode == option.id %}primary-button{% else %}ghost-button{% endif %}"
+            href="{{ url_for('index', mode=option.id) }}"
+            data-mode-link="{{ option.id }}"
+          >
+            {{ "Open This Path" if form_state.mode != option.id else "You're Here" }}
+          </a>
+        </article>
+      {% endfor %}
+    </div>
   </section>
+
+  {% if form_state.error %}
+    <div class="alert alert-error" role="alert" aria-live="polite">
+      <strong>Unable to start diagnostics.</strong>
+      <span>{{ form_state.error }}</span>
+    </div>
+  {% endif %}
+
+  {% if form_state.mode == "support" and profile_catalog_issues %}
+    <div class="alert alert-warning" role="alert" aria-live="polite">
+      <div class="stack-xs">
+        <strong>Some local profiles were skipped.</strong>
+        <ul class="result-list">
+          {% for issue in profile_catalog_issues %}
+            <li><strong>{{ issue.path }}.</strong> {{ issue.reason }}.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if form_state.mode == "self-serve" %}
+    <section class="flow-shell stack-lg">
+      <form
+        method="get"
+        action="{{ url_for('index') }}"
+        class="stack-lg"
+        data-self-serve-symptom-form
+        data-plan-url="{{ url_for('self_serve_plan') }}"
+      >
+        <input type="hidden" name="mode" value="self-serve">
+        {% if form_state.from_run_id %}
+          <input type="hidden" name="from_run" value="{{ form_state.from_run_id }}">
+        {% endif %}
+
+        <article class="card experience-card stack-lg">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Step 1</p>
+              <h2>Choose the symptom that feels closest.</h2>
+            </div>
+            <a class="ghost-button" href="{{ url_for('index') }}">Choose a Different Path</a>
+          </div>
+          <p class="muted">
+            Pick the closest symptom. Occam's Beard will load a plain-language local check plan for you.
+          </p>
+          <div class="choice-grid" role="radiogroup" aria-label="Symptoms">
+            {% for symptom in symptom_options %}
+              <label class="choice-card {% if form_state.symptom_id == symptom.id %}choice-card-active{% endif %}">
+                <input
+                  class="choice-input"
+                  type="radio"
+                  name="symptom"
+                  value="{{ symptom.id }}"
+                  data-symptom-choice="{{ symptom.id }}"
+                  {% if form_state.symptom_id == symptom.id %}checked{% endif %}
+                >
+                <span class="choice-badge">Symptom</span>
+                <span class="choice-title">{{ symptom.label }}</span>
+                <span class="choice-body">{{ symptom.description }}</span>
+              </label>
+            {% endfor %}
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="ghost-button">Load Recommended Plan</button>
+          </div>
+        </article>
+      </form>
+
+      <div class="stack-lg" data-self-serve-plan-region aria-live="polite">
+        {% include "_self_serve_plan.html" %}
+      </div>
+    </section>
+  {% elif form_state.mode == "support" %}
+    <section class="flow-shell stack-lg">
+      <article class="card experience-card stack-lg">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Work With Support</p>
+            <h2>Follow the guided plan your technician asked you to run.</h2>
+          </div>
+          <a class="ghost-button" href="{{ url_for('index') }}">Choose a Different Path</a>
+        </div>
+        <div class="info-grid">
+          <article class="info-panel stack-sm">
+            <h3>When to use this</h3>
+            <ul class="result-list">
+              <li>You already tried the self-serve path and still need help.</li>
+              <li>Support asked for a specific plan, deeper probes, or a support bundle.</li>
+              <li>You need a cleaner handoff than screenshots or ad hoc notes.</li>
+            </ul>
+          </article>
+          <article class="info-panel stack-sm">
+            <h3>Consent and privacy</h3>
+            <ul class="result-list">
+              <li>You can review the plan before you run it.</li>
+              <li>Some guided plans create outbound network traffic.</li>
+              <li>Raw command capture stays opt-in and local unless you export it.</li>
+            </ul>
+          </article>
+        </div>
+      </article>
+
+      {% if form_state.bridge %}
+        <article class="card bridge-card stack-sm">
+          <p class="eyebrow">Continue From Earlier Results</p>
+          <h3>You do not need to start from scratch.</h3>
+          <p>{{ form_state.bridge.headline }}</p>
+          <div class="actions">
+            <a class="ghost-button" href="{{ form_state.bridge.results_url }}">View Earlier {{ form_state.bridge.mode_label }} Results</a>
+            {% if form_state.bridge.suggested_profile_url %}
+              <a class="primary-button" href="{{ form_state.bridge.suggested_profile_url }}">Switch to Suggested Plan: {{ form_state.bridge.suggested_profile_name }}</a>
+            {% else %}
+              <span class="tag">Suggested plan: {{ form_state.bridge.suggested_profile_name }}</span>
+            {% endif %}
+          </div>
+        </article>
+      {% endif %}
+
+      <article class="card support-plan-locked stack-lg" data-support-plan-summary>
+        <div class="result-status-line">
+          <span class="mode-chip">Technician-directed</span>
+          <span class="status-pill status-running">Locked by default</span>
+        </div>
+
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Step 1</p>
+            <h2>Confirm the technician-directed plan</h2>
+          </div>
+          <span class="tag">Support-led run</span>
+        </div>
+
+        <p class="lede">{{ form_state.selected_profile.description }}</p>
+
+        <dl class="summary-list-wide support-plan-list">
+          <div>
+            <dt>Plan</dt>
+            <dd>{{ form_state.selected_profile.name }}</dd>
+          </div>
+          <div>
+            <dt>Issue category</dt>
+            <dd>{{ form_state.selected_profile.issue_category }}</dd>
+          </div>
+          <div>
+            <dt>Deeper probes</dt>
+            <dd>{{ form_state.plan.probe_summary }}</dd>
+          </div>
+          <div>
+            <dt>Raw command capture</dt>
+            <dd>{{ "Enabled" if form_state.capture_raw_commands else "Off unless support asked" }}</dd>
+          </div>
+          <div>
+            <dt>Network traffic</dt>
+            <dd>{{ "Expected" if form_state.plan.has_network_activity else "Local only" }}</dd>
+          </div>
+          <div>
+            <dt>Handoff</dt>
+            <dd>Support bundle available after the run</dd>
+          </div>
+        </dl>
+
+        <div class="tag-row" aria-label="Support plan status">
+          <span class="tag">Loaded locally on this device</span>
+          <span class="tag">{{ form_state.plan.selected_domain_count }} check area(s)</span>
+          <span class="tag">Review before you run</span>
+        </div>
+      </article>
+
+      <article class="card support-consent-card stack-lg" data-support-consent>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Step 2</p>
+            <h2>Review consent and handoff</h2>
+          </div>
+          <span class="tag">Bundle-first handoff</span>
+        </div>
+
+        <div class="info-grid">
+          <article class="info-panel stack-sm">
+            <h3>Before you run</h3>
+            <ul class="result-list">
+              <li>{{ form_state.plan.network_activity_summary }}</li>
+              <li>{{ form_state.plan.raw_capture_summary }}</li>
+              <li>Keep this plan locked unless support told you to switch plans or edit the details.</li>
+            </ul>
+          </article>
+          <article class="info-panel stack-sm">
+            <h3>What support will receive later</h3>
+            <ul class="result-list">
+              <li>A support bundle becomes the main handoff after the run.</li>
+              <li>The bundle includes the findings summary, selected technical evidence, and run metadata.</li>
+              <li>Raw command output is only included if this plan collected it and you choose to export it.</li>
+            </ul>
+          </article>
+        </div>
+      </article>
+
+      <details class="advanced-panel support-plan-picker-panel" data-support-plan-picker>
+        <summary>Support gave me a different plan</summary>
+        <div class="advanced-panel-body stack-lg">
+          <p class="field-help">
+            Use this only if your technician asked you to switch to a different local plan before the run.
+          </p>
+          <form method="get" action="{{ url_for('index') }}" class="plan-picker">
+            <input type="hidden" name="mode" value="support">
+            {% if form_state.from_run_id %}
+              <input type="hidden" name="from_run" value="{{ form_state.from_run_id }}">
+            {% endif %}
+            <div class="stack-xs">
+              <label class="field-label" for="profile">Support plan</label>
+              <p class="field-help">Choose the local plan your technician asked you to follow.</p>
+              <select id="profile" name="profile">
+                {% for profile in profiles %}
+                  <option value="{{ profile.profile_id }}" {% if form_state.profile_id == profile.profile_id %}selected{% endif %}>
+                    {{ profile.name }} ({{ profile.issue_category }})
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="submit" class="ghost-button">Load Different Plan</button>
+          </form>
+        </div>
+      </details>
+
+      <form method="post" action="{{ url_for('run') }}" class="stack-lg">
+        <input type="hidden" name="mode" value="support">
+        <input type="hidden" name="profile_id" value="{{ form_state.profile_id }}">
+        {% if form_state.from_run_id %}
+          <input type="hidden" name="from_run_id" value="{{ form_state.from_run_id }}">
+        {% endif %}
+
+        <details class="advanced-panel" data-support-plan-edit>
+          <summary>Technician asked me to edit the plan details</summary>
+          <div class="advanced-panel-body stack-lg">
+            <p class="field-help">
+              Leave these settings alone unless your technician asked you to edit the plan details directly.
+            </p>
+
+            <fieldset class="stack-sm form-fieldset">
+              <legend>Check areas</legend>
+              <div class="check-grid">
+                {% for item in form_state.plan.collection_items %}
+                  <label class="check-tile">
+                    <input
+                      type="checkbox"
+                      name="checks"
+                      value="{{ item.id }}"
+                      {% if item.id in form_state.selected_checks %}checked{% endif %}
+                    >
+                    <span>{{ item.label }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </fieldset>
+
+            <div class="two-column">
+              <section class="stack-sm">
+                <h3>TCP targets</h3>
+                <label class="field-label" for="targets">One <code>host:port</code> target per line</label>
+                <textarea id="targets" name="targets" rows="8">{{ form_state.targets_text }}</textarea>
+              </section>
+
+              <section class="stack-sm">
+                <h3>DNS hosts</h3>
+                <label class="field-label" for="dns_hosts">One hostname per line</label>
+                <textarea id="dns_hosts" name="dns_hosts" rows="8">{{ form_state.dns_hosts_text }}</textarea>
+              </section>
+            </div>
+
+            <fieldset class="stack-sm form-fieldset">
+              <legend>Deeper probes and capture</legend>
+              <div class="toggle-row">
+                <label class="toggle" for="enable_ping">
+                  <input id="enable_ping" type="checkbox" name="enable_ping" {% if form_state.enable_ping %}checked{% endif %}>
+                  <span>Enable ping</span>
+                </label>
+                <label class="toggle" for="enable_trace">
+                  <input id="enable_trace" type="checkbox" name="enable_trace" {% if form_state.enable_trace %}checked{% endif %}>
+                  <span>Enable traceroute</span>
+                </label>
+                <label class="toggle" for="capture_raw_commands">
+                  <input id="capture_raw_commands" type="checkbox" name="capture_raw_commands" {% if form_state.capture_raw_commands %}checked{% endif %}>
+                  <span>Capture raw command output for the support bundle</span>
+                </label>
+              </div>
+            </fieldset>
+          </div>
+        </details>
+
+        <div class="cta-strip">
+          <div class="stack-xs">
+            <h3>Step 3</h3>
+            <p class="field-help">
+              Run the locked plan exactly as support requested. Review the support bundle at the end before you share it.
+            </p>
+          </div>
+          <button type="submit" class="primary-button">Run Support-Guided Check</button>
+        </div>
+      </form>
+    </section>
+  {% endif %}
 {% endblock %}

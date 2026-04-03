@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from occams_beard.models import TcpTarget
 
-
 DEFAULT_CHECKS = [
     "host",
     "resources",

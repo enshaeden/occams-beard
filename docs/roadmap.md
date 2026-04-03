@@ -1,58 +1,55 @@
 # Roadmap
 
-## What this is
+## Target Product
 
-This document records the current release boundary for Occam's Beard and the next changes that fit that boundary.
+Occam's Beard is aimed at a self-service, on-device troubleshooting assistant that safely collects local diagnostic evidence, interprets it deterministically, explains the result in plain language, guides the user through safe next steps, and produces support-ready artifacts without requiring a cloud dependency by default.
 
-## Problem space
+## Product Boundaries
 
-Diagnostics tools tend to accumulate adjacent features quickly: persistence, remote orchestration, dashboards, policy layers, and remediation. Without an explicit roadmap, that expansion obscures the actual operating model of the system.
+The operating model remains:
 
-## Design approach
-
-The roadmap keeps the project narrow. Near-term work should improve evidence quality, parser coverage, and operator clarity without changing the local, deterministic, read-mostly nature of the tool.
-
-## Key capabilities
-
-Current release focus in `0.1.0`:
-
-- local CLI execution
-- local web execution backed by the same runner
-- structured diagnostics collection
+- local-first
+- read-mostly diagnostics
 - deterministic findings
-- JSON output and terminal reporting
-- representative tests, documentation, and sample artifacts
+- one shared runner
+- no background agent
+- no cloud dependency by default
+- no automatic remediation
 
-## Architecture
+## Solid Today
 
-The roadmap follows the existing architecture rather than introducing a second system. Planned work stays inside the current boundaries:
+- shared runner behavior across CLI, web, and launcher
+- deterministic findings over normalized models
+- bounded subprocess and hostname-resolution execution with explicit warning and execution-status reporting
+- schema-versioned result output and local support-bundle export
+- additive hardware-health facts under the existing `resources` and `storage` domains
+- local profiles, guided self-service summaries, and support-ready artifacts
+- no-JavaScript self-serve symptom selection fallback, with JavaScript limited to progressive enhancement
+- optional local profile overrides that are skipped cleanly when malformed while built-ins stay strict
+- standalone support-bundle validation for directory and zip exports
+- CI gates for documentation structure, unit tests, `ruff` including `E501`, `mypy`, and bounded live smoke validation on GitHub-hosted Ubuntu, macOS, and Windows runners
+- canonical committed sample artifacts that match schema `1.1.0` and current support-bundle output
+- broader parser coverage for Linux, macOS, and Windows split-tunnel, resolver, VPN, malformed-route, legacy-netstat, localized route-print, and traceroute/routing variants
+- documented accessibility hardening in the existing server-rendered UI, plus optional browser-level coverage for key flows
 
-- better fixture coverage and parser hardening
-- more precise routing and tunnel interpretation
-- clearer handling of degraded versus unsupported checks
-- optional local artifacts that support offline review without adding a control plane
+## Current Adoption Blockers
 
-## Usage
+- fixture coverage is stronger, but still not broad enough to represent every platform, OS version, and localization variant
+- repository artifacts cover semantics, focus states, and limited browser behavior, but real assistive-technology validation is still missing
+- live smoke validation now covers GitHub-hosted runner images, but it does not yet represent every enterprise endpoint build or non-English local runtime
+- support-bundle trust is better with the validator, but hostname redaction still depends on deterministic known-value registration
+- non-privileged storage-device health coverage is still thin on Linux and depends on what the host exposes on macOS and Windows
 
-Use this document to understand what changes fit the current scope before proposing new work. For the current system behavior, start with [`README.md`](../README.md). For the reasoning and platform boundaries, continue with [`docs/diagnostic-model.md`](diagnostic-model.md), [`docs/finding-rules.md`](finding-rules.md), and [`docs/platform-notes.md`](platform-notes.md).
+## Next 3 Milestones
 
-## Tradeoffs and limitations
+1. Run manual assistive-technology validation in desktop Chrome and Safari with VoiceOver, and add Windows NVDA validation if a Windows desktop path is available.
+2. Add more reviewed fixtures from non-English Windows and Linux hosts plus additional macOS resolver, routing, and hardware-output variants collected from real systems.
+3. Use the bundle validator in release prep and strengthen automated redaction-verification coverage around remaining hostname and mixed-text edge cases.
 
-- The roadmap does not include agents, daemons, dashboards, remote orchestration, centralized storage, or automatic remediation.
-- Configuration remains intentionally small and local.
-- Improvements are prioritized when they strengthen evidence quality or operator clarity rather than broaden product surface area.
+## Explicitly Out of Scope
 
-## Future work
-
-Near term:
-
-- broaden parser fixture coverage for additional platform variants
-- improve routing interpretation for split-tunnel and policy-route cases
-- add optional raw command capture for offline troubleshooting bundles
-- improve summaries for degraded versus unsupported checks
-
-Later, if the same operating model can be preserved:
-
-- add importable fixture packs for integration-style parser tests
-- add constrained proxy and captive-portal visibility checks
-- support optional configuration files for repeatable service-target bundles
+- control-plane behavior
+- background agents
+- dashboards
+- mandatory cloud services
+- automatic remediation

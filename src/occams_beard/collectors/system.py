@@ -6,11 +6,10 @@ import getpass
 import logging
 import os
 import platform as python_platform
+from collections.abc import Callable
 
-from occams_beard.models import CpuState, DiagnosticWarning, HostBasics, MemoryState
-from occams_beard.platform import current_platform
-from occams_beard.platform import linux, macos, windows
-
+from occams_beard.models import BatteryState, CpuState, DiagnosticWarning, HostBasics, MemoryState
+from occams_beard.platform import current_platform, linux, macos, windows
 
 LOGGER = logging.getLogger(__name__)
 
@@ -68,8 +67,11 @@ def collect_host_basics() -> tuple[HostBasics, list[DiagnosticWarning]]:
     return host, warnings
 
 
-def collect_resource_state() -> tuple[CpuState, MemoryState, list[DiagnosticWarning]]:
-    """Collect CPU and memory facts."""
+def collect_resource_state(
+    *,
+    progress_callback: Callable[[int], None] | None = None,
+) -> tuple[CpuState, MemoryState, BatteryState | None, list[DiagnosticWarning]]:
+    """Collect CPU, memory, and battery facts."""
 
     warnings: list[DiagnosticWarning] = []
     cpu_state = CpuState(logical_cpus=os.cpu_count())
@@ -102,16 +104,22 @@ def collect_resource_state() -> tuple[CpuState, MemoryState, list[DiagnosticWarn
                 message="Load average is not supported on this platform.",
             )
         )
+    if progress_callback is not None:
+        progress_callback(1)
 
     platform_name = current_platform()
     if platform_name == "linux":
         memory_data = linux.read_memory_snapshot()
+        battery_data = linux.read_battery_snapshot()
     elif platform_name == "macos":
         memory_data = macos.read_memory_snapshot()
+        battery_data = macos.read_battery_snapshot()
     elif platform_name == "windows":
         memory_data = windows.read_memory_snapshot()
+        battery_data = windows.read_battery_snapshot()
     else:
         memory_data = {"total_bytes": None, "available_bytes": None, "free_bytes": None}
+        battery_data = None
         warnings.append(
             DiagnosticWarning(
                 domain="resources",
@@ -137,7 +145,18 @@ def collect_resource_state() -> tuple[CpuState, MemoryState, list[DiagnosticWarn
             available_bytes=memory_data["available_bytes"],
         ),
     )
-    return cpu_state, memory_state, warnings
+    battery_state = _build_battery_state(battery_data)
+    if battery_data is None and platform_name in {"linux", "macos", "windows"}:
+        warnings.append(
+            DiagnosticWarning(
+                domain="resources",
+                code="battery-unavailable",
+                message="Battery health facts could not be collected on this endpoint.",
+            )
+        )
+    if progress_callback is not None:
+        progress_callback(2)
+    return cpu_state, memory_state, battery_state, warnings
 
 
 def _classify_memory_pressure(total_bytes: int | None, available_bytes: int | None) -> str | None:
@@ -150,3 +169,37 @@ def _classify_memory_pressure(total_bytes: int | None, available_bytes: int | No
     if ratio <= 0.20:
         return "elevated"
     return "normal"
+
+
+def _build_battery_state(battery_data: dict[str, object] | None) -> BatteryState | None:
+    if battery_data is None:
+        return None
+    return BatteryState(
+        present=bool(battery_data.get("present", False)),
+        charge_percent=_coerce_int(battery_data.get("charge_percent")),
+        status=_coerce_string(battery_data.get("status")),
+        cycle_count=_coerce_int(battery_data.get("cycle_count")),
+        condition=_coerce_string(battery_data.get("condition")),
+        health_percent=_coerce_float(battery_data.get("health_percent")),
+    )
+
+
+def _coerce_int(value: object) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return None
+
+
+def _coerce_float(value: object) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _coerce_string(value: object) -> str | None:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return None

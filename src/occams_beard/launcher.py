@@ -9,11 +9,61 @@ import socket
 import threading
 import time
 import webbrowser
+from collections.abc import Callable
 from dataclasses import dataclass
-
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_WAIT_TIMEOUT_SECONDS = 10.0
+DEFAULT_BROWSER_HEARTBEAT_INTERVAL_SECONDS = 15.0
+DEFAULT_BROWSER_IDLE_TIMEOUT_SECONDS = 90.0
+DEFAULT_BROWSER_CLOSE_GRACE_SECONDS = 5.0
+DEFAULT_BROWSER_STARTUP_TIMEOUT_SECONDS = 60.0
+
+
+class BrowserPresenceTracker:
+    """Track whether the launcher-opened browser page is still present."""
+
+    def __init__(
+        self,
+        *,
+        idle_timeout_seconds: float = DEFAULT_BROWSER_IDLE_TIMEOUT_SECONDS,
+        close_grace_seconds: float = DEFAULT_BROWSER_CLOSE_GRACE_SECONDS,
+        startup_timeout_seconds: float = DEFAULT_BROWSER_STARTUP_TIMEOUT_SECONDS,
+        now: Callable[[], float] | None = None,
+    ) -> None:
+        self.idle_timeout_seconds = idle_timeout_seconds
+        self.close_grace_seconds = close_grace_seconds
+        self.startup_timeout_seconds = startup_timeout_seconds
+        self._now = now or time.monotonic
+        self._lock = threading.Lock()
+        self._last_seen_at: float | None = None
+        self._closing_requested_at: float | None = None
+        self._startup_deadline = self._now() + max(startup_timeout_seconds, 1.0)
+
+    def record_heartbeat(self) -> None:
+        """Record that a browser page for this launcher instance is still open."""
+
+        with self._lock:
+            self._last_seen_at = self._now()
+            self._closing_requested_at = None
+
+    def record_page_closing(self) -> None:
+        """Record that a browser page is navigating away or closing."""
+
+        with self._lock:
+            self._closing_requested_at = self._now()
+
+    def should_shutdown(self) -> bool:
+        """Return True when the launcher should stop the local server."""
+
+        now = self._now()
+        with self._lock:
+            if self._closing_requested_at is not None:
+                if self._last_seen_at is None or self._last_seen_at <= self._closing_requested_at:
+                    return now - self._closing_requested_at >= self.close_grace_seconds
+            if self._last_seen_at is None:
+                return now >= self._startup_deadline
+            return now - self._last_seen_at >= self.idle_timeout_seconds
 
 
 @dataclass(slots=True)
@@ -25,6 +75,7 @@ class OperatorLauncherConfig:
     open_browser: bool = True
     wait_timeout_seconds: float = DEFAULT_WAIT_TIMEOUT_SECONDS
     ready_file: str | None = None
+    shutdown_on_browser_close: bool = False
 
 
 class LauncherDependencyError(RuntimeError):
@@ -55,6 +106,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--ready-file",
         help="Write the bound local URL to PATH after the server is ready.",
     )
+    parser.add_argument(
+        "--shutdown-on-browser-close",
+        action="store_true",
+        help="Stop the local server after the last browser page is closed.",
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable INFO-level logging.")
     parser.add_argument("--debug", action="store_true", help="Enable DEBUG-level logging.")
     return parser
@@ -73,6 +129,7 @@ def main(argv: list[str] | None = None) -> int:
             open_browser=not args.no_browser,
             wait_timeout_seconds=args.wait_timeout,
             ready_file=args.ready_file,
+            shutdown_on_browser_close=args.shutdown_on_browser_close,
         )
     )
 
@@ -86,7 +143,10 @@ def launch_operator_interface(config: OperatorLauncherConfig) -> int:
         LOGGER.error("%s", exc)
         return 1
 
-    app = create_app()
+    presence_tracker = (
+        BrowserPresenceTracker() if config.shutdown_on_browser_close else None
+    )
+    app = create_app(_browser_presence_app_config(presence_tracker))
 
     try:
         server = _make_server_with_fallback(make_server, config.host, config.port, app)
@@ -125,10 +185,20 @@ def launch_operator_interface(config: OperatorLauncherConfig) -> int:
         _open_browser(browser_url)
 
     print(f"Occam's Beard operator interface is running at {browser_url}")
-    print("Press Ctrl-C to stop the local server.")
+    if config.shutdown_on_browser_close:
+        print("The local server will stop after the last browser page is closed.")
+    else:
+        print("Press Ctrl-C to stop the local server.")
 
     try:
         while server_thread.is_alive():
+            if presence_tracker is not None and presence_tracker.should_shutdown():
+                LOGGER.info(
+                    "Stopping operator interface after the launcher browser page closed or "
+                    "stopped checking in: url=%s",
+                    browser_url,
+                )
+                break
             server_thread.join(timeout=0.5)
     except KeyboardInterrupt:
         LOGGER.info("Stopping operator interface: url=%s", browser_url)
@@ -149,7 +219,8 @@ def _load_web_dependencies():
         raise LauncherDependencyError(
             "Operator interface dependencies are missing. "
             "Install the project with `pip install -e .` or use the macOS "
-            "`open-operator-interface.command` launcher so it can bootstrap a local `.venv`."
+            "`Open Device Check.command` launcher in the repo root so it can bootstrap a "
+            "local `.venv`."
         ) from exc
 
     return app_module.create_app, serving_module.make_server
@@ -223,6 +294,19 @@ def _write_ready_file(path: str | None, url: str) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         handle.write(url)
         handle.write("\n")
+
+
+def _browser_presence_app_config(
+    tracker: BrowserPresenceTracker | None,
+) -> dict[str, object]:
+    if tracker is None:
+        return {}
+    return {
+        "LAUNCHER_BROWSER_PRESENCE_TRACKER": tracker,
+        "LAUNCHER_BROWSER_PRESENCE_INTERVAL_MS": int(
+            DEFAULT_BROWSER_HEARTBEAT_INTERVAL_SECONDS * 1000
+        ),
+    }
 
 
 def _configure_logging(verbose: bool, debug: bool) -> None:

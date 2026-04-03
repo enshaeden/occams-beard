@@ -1,0 +1,21 @@
+id = "device-slow"
+name = "Device Slow"
+description = "Profile for local endpoint slowness where host pressure may be affecting user experience or diagnostics."
+issue_category = "device slow"
+recommended_checks = ["host", "resources", "storage", "network", "routing", "dns", "connectivity"]
+dns_hosts = ["github.com"]
+labels = ["performance", "host-health"]
+safe_user_guidance = [
+  "Close non-essential heavy applications before rerunning if the endpoint is visibly saturated.",
+  "Capture a support bundle after the slow period is still present so evidence is current.",
+]
+escalation_guidance = [
+  "Escalate if memory pressure or disk exhaustion remains after obvious local workload reduction.",
+  "Escalate if host pressure and connectivity degradation recur together across repeated runs.",
+]
+
+[[tcp_targets]]
+host = "github.com"
+port = 443
+label = "github-https"
+

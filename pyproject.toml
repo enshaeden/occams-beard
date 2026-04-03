@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "occams-beard"
 version = "0.1.0"
-description = "Cross-platform host and network diagnostics and lightweight remediation analysis for systems engineering portfolios."
+description = "Cross-platform host and network diagnostics with local support-ready artifacts."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
@@ -36,6 +36,7 @@ dev = [
 occams-beard = "occams_beard.cli:main"
 occams-beard-web = "occams_beard.app:main"
 occams-beard-operator = "occams_beard.launcher:main"
+occams-beard-validate-bundle = "occams_beard.bundle_validator:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -44,7 +45,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-occams_beard = ["templates/*.html", "templates/partials/*.html", "static/*.css"]
+occams_beard = ["templates/*.html", "static/*.css", "static/*.js", "profiles/*.toml"]
 
 [tool.unittest]
 test-paths = ["tests"]

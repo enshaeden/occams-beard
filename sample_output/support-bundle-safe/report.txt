@@ -1,0 +1,134 @@
+Occam's Beard Report
+================================
+
+Summary
+- Result schema version: 1.1.0
+- App version: 0.1.0
+- Host: <endpoint-host-1>
+- Platform: Linux 6.8.0 (x86_64)
+- Internet reachable: no
+- Default route present: yes
+- Probable fault domain: local_network
+- Fault-domain basis: Default route exists but looks inconsistent with local interface state (0.90 confidence)
+
+Execution Status
+- Host basics: passed (local only)
+  Duration: 4 ms
+  Summary: Collected endpoint identity and uptime facts as a baseline domain.
+- Interface inventory: passed (local only)
+  Duration: 10 ms
+  Summary: Collected interface state, local addresses, and neighbor context.
+- Routing inventory: partial (local only)
+  Duration: 9 ms
+  Summary: Collected route table and default-route interpretation.
+  Warning: [routing:route-data-warning] Default route was collected, but it appears link-scoped and may be incomplete.
+  Probe Collect routing summary: partial (Default route present: yes.)
+- DNS checks: partial (network egress)
+  Duration: 30 ms
+  Summary: Collected resolver configuration and hostname resolution checks.
+  Probe Resolve <hostname-2>: failed (Lookup failed: temporary failure in name resolution.)
+- Generic connectivity: partial (network egress)
+  Duration: 61 ms
+  Summary: Collected generic DNS-independent and TCP path checks.
+  Warning: [connectivity:trace-unavailable] Traceroute command is unavailable on this endpoint.
+  Probe TCP <hostname-1>:443: failed (TCP connection failed: timeout.)
+  Probe TCP 1.1.1.1:53: failed (TCP connection failed: timeout.)
+- VPN heuristics: passed (local only)
+  Duration: 2 ms
+  Summary: Evaluated tunnel-interface and route heuristics.
+
+Key Findings
+1. [HIGH] Default route exists but looks inconsistent with local interface state
+   Derived finding: A default route was collected, but route and interface evidence suggest it may not be usable.
+   Plain language: The host has a default route on paper, but the route and interface evidence do not line up cleanly.
+   Evidence summary: Default route uses link-scoped gateway link#15, so next-hop reachability is less explicit. Default route uses interface tun0, but that interface was not collected as active.
+   Observed fact: Default route uses link-scoped gateway link#15, so next-hop reachability is less explicit.
+   Observed fact: Default route uses interface tun0, but that interface was not collected as active.
+   Observed fact: Default route uses interface tun0, but that interface has no usable non-loopback address.
+   Observed fact: 1 more supporting signal(s) not shown
+   Probable cause: The route table contains a default path, but the host still appears locally misrouted, attached to the wrong interface, or missing a usable next-hop path.
+   Safe next actions: Verify the expected interface is still the active interface before rerunning.; If a dock, VPN, or secondary adapter recently changed state, reconnect it once.
+   Escalate when: Escalate if the default route still points to an inactive or unusable interface after the interface is reset.
+   Uncertainty: The route table inconsistency can indicate stale local state, policy routing, or an incomplete next-hop path.
+   Fault domain: local_network (0.90 confidence, evidence-based)
+2. [LOW] DNS resolution is only partially successful
+   Derived finding: Some configured hostnames resolved while others failed, which suggests selective DNS reachability or split-horizon behavior rather than a total DNS outage.
+   Plain language: Some hostnames resolved and others did not, so DNS behavior is inconsistent rather than completely down.
+   Evidence summary: Successful DNS lookups: <hostname-1> -> 140.82.114.3. Failed DNS lookups: <hostname-2> (temporary failure in name resolution).
+   Observed fact: Successful DNS lookups: <hostname-1> -> 140.82.114.3.
+   Observed fact: Failed DNS lookups: <hostname-2> (temporary failure in name resolution).
+   Heuristic conclusion: Resolver selection, split-horizon DNS, or intermittent upstream resolver reachability may be affecting only part of the configured namespace set.
+   Safe next actions: Keep both public and environment-specific hostnames in the run so the split is visible.; If VPN is relevant, compare results with and without the tunnel connected only if policy allows it.
+   Escalate when: Escalate if the same namespace subset keeps failing after reconnecting the intended network path.
+   Uncertainty: Selective DNS failures can be caused by split-horizon DNS, resolver choice, or intermittent upstream reachability.
+   Fault domain: dns (0.58 confidence, heuristic)
+
+What We Know
+- The host has a default route on paper, but the route and interface evidence do not line up cleanly.
+
+What Likely Happened
+- The route table contains a default path, but the host still appears locally misrouted, attached to the wrong interface, or missing a usable next-hop path.
+- Heuristic conclusion: Resolver selection, split-horizon DNS, or intermittent upstream resolver reachability may be affecting only part of the configured namespace set.
+
+What You Can Try Safely
+- Verify the expected interface is still the active interface before rerunning.
+- If a dock, VPN, or secondary adapter recently changed state, reconnect it once.
+- Keep both public and environment-specific hostnames in the run so the split is visible.
+- If VPN is relevant, compare results with and without the tunnel connected only if policy allows it.
+
+Escalate When
+- Escalate if the default route still points to an inactive or unusable interface after the interface is reset.
+- Escalate if the same namespace subset keeps failing after reconnecting the intended network path.
+
+What Remains Uncertain
+- The route table inconsistency can indicate stale local state, policy routing, or an incomplete next-hop path.
+- Selective DNS failures can be caused by split-horizon DNS, resolver choice, or intermittent upstream reachability.
+- Routing inventory was only partially collected or produced mixed results.
+- DNS checks was only partially collected or produced mixed results.
+- Generic connectivity was only partially collected or produced mixed results.
+
+System Snapshot
+- Current user: <user-1>
+- Uptime (seconds): 5400
+- CPU logical cores: unknown
+- CPU utilization estimate: unknown
+- Memory pressure: unknown
+- Memory available: unknown / unknown
+- Battery health: not collected
+
+Storage Snapshot
+- Monitored volumes: not collected
+- Storage device health: not collected
+
+Network Snapshot
+- Active interfaces: eth0
+- Local addresses: <private-ip-1>
+- Interface MTUs: eth0=1500
+- ARP neighbors: none collected
+- Default gateway: link#15
+- Default interface: tun0
+- Default route state: suspect
+- Route entries collected: 1
+- Route observations: Default route uses link-scoped gateway link#15, so next-hop reachability is less explicit.
+
+Generic Reachability Checks
+- <hostname-1>:443 [github-https]: failed (timeout)
+- 1.1.1.1:53 [cloudflare-dns]: failed (timeout)
+- Trace <hostname-1>: not run (trace-command-unavailable)
+- Trace 1.1.1.1: not run (trace-command-unavailable)
+
+DNS Resolution
+- Resolvers: <private-ip-2>
+- <hostname-1>: ok (140.82.114.3)
+- <hostname-2>: failed (temporary failure in name resolution)
+
+Configured Service Checks
+- Service checks were not collected.
+
+Probable Fault Domain
+- local_network
+- Justification: The route table contains a default path, but the host still appears locally misrouted, attached to the wrong interface, or missing a usable next-hop path.
+
+Warnings and degraded checks
+- [routing:route-data-warning] Default route was collected, but it appears link-scoped and may be incomplete.
+- [connectivity:trace-unavailable] Traceroute command is unavailable on this endpoint.

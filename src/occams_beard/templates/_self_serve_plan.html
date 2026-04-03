@@ -1,0 +1,130 @@
+{% if form_state.selected_profile %}
+  <form method="post" action="{{ url_for('run') }}" class="stack-lg">
+    <input type="hidden" name="mode" value="self-serve">
+    <input type="hidden" name="symptom_id" value="{{ form_state.symptom_id }}">
+    {% if form_state.from_run_id %}
+      <input type="hidden" name="from_run_id" value="{{ form_state.from_run_id }}">
+    {% endif %}
+
+    <article
+      id="self-serve-plan-step"
+      class="card stack-lg"
+      data-self-serve-plan-summary
+      tabindex="-1"
+    >
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Step 2</p>
+          <h2>Review the plan before you run it.</h2>
+        </div>
+        <span class="mode-chip">Employee-safe</span>
+      </div>
+
+      <p class="lede">{{ form_state.selected_profile.description }}</p>
+
+      <div class="info-grid">
+        <article class="info-panel stack-sm">
+          <h3>What we’ll check</h3>
+          <ul class="result-list">
+            {% for item in form_state.plan.collection_items %}
+              <li><strong>{{ item.label }}.</strong> {{ item.description }}</li>
+            {% endfor %}
+          </ul>
+        </article>
+
+        <article class="info-panel stack-sm">
+          <h3>What to expect</h3>
+          <ul class="result-list">
+            <li>Everything stays on this device unless you choose to export it later.</li>
+            <li>{{ form_state.plan.network_activity_summary }}</li>
+            <li>You do not need to change any technical settings to start.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="tag-row" aria-label="Current plan">
+        <span class="tag">Recommended plan: {{ form_state.selected_profile.name }}</span>
+        <span class="tag">{{ form_state.plan.selected_domain_count }} check area(s)</span>
+        <span class="tag">No background agent</span>
+      </div>
+    </article>
+
+    <details class="advanced-panel" data-self-serve-advanced>
+      <summary>Support asked me to change this plan</summary>
+      <div class="advanced-panel-body stack-lg">
+        <p class="field-help">
+          Only open this if support asked you to change the plan details or add deeper probes.
+        </p>
+        {% if form_state.profile_id %}
+          <input type="hidden" name="profile_id" value="{{ form_state.profile_id }}">
+        {% endif %}
+
+        <fieldset class="stack-sm form-fieldset">
+          <legend>Check areas</legend>
+          <div class="check-grid">
+            {% for item in form_state.plan.collection_items %}
+              <label class="check-tile">
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="{{ item.id }}"
+                  {% if item.id in form_state.selected_checks %}checked{% endif %}
+                >
+                <span>{{ item.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <div class="two-column">
+          <section class="stack-sm">
+            <h3>TCP targets</h3>
+            <label class="field-label" for="targets">One <code>host:port</code> target per line</label>
+            <textarea id="targets" name="targets" rows="7">{{ form_state.targets_text }}</textarea>
+          </section>
+
+          <section class="stack-sm">
+            <h3>DNS hosts</h3>
+            <label class="field-label" for="dns_hosts">One hostname per line</label>
+            <textarea id="dns_hosts" name="dns_hosts" rows="7">{{ form_state.dns_hosts_text }}</textarea>
+          </section>
+        </div>
+
+        <fieldset class="stack-sm form-fieldset">
+          <legend>Optional probes and export privacy</legend>
+          <div class="toggle-row">
+            <label class="toggle" for="enable_ping">
+              <input id="enable_ping" type="checkbox" name="enable_ping" {% if form_state.enable_ping %}checked{% endif %}>
+              <span>Enable ping</span>
+            </label>
+            <label class="toggle" for="enable_trace">
+              <input id="enable_trace" type="checkbox" name="enable_trace" {% if form_state.enable_trace %}checked{% endif %}>
+              <span>Enable traceroute</span>
+            </label>
+            <label class="toggle" for="capture_raw_commands">
+              <input id="capture_raw_commands" type="checkbox" name="capture_raw_commands" {% if form_state.capture_raw_commands %}checked{% endif %}>
+              <span>Capture raw command output for a support bundle</span>
+            </label>
+          </div>
+        </fieldset>
+      </div>
+    </details>
+
+    <div class="cta-strip">
+      <div class="stack-xs">
+        <h3>Step 3</h3>
+        <p class="field-help">
+          Start the local check. You can decide later whether you want to share a support bundle.
+        </p>
+      </div>
+      <button type="submit" class="primary-button">Start Device Check</button>
+    </div>
+  </form>
+{% else %}
+  <article class="card">
+    <div class="empty-state">
+      <h3>Choose a symptom to continue</h3>
+      <p>The tool will load a plain-language plan and keep the technical controls out of the way.</p>
+    </div>
+  </article>
+{% endif %}

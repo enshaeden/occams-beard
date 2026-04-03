@@ -3,24 +3,63 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
-from tempfile import TemporaryDirectory
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock, patch
 
 from occams_beard.launcher import (
+    BrowserPresenceTracker,
     LauncherDependencyError,
     OperatorLauncherConfig,
     _build_browser_url,
-    _make_server_with_fallback,
     _load_web_dependencies,
+    _make_server_with_fallback,
     _write_ready_file,
-    main,
     launch_operator_interface,
+    main,
 )
 
 
 class LauncherTests(unittest.TestCase):
     """Validate browser URL shaping and launcher orchestration."""
+
+    def test_browser_presence_tracker_waits_for_close_grace_period_before_shutdown(self) -> None:
+        current_time = 100.0
+
+        def now() -> float:
+            return current_time
+
+        tracker = BrowserPresenceTracker(
+            idle_timeout_seconds=90.0,
+            close_grace_seconds=5.0,
+            startup_timeout_seconds=60.0,
+            now=now,
+        )
+        tracker.record_heartbeat()
+        tracker.record_page_closing()
+
+        current_time += 4.9
+        self.assertFalse(tracker.should_shutdown())
+
+        current_time += 0.2
+        self.assertTrue(tracker.should_shutdown())
+
+    def test_browser_presence_tracker_stops_when_browser_never_checks_in(self) -> None:
+        current_time = 10.0
+
+        def now() -> float:
+            return current_time
+
+        tracker = BrowserPresenceTracker(
+            startup_timeout_seconds=3.0,
+            now=now,
+        )
+
+        current_time += 2.9
+        self.assertFalse(tracker.should_shutdown())
+
+        current_time += 0.2
+        self.assertTrue(tracker.should_shutdown())
 
     def test_build_browser_url_rewrites_wildcard_host_for_local_browser(self) -> None:
         self.assertEqual(_build_browser_url("0.0.0.0", 5000), "http://127.0.0.1:5000")
@@ -34,7 +73,9 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual(ready_path.read_text(encoding="utf-8"), "http://127.0.0.1:5010\n")
 
     @patch("occams_beard.launcher.launch_operator_interface", return_value=0)
-    def test_main_delegates_to_launch_operator_interface(self, mock_launch_operator_interface) -> None:
+    def test_main_delegates_to_launch_operator_interface(
+        self, mock_launch_operator_interface
+    ) -> None:
         result = main(["--no-browser", "--port", "5013"])
 
         self.assertEqual(result, 0)
@@ -92,7 +133,10 @@ class LauncherTests(unittest.TestCase):
     ) -> None:
         server = MagicMock()
         server.server_port = 5010
-        mock_load_web_dependencies.return_value = (MagicMock(return_value=object()), MagicMock(return_value=server))
+        mock_load_web_dependencies.return_value = (
+            MagicMock(return_value=object()),
+            MagicMock(return_value=server),
+        )
         server.serve_forever.side_effect = None
 
         with patch("occams_beard.launcher.threading.Thread") as mock_thread_class:
@@ -157,7 +201,10 @@ class LauncherTests(unittest.TestCase):
     ) -> None:
         server = MagicMock()
         server.server_port = 5011
-        mock_load_web_dependencies.return_value = (MagicMock(return_value=object()), MagicMock(return_value=server))
+        mock_load_web_dependencies.return_value = (
+            MagicMock(return_value=object()),
+            MagicMock(return_value=server),
+        )
 
         with patch("occams_beard.launcher.threading.Thread") as mock_thread_class:
             thread = MagicMock()

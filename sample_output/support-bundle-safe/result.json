@@ -1,0 +1,581 @@
+{
+  "schema_version": "1.1.0",
+  "metadata": {
+    "project_name": "occams-beard",
+    "version": "0.1.0",
+    "generated_at": "2026-04-01T00:10:00+00:00",
+    "elapsed_ms": 175,
+    "selected_checks": [
+      "network",
+      "routing",
+      "dns",
+      "connectivity",
+      "vpn"
+    ],
+    "profile_id": null,
+    "profile_name": null,
+    "issue_category": null
+  },
+  "platform": {
+    "system": "Linux",
+    "release": "6.8.0",
+    "version": "demo-build",
+    "machine": "x86_64",
+    "python_version": "3.13.4"
+  },
+  "facts": {
+    "host": {
+      "hostname": "<endpoint-host-1>",
+      "operating_system": "Linux",
+      "kernel": "6.8.0",
+      "current_user": "<user-1>",
+      "uptime_seconds": 5400
+    },
+    "resources": {
+      "cpu": {
+        "logical_cpus": null,
+        "load_average_1m": null,
+        "load_average_5m": null,
+        "load_average_15m": null,
+        "utilization_percent_estimate": null
+      },
+      "memory": {
+        "total_bytes": null,
+        "available_bytes": null,
+        "free_bytes": null,
+        "pressure_level": null
+      },
+      "disks": [],
+      "battery": null,
+      "storage_devices": []
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "eth0",
+          "is_up": true,
+          "mac_address": "<mac-address-1>",
+          "addresses": [
+            {
+              "family": "ipv4",
+              "address": "<private-ip-1>",
+              "netmask": "24",
+              "is_loopback": false
+            }
+          ],
+          "mtu": 1500,
+          "type_hint": "ethernet"
+        },
+        {
+          "name": "tun0",
+          "is_up": false,
+          "mac_address": null,
+          "addresses": [],
+          "mtu": 1380,
+          "type_hint": "tunnel"
+        }
+      ],
+      "local_addresses": [
+        "<private-ip-1>"
+      ],
+      "active_interfaces": [
+        "eth0"
+      ],
+      "arp_neighbors": [],
+      "route_summary": {
+        "default_gateway": "link#15",
+        "default_interface": "tun0",
+        "has_default_route": true,
+        "routes": [
+          {
+            "destination": "default",
+            "gateway": "link#15",
+            "interface": "tun0",
+            "metric": 50,
+            "note": "Default route uses link-scoped gateway link#15, so next-hop reachability is less explicit."
+          }
+        ],
+        "default_route_state": "suspect",
+        "observations": [
+          "Default route uses link-scoped gateway link#15, so next-hop reachability is less explicit."
+        ]
+      }
+    },
+    "dns": {
+      "resolvers": [
+        "<private-ip-2>"
+      ],
+      "checks": [
+        {
+          "hostname": "<hostname-1>",
+          "success": true,
+          "resolved_addresses": [
+            "140.82.114.3"
+          ],
+          "error": null,
+          "duration_ms": 12
+        },
+        {
+          "hostname": "<hostname-2>",
+          "success": false,
+          "resolved_addresses": [],
+          "error": "temporary failure in name resolution",
+          "duration_ms": 15
+        }
+      ]
+    },
+    "connectivity": {
+      "internet_reachable": false,
+      "tcp_checks": [
+        {
+          "target": {
+            "host": "<hostname-1>",
+            "port": 443,
+            "label": "github-https"
+          },
+          "success": false,
+          "latency_ms": null,
+          "error": "timeout",
+          "ip_used": null,
+          "duration_ms": 3000
+        },
+        {
+          "target": {
+            "host": "1.1.1.1",
+            "port": 53,
+            "label": "cloudflare-dns"
+          },
+          "success": false,
+          "latency_ms": null,
+          "error": "timeout",
+          "ip_used": null,
+          "duration_ms": 3000
+        }
+      ],
+      "ping_checks": [],
+      "trace_results": [
+        {
+          "target": "<hostname-1>",
+          "ran": false,
+          "success": false,
+          "hops": [],
+          "error": "trace-command-unavailable",
+          "partial": false,
+          "target_address": null,
+          "last_responding_hop": null,
+          "duration_ms": 1
+        },
+        {
+          "target": "1.1.1.1",
+          "ran": false,
+          "success": false,
+          "hops": [],
+          "error": "trace-command-unavailable",
+          "partial": false,
+          "target_address": null,
+          "last_responding_hop": null,
+          "duration_ms": 1
+        }
+      ]
+    },
+    "vpn": {
+      "signals": []
+    },
+    "services": {
+      "checks": []
+    }
+  },
+  "findings": [
+    {
+      "identifier": "default-route-present-but-inconsistent",
+      "severity": "high",
+      "title": "Default route exists but looks inconsistent with local interface state",
+      "summary": "A default route was collected, but route and interface evidence suggest it may not be usable.",
+      "evidence": [
+        "Default route uses link-scoped gateway link#15, so next-hop reachability is less explicit.",
+        "Default route uses interface tun0, but that interface was not collected as active.",
+        "Default route uses interface tun0, but that interface has no usable non-loopback address.",
+        "External TCP checks failed: <hostname-1>:443 (timeout), 1.1.1.1:53 (timeout)."
+      ],
+      "probable_cause": "The route table contains a default path, but the host still appears locally misrouted, attached to the wrong interface, or missing a usable next-hop path.",
+      "fault_domain": "local_network",
+      "confidence": 0.9,
+      "heuristic": false,
+      "plain_language": "The host has a default route on paper, but the route and interface evidence do not line up cleanly.",
+      "evidence_summary": "Default route uses link-scoped gateway link#15, so next-hop reachability is less explicit. Default route uses interface tun0, but that interface was not collected as active.",
+      "safe_next_actions": [
+        "Verify the expected interface is still the active interface before rerunning.",
+        "If a dock, VPN, or secondary adapter recently changed state, reconnect it once."
+      ],
+      "escalation_triggers": [
+        "Escalate if the default route still points to an inactive or unusable interface after the interface is reset."
+      ],
+      "uncertainty_notes": [
+        "The route table inconsistency can indicate stale local state, policy routing, or an incomplete next-hop path."
+      ]
+    },
+    {
+      "identifier": "dns-partial-resolution",
+      "severity": "low",
+      "title": "DNS resolution is only partially successful",
+      "summary": "Some configured hostnames resolved while others failed, which suggests selective DNS reachability or split-horizon behavior rather than a total DNS outage.",
+      "evidence": [
+        "Successful DNS lookups: <hostname-1> -> 140.82.114.3.",
+        "Failed DNS lookups: <hostname-2> (temporary failure in name resolution)."
+      ],
+      "probable_cause": "Resolver selection, split-horizon DNS, or intermittent upstream resolver reachability may be affecting only part of the configured namespace set.",
+      "fault_domain": "dns",
+      "confidence": 0.58,
+      "heuristic": true,
+      "plain_language": "Some hostnames resolved and others did not, so DNS behavior is inconsistent rather than completely down.",
+      "evidence_summary": "Successful DNS lookups: <hostname-1> -> 140.82.114.3. Failed DNS lookups: <hostname-2> (temporary failure in name resolution).",
+      "safe_next_actions": [
+        "Keep both public and environment-specific hostnames in the run so the split is visible.",
+        "If VPN is relevant, compare results with and without the tunnel connected only if policy allows it."
+      ],
+      "escalation_triggers": [
+        "Escalate if the same namespace subset keeps failing after reconnecting the intended network path."
+      ],
+      "uncertainty_notes": [
+        "Selective DNS failures can be caused by split-horizon DNS, resolver choice, or intermittent upstream reachability."
+      ]
+    }
+  ],
+  "probable_fault_domain": "local_network",
+  "warnings": [
+    {
+      "domain": "routing",
+      "code": "route-data-warning",
+      "message": "Default route was collected, but it appears link-scoped and may be incomplete."
+    },
+    {
+      "domain": "connectivity",
+      "code": "trace-unavailable",
+      "message": "Traceroute command is unavailable on this endpoint."
+    }
+  ],
+  "execution": [
+    {
+      "domain": "host",
+      "label": "Host basics",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 4,
+      "summary": "Collected endpoint identity and uptime facts as a baseline domain.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "host-basics",
+          "label": "Collect host basics",
+          "status": "passed",
+          "duration_ms": 4,
+          "target": null,
+          "details": [
+            "Hostname: <endpoint-host-1>.",
+            "Kernel: 6.8.0."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "resources",
+      "label": "Resource snapshot",
+      "status": "not_run",
+      "selected": false,
+      "duration_ms": null,
+      "summary": "This domain was not selected for the run.",
+      "warnings": [],
+      "probes": [],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "storage",
+      "label": "Storage snapshot",
+      "status": "not_run",
+      "selected": false,
+      "duration_ms": null,
+      "summary": "This domain was not selected for the run.",
+      "warnings": [],
+      "probes": [],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "network",
+      "label": "Interface inventory",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 10,
+      "summary": "Collected interface state, local addresses, and neighbor context.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "interface-inventory",
+          "label": "Collect interface inventory",
+          "status": "passed",
+          "duration_ms": 10,
+          "target": null,
+          "details": [
+            "Interfaces collected: 2."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "arp-neighbor-cache",
+          "label": "Collect ARP or neighbor cache",
+          "status": "passed",
+          "duration_ms": 10,
+          "target": null,
+          "details": [
+            "Neighbor entries collected: 0."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "routing",
+      "label": "Routing inventory",
+      "status": "partial",
+      "selected": true,
+      "duration_ms": 9,
+      "summary": "Collected route table and default-route interpretation.",
+      "warnings": [
+        {
+          "domain": "routing",
+          "code": "route-data-warning",
+          "message": "Default route was collected, but it appears link-scoped and may be incomplete."
+        }
+      ],
+      "probes": [
+        {
+          "probe_id": "route-inventory",
+          "label": "Collect routing summary",
+          "status": "partial",
+          "duration_ms": 9,
+          "target": null,
+          "details": [
+            "Default route present: yes.",
+            "Default route state: suspect."
+          ],
+          "warnings": [
+            {
+              "domain": "routing",
+              "code": "route-data-warning",
+              "message": "Default route was collected, but it appears link-scoped and may be incomplete."
+            }
+          ],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "dns",
+      "label": "DNS checks",
+      "status": "partial",
+      "selected": true,
+      "duration_ms": 30,
+      "summary": "Collected resolver configuration and hostname resolution checks.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "resolver-inventory",
+          "label": "Determine configured resolvers",
+          "status": "passed",
+          "duration_ms": 30,
+          "target": null,
+          "details": [
+            "Resolvers: <private-ip-2>."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "dns:<hostname-1>",
+          "label": "Resolve <hostname-1>",
+          "status": "passed",
+          "duration_ms": 12,
+          "target": "<hostname-1>",
+          "details": [
+            "Resolved to 140.82.114.3."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "dns:<hostname-2>",
+          "label": "Resolve <hostname-2>",
+          "status": "failed",
+          "duration_ms": 15,
+          "target": "<hostname-2>",
+          "details": [
+            "Lookup failed: temporary failure in name resolution."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    },
+    {
+      "domain": "connectivity",
+      "label": "Generic connectivity",
+      "status": "partial",
+      "selected": true,
+      "duration_ms": 61,
+      "summary": "Collected generic DNS-independent and TCP path checks.",
+      "warnings": [
+        {
+          "domain": "connectivity",
+          "code": "trace-unavailable",
+          "message": "Traceroute command is unavailable on this endpoint."
+        }
+      ],
+      "probes": [
+        {
+          "probe_id": "tcp:<hostname-1>:443",
+          "label": "TCP <hostname-1>:443",
+          "status": "failed",
+          "duration_ms": 3000,
+          "target": "<hostname-1>:443",
+          "details": [
+            "TCP connection failed: timeout."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "tcp:1.1.1.1:53",
+          "label": "TCP 1.1.1.1:53",
+          "status": "failed",
+          "duration_ms": 3000,
+          "target": "1.1.1.1:53",
+          "details": [
+            "TCP connection failed: timeout."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "ping:<hostname-1>",
+          "label": "Ping <hostname-1>",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "<hostname-1>",
+          "details": [
+            "Ping was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "trace:<hostname-1>",
+          "label": "Trace <hostname-1>",
+          "status": "unsupported",
+          "duration_ms": 1,
+          "target": "<hostname-1>",
+          "details": [
+            "Trace failed: trace-command-unavailable."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "ping:1.1.1.1",
+          "label": "Ping 1.1.1.1",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "1.1.1.1",
+          "details": [
+            "Ping was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "trace:1.1.1.1",
+          "label": "Trace 1.1.1.1",
+          "status": "unsupported",
+          "duration_ms": 1,
+          "target": "1.1.1.1",
+          "details": [
+            "Trace failed: trace-command-unavailable."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    },
+    {
+      "domain": "vpn",
+      "label": "VPN heuristics",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 2,
+      "summary": "Evaluated tunnel-interface and route heuristics.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "vpn-heuristics",
+          "label": "Evaluate VPN and tunnel signals",
+          "status": "passed",
+          "duration_ms": 2,
+          "target": null,
+          "details": [
+            "No VPN-like interfaces or default-route tunnel hints were detected."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "services",
+      "label": "Configured services",
+      "status": "not_run",
+      "selected": false,
+      "duration_ms": null,
+      "summary": "This domain was not selected for the run.",
+      "warnings": [],
+      "probes": [],
+      "creates_network_egress": true
+    }
+  ],
+  "guided_experience": {
+    "issue_category": null,
+    "profile_id": null,
+    "profile_name": null,
+    "what_we_know": [
+      "The host has a default route on paper, but the route and interface evidence do not line up cleanly."
+    ],
+    "likely_happened": [
+      "The route table contains a default path, but the host still appears locally misrouted, attached to the wrong interface, or missing a usable next-hop path.",
+      "Heuristic conclusion: Resolver selection, split-horizon DNS, or intermittent upstream resolver reachability may be affecting only part of the configured namespace set."
+    ],
+    "safe_next_steps": [
+      "Verify the expected interface is still the active interface before rerunning.",
+      "If a dock, VPN, or secondary adapter recently changed state, reconnect it once.",
+      "Keep both public and environment-specific hostnames in the run so the split is visible.",
+      "If VPN is relevant, compare results with and without the tunnel connected only if policy allows it."
+    ],
+    "escalation_guidance": [
+      "Escalate if the default route still points to an inactive or unusable interface after the interface is reset.",
+      "Escalate if the same namespace subset keeps failing after reconnecting the intended network path."
+    ],
+    "uncertainty_notes": [
+      "The route table inconsistency can indicate stale local state, policy routing, or an incomplete next-hop path.",
+      "Selective DNS failures can be caused by split-horizon DNS, resolver choice, or intermittent upstream reachability.",
+      "Routing inventory was only partially collected or produced mixed results.",
+      "DNS checks was only partially collected or produced mixed results.",
+      "Generic connectivity was only partially collected or produced mixed results."
+    ]
+  }
+}

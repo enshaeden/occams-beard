@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from occams_beard.models import DiagnosticWarning, RouteEntry, RouteSummary
-from occams_beard.platform import current_platform
-from occams_beard.platform import linux, macos, windows
+from occams_beard.platform import current_platform, linux, macos, windows
+from occams_beard.utils.parsing import empty_route_data
 
 
 def collect_route_summary() -> tuple[RouteSummary, list[DiagnosticWarning]]:
@@ -20,15 +20,7 @@ def collect_route_summary() -> tuple[RouteSummary, list[DiagnosticWarning]]:
     elif platform_name == "windows":
         raw_data, command_result = windows.read_routes()
     else:
-        raw_data, command_result = {
-            "default_gateway": None,
-            "default_interface": None,
-            "has_default_route": False,
-            "routes": [],
-            "default_route_state": "missing",
-            "observations": [],
-            "parse_warnings": [],
-        }, None
+        raw_data, command_result = empty_route_data(), None
         warnings.append(
             DiagnosticWarning(
                 domain="routing",
@@ -43,12 +35,13 @@ def collect_route_summary() -> tuple[RouteSummary, list[DiagnosticWarning]]:
                 domain="routing",
                 code="route-command-failed",
                 message=(
-                    f"Route inventory command failed: {command_result.error or command_result.stderr.strip() or 'unknown-error'}"
+                    "Route inventory command failed: "
+                    f"{command_result.error or command_result.stderr.strip() or 'unknown-error'}"
                 ),
             )
         )
 
-    for parse_warning in raw_data.get("parse_warnings", []):
+    for parse_warning in raw_data["parse_warnings"]:
         warnings.append(
             DiagnosticWarning(
                 domain="routing",
@@ -61,19 +54,19 @@ def collect_route_summary() -> tuple[RouteSummary, list[DiagnosticWarning]]:
         RouteSummary(
             default_gateway=raw_data["default_gateway"],
             default_interface=raw_data["default_interface"],
-            has_default_route=bool(raw_data["has_default_route"]),
+            has_default_route=raw_data["has_default_route"],
             routes=[
                 RouteEntry(
-                    destination=str(route.get("destination")),
-                    gateway=str(route.get("gateway")) if route.get("gateway") else None,
-                    interface=str(route.get("interface")) if route.get("interface") else None,
-                    metric=int(route["metric"]) if route.get("metric") is not None else None,
-                    note=str(route.get("note")) if route.get("note") else None,
+                    destination=route["destination"],
+                    gateway=route["gateway"],
+                    interface=route["interface"],
+                    metric=route["metric"],
+                    note=route["note"],
                 )
                 for route in raw_data["routes"]
             ],
-            default_route_state=str(raw_data.get("default_route_state", "missing")),
-            observations=[str(item) for item in raw_data.get("observations", [])],
+            default_route_state=raw_data["default_route_state"],
+            observations=list(raw_data["observations"]),
         ),
         warnings,
     )

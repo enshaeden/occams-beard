@@ -2,43 +2,84 @@
 
 from __future__ import annotations
 
-import socket
+from collections.abc import Callable
 
 from occams_beard.models import DiagnosticWarning, DnsResolutionCheck, DnsState
-from occams_beard.platform import current_platform
-from occams_beard.platform import linux, macos, windows
-from occams_beard.utils.validation import dedupe_preserve_order
+from occams_beard.platform import current_platform, linux, macos, windows
+from occams_beard.utils.resolution import (
+    HOSTNAME_RESOLUTION_TIMEOUT_SECONDS,
+    resolve_hostname_addresses,
+)
 
 
-def collect_dns_state(hostnames: list[str]) -> tuple[DnsState, list[DiagnosticWarning]]:
+def collect_dns_state(
+    hostnames: list[str],
+    *,
+    progress_callback: Callable[[int], None] | None = None,
+) -> tuple[DnsState, list[DiagnosticWarning]]:
     """Collect resolver configuration and resolution results."""
 
     warnings: list[DiagnosticWarning] = []
     resolvers = _read_resolvers()
     checks: list[DnsResolutionCheck] = []
+    completed_steps = 1
+
+    if progress_callback is not None:
+        progress_callback(completed_steps)
 
     for hostname in hostnames:
-        try:
-            results = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
-        except socket.gaierror as exc:
+        resolution = resolve_hostname_addresses(hostname)
+        if resolution.timed_out:
+            warnings.append(
+                DiagnosticWarning(
+                    domain="dns",
+                    code="hostname-resolution-timeout",
+                    message=(
+                        "Hostname resolution timed out after "
+                        f"{HOSTNAME_RESOLUTION_TIMEOUT_SECONDS:.1f}s for {hostname}."
+                    ),
+                )
+            )
             checks.append(
                 DnsResolutionCheck(
                     hostname=hostname,
                     success=False,
-                    error=str(exc),
+                    error="hostname-resolution-timeout",
+                    duration_ms=resolution.duration_ms,
                 )
             )
+            completed_steps += 1
+            if progress_callback is not None:
+                progress_callback(completed_steps)
             continue
 
-        addresses = dedupe_preserve_order(item[4][0] for item in results if item[4])
+        if resolution.error is not None:
+            checks.append(
+                DnsResolutionCheck(
+                    hostname=hostname,
+                    success=False,
+                    error=resolution.error,
+                    duration_ms=resolution.duration_ms,
+                )
+            )
+            completed_steps += 1
+            if progress_callback is not None:
+                progress_callback(completed_steps)
+            continue
+
+        addresses = resolution.addresses
         checks.append(
             DnsResolutionCheck(
                 hostname=hostname,
                 success=bool(addresses),
                 resolved_addresses=addresses,
                 error=None if addresses else "no-addresses-returned",
+                duration_ms=resolution.duration_ms,
             )
         )
+        completed_steps += 1
+        if progress_callback is not None:
+            progress_callback(completed_steps)
 
     if not resolvers:
         warnings.append(

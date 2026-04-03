@@ -1,0 +1,26 @@
+id = "internal-service-unreachable"
+name = "Internal Service Unreachable"
+description = "Profile for private or enterprise service paths that fail while the endpoint may still have general connectivity."
+issue_category = "internal service unreachable"
+recommended_checks = ["network", "routing", "dns", "connectivity", "services", "vpn"]
+dns_hosts = ["github.com"]
+labels = ["service-path", "internal"]
+safe_user_guidance = [
+  "Keep at least one public baseline target in the run to separate general egress issues from service-path issues.",
+  "Confirm the service target and port are still correct before escalation.",
+]
+escalation_guidance = [
+  "Escalate if the public baseline succeeds but the intended internal service still fails.",
+  "Escalate if the internal service depends on VPN and the VPN profile also shows tunnel-routing concerns.",
+]
+
+[[tcp_targets]]
+host = "github.com"
+port = 443
+label = "public-baseline"
+
+[[tcp_targets]]
+host = "10.0.0.10"
+port = 443
+label = "internal-service"
+

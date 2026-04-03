@@ -1,0 +1,109 @@
+Occam's Beard Report
+================================
+
+Summary
+- Result schema version: 1.1.0
+- App version: 0.1.0
+- Host: field-macbook
+- Platform: macOS 15.0 (arm64)
+- Internet reachable: yes
+- Default route present: yes
+- Probable fault domain: dns
+- Fault-domain basis: DNS resolution failed but raw IP connectivity succeeded (0.92 confidence)
+- Profile: DNS Issue (DNS issue)
+
+Execution Status
+- Host basics: passed (local only)
+  Duration: 4 ms
+  Summary: Collected endpoint identity and uptime facts as a baseline domain.
+- Interface inventory: passed (local only)
+  Duration: 13 ms
+  Summary: Collected interface state, local addresses, and neighbor context.
+- Routing inventory: passed (local only)
+  Duration: 7 ms
+  Summary: Collected route table and default-route interpretation.
+- DNS checks: partial (network egress)
+  Duration: 38 ms
+  Summary: Collected resolver configuration and hostname resolution checks.
+  Probe Resolve github.com: failed (Lookup failed: temporary failure in name resolution.)
+  Probe Resolve python.org: failed (Lookup failed: temporary failure in name resolution.)
+- Generic connectivity: passed (network egress)
+  Duration: 34 ms
+  Summary: Collected generic DNS-independent and TCP path checks.
+  Probe Ping 1.1.1.1: skipped (Ping was not enabled for this run.)
+  Probe Trace 1.1.1.1: skipped (Traceroute was not enabled for this run.)
+
+Key Findings
+1. [HIGH] DNS resolution failed but raw IP connectivity succeeded
+   Derived finding: The endpoint can reach an external IP directly, but hostname resolution failed.
+   Plain language: The endpoint can reach a numeric external IP, but hostname lookups are failing.
+   Evidence summary: DNS hostnames that failed to resolve: github.com (temporary failure in name resolution), python.org (temporary failure in name resolution), pypi.org (temporary failure in name resolution). Numeric IP TCP success observed: 1.1.1.1:53 (ok), 8.8.8.8:53 (ok).
+   Observed fact: DNS hostnames that failed to resolve: github.com (temporary failure in name resolution), python.org (temporary failure in name resolution), pypi.org (temporary failure in name resolution).
+   Observed fact: Numeric IP TCP success observed: 1.1.1.1:53 (ok), 8.8.8.8:53 (ok).
+   Probable cause: The most likely failure domain is the local or upstream DNS resolver path.
+   Safe next actions: Compare the endpoint's resolver settings with the expected network or VPN profile.; Rerun once after reconnecting the network or VPN so the resolver path is refreshed.
+   Escalate when: Escalate if numeric IP access still works while hostname lookups keep failing.
+   Uncertainty: The finding isolates the failure toward DNS behavior, not whether the problem is local resolver selection or upstream resolver reachability.
+   Fault domain: dns (0.92 confidence, evidence-based)
+
+What We Know
+- The endpoint can reach a numeric external IP, but hostname lookups are failing.
+
+What Likely Happened
+- The most likely failure domain is the local or upstream DNS resolver path.
+
+What You Can Try Safely
+- Compare the endpoint's resolver settings with the expected network or VPN profile.
+- Rerun once after reconnecting the network or VPN so the resolver path is refreshed.
+- Rerun once after verifying the endpoint is using the intended DNS settings or VPN state.
+- Compare hostname failures with numeric-IP TCP results before assuming general internet loss.
+
+Escalate When
+- Escalate if numeric IP access still works while hostname lookups keep failing.
+- Escalate if DNS failures persist while numeric external IP targets still succeed.
+- Escalate if internal DNS names fail only on one network or VPN path.
+
+What Remains Uncertain
+- The finding isolates the failure toward DNS behavior, not whether the problem is local resolver selection or upstream resolver reachability.
+- DNS checks was only partially collected or produced mixed results.
+
+System Snapshot
+- Current user: operator
+- Uptime (seconds): 9200
+- CPU logical cores: unknown
+- CPU utilization estimate: unknown
+- Memory pressure: unknown
+- Memory available: unknown / unknown
+- Battery health: not collected
+
+Storage Snapshot
+- Monitored volumes: not collected
+- Storage device health: not collected
+
+Network Snapshot
+- Active interfaces: en0
+- Local addresses: 192.168.0.25
+- Interface MTUs: en0=1500
+- ARP neighbors: none collected
+- Default gateway: 192.168.0.1
+- Default interface: en0
+- Default route state: present
+- Route entries collected: 1
+- Route observations: none
+
+Generic Reachability Checks
+- 1.1.1.1:53 [cloudflare-dns]: ok, 14.2 ms, via 1.1.1.1
+- 8.8.8.8:53 [google-dns]: ok, 15.1 ms, via 8.8.8.8
+
+DNS Resolution
+- Resolvers: 192.168.0.1
+- github.com: failed (temporary failure in name resolution)
+- python.org: failed (temporary failure in name resolution)
+- pypi.org: failed (temporary failure in name resolution)
+
+Configured Service Checks
+- Service checks were not collected.
+
+Probable Fault Domain
+- dns
+- Justification: The most likely failure domain is the local or upstream DNS resolver path.

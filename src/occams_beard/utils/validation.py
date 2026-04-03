@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import ipaddress
+import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from occams_beard.models import TcpTarget
 

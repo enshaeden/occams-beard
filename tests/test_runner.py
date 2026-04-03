@@ -6,7 +6,19 @@ import unittest
 from unittest.mock import patch
 
 from occams_beard.defaults import DEFAULT_CHECKS
-from occams_beard.models import DnsState, Finding, HostBasics, TcpTarget
+from occams_beard.models import (
+    ConnectivityState,
+    CpuState,
+    DiagnosticWarning,
+    DnsResolutionCheck,
+    DnsState,
+    Finding,
+    HostBasics,
+    MemoryState,
+    TcpConnectivityCheck,
+    TcpTarget,
+)
+from occams_beard.execution import planned_execution_step_count
 from occams_beard.runner import DiagnosticsRunOptions, build_run_options, run_diagnostics
 
 
@@ -21,6 +33,18 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(options.dns_hosts, ["github.com", "python.org"])
         self.assertFalse(options.enable_ping)
         self.assertFalse(options.enable_trace)
+        self.assertIsNone(options.profile)
+
+    def test_build_run_options_uses_profile_defaults(self) -> None:
+        options = build_run_options(profile_id="dns-issue")
+
+        self.assertEqual(options.profile.profile_id, "dns-issue")
+        self.assertEqual(options.selected_checks, ["network", "routing", "dns", "connectivity"])
+        self.assertEqual(options.dns_hosts, ["github.com", "python.org", "pypi.org"])
+        self.assertEqual(
+            [(target.host, target.port) for target in options.targets],
+            [("1.1.1.1", 53), ("8.8.8.8", 53)],
+        )
 
     def test_run_diagnostics_returns_result_and_skips_unselected_collectors(self) -> None:
         options = DiagnosticsRunOptions(
@@ -39,39 +63,45 @@ class RunnerTests(unittest.TestCase):
             confidence=0.88,
         )
 
-        with patch(
-            "occams_beard.runner.collect_host_basics",
-            return_value=(
-                HostBasics(
-                    hostname="demo-host",
-                    operating_system="Linux",
-                    kernel="6.8.0",
-                    current_user="operator",
-                    uptime_seconds=120,
+        with (
+            patch(
+                "occams_beard.runner.collect_host_basics",
+                return_value=(
+                    HostBasics(
+                        hostname="demo-host",
+                        operating_system="Linux",
+                        kernel="6.8.0",
+                        current_user="operator",
+                        uptime_seconds=120,
+                    ),
+                    [],
                 ),
-                [],
             ),
-        ), patch(
-            "occams_beard.runner.collect_dns_state",
-            return_value=(DnsState(), []),
-        ), patch(
-            "occams_beard.runner.evaluate_selected_findings",
-            return_value=([finding], "dns"),
-        ), patch("occams_beard.runner.collect_resource_state") as mock_resources, patch(
-            "occams_beard.runner.collect_storage_state"
-        ) as mock_storage, patch("occams_beard.runner.collect_network_state") as mock_network, patch(
-            "occams_beard.runner.collect_route_summary"
-        ) as mock_routes, patch(
-            "occams_beard.runner.collect_connectivity_state"
-        ) as mock_connectivity, patch(
-            "occams_beard.runner.collect_service_state"
-        ) as mock_services, patch("occams_beard.runner.collect_vpn_state") as mock_vpn:
+            patch(
+                "occams_beard.runner.collect_dns_state",
+                return_value=(DnsState(), []),
+            ),
+            patch(
+                "occams_beard.runner.evaluate_selected_findings",
+                return_value=([finding], "dns"),
+            ),
+            patch("occams_beard.runner.collect_resource_state") as mock_resources,
+            patch("occams_beard.runner.collect_storage_state") as mock_storage,
+            patch("occams_beard.runner.collect_network_state") as mock_network,
+            patch("occams_beard.runner.collect_route_summary") as mock_routes,
+            patch("occams_beard.runner.collect_connectivity_state") as mock_connectivity,
+            patch("occams_beard.runner.collect_service_state") as mock_services,
+            patch("occams_beard.runner.collect_vpn_state") as mock_vpn,
+        ):
             result = run_diagnostics(options)
 
         self.assertEqual(result.metadata.selected_checks, ["dns"])
         self.assertEqual(result.probable_fault_domain, "dns")
         self.assertEqual(result.findings[0].identifier, "dns-degraded")
         self.assertEqual(result.facts.host.hostname, "demo-host")
+        self.assertEqual(result.schema_version, "1.1.0")
+        self.assertTrue(result.execution)
+        self.assertIsNotNone(result.guided_experience)
         mock_resources.assert_not_called()
         mock_storage.assert_not_called()
         mock_network.assert_not_called()
@@ -79,6 +109,269 @@ class RunnerTests(unittest.TestCase):
         mock_connectivity.assert_not_called()
         mock_services.assert_not_called()
         mock_vpn.assert_not_called()
+
+    def test_run_diagnostics_emits_progress_for_selected_domains(self) -> None:
+        options = DiagnosticsRunOptions(
+            selected_checks=["dns"],
+            targets=[TcpTarget(host="github.com", port=443)],
+            dns_hosts=["github.com"],
+        )
+        progress_updates: list[tuple[list[str], str | None, int, int, dict[str, int]]] = []
+
+        def capture_progress(
+            execution,
+            active_domain: str | None,
+            completed_count: int,
+            total_count: int,
+            completed_steps_by_domain: dict[str, int],
+        ) -> None:
+            progress_updates.append(
+                (
+                    [record.domain for record in execution if record.selected],
+                    active_domain,
+                    completed_count,
+                    total_count,
+                    completed_steps_by_domain,
+                )
+            )
+
+        def fake_collect_dns_state(hostnames, *, progress_callback=None):
+            if progress_callback is not None:
+                progress_callback(1)
+                progress_callback(2)
+            return DnsState(resolvers=["1.1.1.1"]), []
+
+        with (
+            patch(
+                "occams_beard.runner.collect_host_basics",
+                return_value=(
+                    HostBasics(
+                        hostname="demo-host",
+                        operating_system="Linux",
+                        kernel="6.8.0",
+                        current_user="operator",
+                        uptime_seconds=120,
+                    ),
+                    [],
+                ),
+            ),
+            patch(
+                "occams_beard.runner.collect_dns_state",
+                side_effect=fake_collect_dns_state,
+            ),
+            patch(
+                "occams_beard.runner.evaluate_selected_findings",
+                return_value=([], "healthy"),
+            ),
+        ):
+            run_diagnostics(
+                options,
+                progress_callback=capture_progress,
+            )
+
+        self.assertEqual(len(progress_updates), 4)
+        self.assertEqual(progress_updates[0][0], ["host", "dns"])
+        self.assertEqual(progress_updates[0][1], "dns")
+        self.assertEqual(progress_updates[0][2:4], (1, 3))
+        self.assertEqual(progress_updates[1][1], "dns")
+        self.assertEqual(progress_updates[1][2:4], (2, 3))
+        self.assertEqual(progress_updates[1][4]["dns"], 1)
+        self.assertEqual(progress_updates[2][1], "dns")
+        self.assertEqual(progress_updates[2][2:4], (3, 3))
+        self.assertEqual(progress_updates[2][4]["dns"], 2)
+        self.assertEqual(progress_updates[3][1], None)
+        self.assertEqual(progress_updates[3][2:4], (3, 3))
+
+    def test_run_diagnostics_emits_progress_inside_resource_collection(self) -> None:
+        options = DiagnosticsRunOptions(
+            selected_checks=["resources"],
+            targets=[],
+            dns_hosts=[],
+        )
+        progress_updates: list[tuple[str | None, int, int, dict[str, int]]] = []
+
+        def capture_progress(
+            _execution,
+            active_domain: str | None,
+            completed_count: int,
+            total_count: int,
+            completed_steps_by_domain: dict[str, int],
+        ) -> None:
+            progress_updates.append(
+                (
+                    active_domain,
+                    completed_count,
+                    total_count,
+                    completed_steps_by_domain,
+                )
+            )
+
+        def fake_collect_resource_state(*, progress_callback=None):
+            if progress_callback is not None:
+                progress_callback(1)
+                progress_callback(2)
+            return (
+                CpuState(logical_cpus=8),
+                MemoryState(total_bytes=1000, available_bytes=500, free_bytes=400),
+                None,
+                [],
+            )
+
+        with (
+            patch(
+                "occams_beard.runner.collect_host_basics",
+                return_value=(
+                    HostBasics(
+                        hostname="demo-host",
+                        operating_system="Linux",
+                        kernel="6.8.0",
+                        current_user="operator",
+                        uptime_seconds=120,
+                    ),
+                    [],
+                ),
+            ),
+            patch(
+                "occams_beard.runner.collect_resource_state",
+                side_effect=fake_collect_resource_state,
+            ),
+            patch(
+                "occams_beard.runner.evaluate_selected_findings",
+                return_value=([], "healthy"),
+            ),
+        ):
+            run_diagnostics(options, progress_callback=capture_progress)
+
+        self.assertEqual(progress_updates[0][0], "resources")
+        self.assertEqual(progress_updates[0][1:3], (1, 3))
+        self.assertEqual(progress_updates[1][0], "resources")
+        self.assertEqual(progress_updates[1][1:3], (2, 3))
+        self.assertEqual(progress_updates[1][3]["resources"], 1)
+        self.assertEqual(progress_updates[2][0], "resources")
+        self.assertEqual(progress_updates[2][1:3], (3, 3))
+        self.assertEqual(progress_updates[2][3]["resources"], 2)
+        self.assertEqual(progress_updates[3][0], None)
+
+    def test_planned_execution_step_count_grows_with_targets_and_enabled_probes(self) -> None:
+        options = DiagnosticsRunOptions(
+            selected_checks=["dns", "connectivity", "services"],
+            targets=[
+                TcpTarget(host="github.com", port=443),
+                TcpTarget(host="1.1.1.1", port=53),
+            ],
+            dns_hosts=["github.com", "python.org", "pypi.org"],
+            enable_ping=True,
+            enable_trace=True,
+        )
+
+        self.assertEqual(planned_execution_step_count(options), 13)
+
+    def test_run_diagnostics_marks_dns_timeout_as_partial_execution(self) -> None:
+        options = DiagnosticsRunOptions(
+            selected_checks=["dns"],
+            targets=[],
+            dns_hosts=["github.com"],
+        )
+
+        with (
+            patch(
+                "occams_beard.runner.collect_host_basics",
+                return_value=(
+                    HostBasics(
+                        hostname="demo-host",
+                        operating_system="Linux",
+                        kernel="6.8.0",
+                        current_user="operator",
+                        uptime_seconds=120,
+                    ),
+                    [],
+                ),
+            ),
+            patch(
+                "occams_beard.runner.collect_dns_state",
+                return_value=(
+                    DnsState(
+                        resolvers=["1.1.1.1"],
+                        checks=[
+                            DnsResolutionCheck(
+                                hostname="github.com",
+                                success=False,
+                                error="hostname-resolution-timeout",
+                                duration_ms=2000,
+                            )
+                        ],
+                    ),
+                    [
+                        DiagnosticWarning(
+                            domain="dns",
+                            code="hostname-resolution-timeout",
+                            message="Hostname resolution timed out for github.com.",
+                        )
+                    ],
+                ),
+            ),
+        ):
+            result = run_diagnostics(options)
+
+        dns_execution = next(record for record in result.execution if record.domain == "dns")
+        self.assertEqual(dns_execution.status, "partial")
+        self.assertEqual(dns_execution.probes[1].status, "partial")
+        self.assertEqual(result.findings[0].identifier, "healthy-baseline")
+
+    def test_run_diagnostics_marks_trace_target_resolution_timeout_as_partial_execution(
+        self,
+    ) -> None:
+        options = DiagnosticsRunOptions(
+            selected_checks=["connectivity"],
+            targets=[TcpTarget(host="github.com", port=443)],
+            dns_hosts=[],
+            enable_trace=True,
+        )
+
+        with (
+            patch(
+                "occams_beard.runner.collect_host_basics",
+                return_value=(
+                    HostBasics(
+                        hostname="demo-host",
+                        operating_system="Linux",
+                        kernel="6.8.0",
+                        current_user="operator",
+                        uptime_seconds=120,
+                    ),
+                    [],
+                ),
+            ),
+            patch(
+                "occams_beard.runner.collect_connectivity_state",
+                return_value=(
+                    ConnectivityState(
+                        internet_reachable=True,
+                        tcp_checks=[
+                            TcpConnectivityCheck(
+                                target=TcpTarget(host="github.com", port=443),
+                                success=True,
+                                latency_ms=12.5,
+                                duration_ms=13,
+                            )
+                        ],
+                    ),
+                    [
+                        DiagnosticWarning(
+                            domain="connectivity",
+                            code="trace-target-resolution-timeout",
+                            message="Trace target hostname resolution timed out for github.com.",
+                        )
+                    ],
+                ),
+            ),
+        ):
+            result = run_diagnostics(options)
+
+        connectivity_execution = next(
+            record for record in result.execution if record.domain == "connectivity"
+        )
+        self.assertEqual(connectivity_execution.status, "partial")
 
 
 if __name__ == "__main__":

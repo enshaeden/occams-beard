@@ -1,41 +1,19 @@
 # Platform Notes
 
-## What this is
+## General Rules
 
-This document records the platform-specific sources, assumptions, and degradation behavior behind Occam's Beard.
+- Baseline collection remains non-privileged.
+- Missing commands degrade into warnings or `unsupported` execution status instead of silent skips.
+- Optional ping and traceroute remain best-effort.
+- Raw command capture is opt-in and local only.
 
-## Problem space
-
-Cross-platform diagnostics require different operating system commands, data sources, and parsing rules. Treating those differences as incidental usually produces inconsistent output or stronger claims than the source data supports.
-
-## Design approach
-
-Occam's Beard uses a standard-library-first runtime and relies on built-in operating system facilities where needed. Baseline checks are designed to work without elevated privileges, command execution is bounded with timeouts, and missing tools degrade into warnings rather than silent skips.
-
-Platform-specific collection is normalized before findings run. That keeps platform drift out of the reasoning layer and makes partial results explicit.
-
-## Key capabilities
-
-- Cross-platform collection for macOS, Linux, and Windows
-- Platform-specific command selection with bounded execution
-- Stable normalization for interfaces, routes, DNS state, connectivity, and warnings
-- Best-effort optional ping and traceroute collection with platform-aware argument handling
-
-## Architecture
-
-Common rules:
-
-- Baseline collection should succeed without `sudo` or administrator privileges.
-- Missing commands should produce warnings.
-- Optional probes should not block the rest of the run.
-- Supplemental evidence such as ARP or neighbor data should remain contextual.
-
-Primary sources by platform:
+## Primary Sources
 
 Linux:
 
 - `/proc/uptime`
 - `/proc/meminfo`
+- `/sys/class/power_supply/BAT*`
 - `ip addr show`
 - `ip route show`
 - `/etc/resolv.conf`
@@ -45,6 +23,9 @@ macOS:
 
 - `sysctl`
 - `vm_stat`
+- `system_profiler SPPowerDataType`
+- `pmset -g batt`
+- `diskutil info -all`
 - `ifconfig`
 - `route -n get default`
 - `netstat -rn`
@@ -54,62 +35,27 @@ macOS:
 Windows:
 
 - PowerShell CIM queries
+- `Get-CimInstance Win32_Battery`
+- `Get-PhysicalDisk`
 - `ipconfig /all`
 - `route print`
 - `arp -a`
 - PowerShell DNS server enumeration
 
-Connectivity sources:
+## Live Smoke Validation
 
-- generic TCP checks use direct socket connections
-- ping uses platform-specific `ping` semantics
-- traceroute uses `traceroute` or `tracert` with platform-aware parsing
+- CI now runs a bounded live smoke validation job on GitHub-hosted Ubuntu, macOS, and Windows runners.
+- The smoke job runs the existing shared runner with `host`, `resources`, `network`, `routing`, and `dns` selected.
+- The smoke job does not enable TCP targets, ping, or traceroute, so it stays focused on local parser and collector drift.
+- The smoke summary artifact records platform metadata, execution statuses, counts, and command invocations without persisting raw stdout or stderr.
 
-## Usage
+## Current Limits
 
-Use this document when you need to understand why a platform returned partial data or why a probe was reported as degraded.
-
-Examples:
-
-```bash
-occams-beard run --enable-ping --enable-trace
-```
-
-```bash
-occams-beard run --checks network,routing,dns,connectivity
-```
-
-When the result includes warnings, compare them against the notes here before treating the absence of a detail as evidence of failure.
-
-## Tradeoffs and limitations
-
-Linux:
-
-- command output varies by distribution and age
-- restricted or containerized environments can expose incomplete route or interface data
-- neighbor-cache output can be stale or sparse
-
-macOS:
-
-- memory pressure is approximated from available page-state data rather than proprietary metrics
-- `utun*` and similar interfaces are useful tunnel signals but not proof of a working VPN session
-- sandboxed or privacy-restricted contexts can return partial uptime or resolver data
-- pseudo-filesystem mounts such as `/dev` and CoreSimulator volumes are excluded from host disk pressure evaluation
-
-Windows:
-
-- richer host data depends on broadly available PowerShell behavior
-- output formatting varies more than on Unix-like platforms
-- localized or older command variants may degrade into warnings or partial route observations
-
-Shared limits:
-
-- traceroute parsing is conservative and some outputs remain only partially parsed
-- ping and traceroute availability depends on command presence and network policy
-- VPN detection is heuristic and based on interface, address, and route signals rather than authoritative session state
-
-## Future work
-
-- Broaden fixture coverage for Windows and traceroute variants
-- Add additional non-privileged fallback probes where sandboxed environments still return partial data
-- Refine tunnel and route interpretation where it can remain conservative
+- command output still varies by platform and OS version
+- VPN detection remains heuristic
+- Linux battery health is limited to what sysfs exposes, and non-privileged Linux storage-device health is still effectively unavailable in the current model
+- macOS storage-device health depends on `diskutil` exposing usable device and SMART state on the current host
+- Windows battery collection currently captures battery presence, charge, and coarse state, but not design-capacity health
+- traceroute parsing remains conservative
+- fixture coverage now includes representative split-tunnel, blackhole/default-route, resolver, VPN-adapter, malformed-route, legacy-netstat, and additional traceroute variants across Linux, macOS, and Windows, but it still does not cover every OS/version-localization combination
+- live smoke validation now checks real command output on GitHub-hosted Ubuntu, macOS, and Windows images, but it does not yet represent every enterprise image, self-hosted runner baseline, or non-English locale

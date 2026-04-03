@@ -1,0 +1,5 @@
+Tracing route to intranet.example [10.20.30.40]
+over a maximum of 30 hops:
+
+  1     *        *        *     General failure.
+  2     *        *        *     Request timed out.

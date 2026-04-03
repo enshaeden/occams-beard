@@ -211,6 +211,49 @@ class NetworkCollectionTests(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertEqual(warnings[0].code, "arp-command-failed")
 
+    @patch("occams_beard.collectors.network.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.network.linux.read_arp_neighbors")
+    @patch("occams_beard.collectors.network.linux.read_interfaces")
+    def test_collect_network_state_reports_incremental_progress(
+        self,
+        mock_read_interfaces,
+        mock_read_arp_neighbors,
+        _mock_platform,
+    ) -> None:
+        mock_read_interfaces.return_value = (
+            [
+                {
+                    "name": "eth0",
+                    "is_up": True,
+                    "mac_address": "aa:bb:cc:dd:ee:ff",
+                    "mtu": 1500,
+                    "addresses": [],
+                }
+            ],
+            CommandResult(
+                args=("ip", "addr", "show"),
+                returncode=0,
+                stdout="",
+                stderr="",
+                duration_ms=5,
+            ),
+        )
+        mock_read_arp_neighbors.return_value = (
+            [],
+            CommandResult(
+                args=("ip", "neigh", "show"),
+                returncode=0,
+                stdout="",
+                stderr="",
+                duration_ms=5,
+            ),
+        )
+        progress_updates: list[int] = []
+
+        collect_network_state(progress_callback=progress_updates.append)
+
+        self.assertEqual(progress_updates, [1, 2])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,25 @@
+id = "custom-profile"
+name = "Custom Profile"
+description = "General starting point when the operator needs to adjust checks and targets manually."
+issue_category = "custom profile"
+recommended_checks = ["host", "resources", "storage", "network", "routing", "dns", "connectivity", "vpn", "services"]
+dns_hosts = ["github.com", "python.org"]
+labels = ["custom"]
+safe_user_guidance = [
+  "Review the default checks and remove anything that does not help answer the current troubleshooting question.",
+  "Keep targets local to the endpoint context and avoid collecting extra evidence that is not needed.",
+]
+escalation_guidance = [
+  "Escalate when the findings remain inconclusive after collecting the minimum relevant domains.",
+  "Escalate if additional evidence would require privileged access or policy exceptions.",
+]
+
+[[tcp_targets]]
+host = "github.com"
+port = 443
+label = "github-https"
+
+[[tcp_targets]]
+host = "1.1.1.1"
+port = 53
+label = "cloudflare-dns"

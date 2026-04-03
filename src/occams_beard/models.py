@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
-
+from typing import Any, Literal
 
 Severity = Literal["info", "low", "medium", "high"]
+ExecutionStatus = Literal["passed", "failed", "partial", "unsupported", "skipped", "not_run"]
 FaultDomain = Literal[
     "healthy",
     "local_host",
@@ -17,6 +17,7 @@ FaultDomain = Literal[
     "upstream_network",
     "unknown",
 ]
+RedactionLevel = Literal["none", "safe", "strict"]
 
 
 @dataclass(slots=True)
@@ -37,6 +38,9 @@ class Metadata:
     generated_at: str
     elapsed_ms: int
     selected_checks: list[str]
+    profile_id: str | None = None
+    profile_name: str | None = None
+    issue_category: str | None = None
 
 
 @dataclass(slots=True)
@@ -94,12 +98,38 @@ class DiskVolume:
 
 
 @dataclass(slots=True)
+class BatteryState:
+    """Read-only battery health information when the endpoint exposes it."""
+
+    present: bool
+    charge_percent: int | None = None
+    status: str | None = None
+    cycle_count: int | None = None
+    condition: str | None = None
+    health_percent: float | None = None
+
+
+@dataclass(slots=True)
+class StorageDeviceHealth:
+    """Read-only storage-device health information when the endpoint exposes it."""
+
+    device_id: str
+    model: str | None = None
+    protocol: str | None = None
+    medium: str | None = None
+    health_status: str | None = None
+    operational_status: str | None = None
+
+
+@dataclass(slots=True)
 class ResourceState:
     """Normalized view of host resource state."""
 
     cpu: CpuState
     memory: MemoryState
     disks: list[DiskVolume] = field(default_factory=list)
+    battery: BatteryState | None = None
+    storage_devices: list[StorageDeviceHealth] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -165,9 +195,7 @@ class NetworkState:
     local_addresses: list[str] = field(default_factory=list)
     active_interfaces: list[str] = field(default_factory=list)
     arp_neighbors: list[ArpNeighbor] = field(default_factory=list)
-    route_summary: RouteSummary = field(
-        default_factory=lambda: RouteSummary(None, None, False, [])
-    )
+    route_summary: RouteSummary = field(default_factory=lambda: RouteSummary(None, None, False, []))
 
 
 @dataclass(slots=True)
@@ -178,6 +206,7 @@ class DnsResolutionCheck:
     success: bool
     resolved_addresses: list[str] = field(default_factory=list)
     error: str | None = None
+    duration_ms: int | None = None
 
 
 @dataclass(slots=True)
@@ -206,6 +235,7 @@ class TcpConnectivityCheck:
     latency_ms: float | None = None
     error: str | None = None
     ip_used: str | None = None
+    duration_ms: int | None = None
 
 
 @dataclass(slots=True)
@@ -217,6 +247,7 @@ class PingResult:
     packet_loss_percent: float | None = None
     average_latency_ms: float | None = None
     error: str | None = None
+    duration_ms: int | None = None
 
 
 @dataclass(slots=True)
@@ -242,6 +273,7 @@ class TraceResult:
     partial: bool = False
     target_address: str | None = None
     last_responding_hop: int | None = None
+    duration_ms: int | None = None
 
 
 @dataclass(slots=True)
@@ -281,6 +313,7 @@ class ServiceCheck:
     success: bool
     latency_ms: float | None = None
     error: str | None = None
+    duration_ms: int | None = None
 
 
 @dataclass(slots=True)
@@ -316,6 +349,119 @@ class Finding:
     fault_domain: FaultDomain
     confidence: float
     heuristic: bool = False
+    plain_language: str | None = None
+    evidence_summary: str | None = None
+    safe_next_actions: list[str] = field(default_factory=list)
+    escalation_triggers: list[str] = field(default_factory=list)
+    uncertainty_notes: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class ExecutionProbe:
+    """Execution status for a concrete probe or sub-check."""
+
+    probe_id: str
+    label: str
+    status: ExecutionStatus
+    duration_ms: int | None = None
+    target: str | None = None
+    details: list[str] = field(default_factory=list)
+    warnings: list[DiagnosticWarning] = field(default_factory=list)
+    creates_network_egress: bool = False
+
+
+@dataclass(slots=True)
+class DomainExecution:
+    """Execution status for a diagnostic domain."""
+
+    domain: str
+    label: str
+    status: ExecutionStatus
+    selected: bool
+    duration_ms: int | None = None
+    summary: str | None = None
+    warnings: list[DiagnosticWarning] = field(default_factory=list)
+    probes: list[ExecutionProbe] = field(default_factory=list)
+    creates_network_egress: bool = False
+
+
+@dataclass(slots=True)
+class GuidedExperience:
+    """Deterministic self-service summary derived from findings and execution state."""
+
+    issue_category: str | None = None
+    profile_id: str | None = None
+    profile_name: str | None = None
+    what_we_know: list[str] = field(default_factory=list)
+    likely_happened: list[str] = field(default_factory=list)
+    safe_next_steps: list[str] = field(default_factory=list)
+    escalation_guidance: list[str] = field(default_factory=list)
+    uncertainty_notes: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class RawCommandCapture:
+    """Captured raw command execution for an explicitly enabled support bundle."""
+
+    command: list[str]
+    returncode: int | None
+    stdout: str
+    stderr: str
+    duration_ms: int
+    timed_out: bool = False
+    error: str | None = None
+
+
+@dataclass(slots=True)
+class DiagnosticProfile:
+    """Local reusable scenario profile for repeatable diagnostics runs."""
+
+    profile_id: str
+    name: str
+    description: str
+    issue_category: str
+    recommended_checks: list[str]
+    dns_hosts: list[str] = field(default_factory=list)
+    tcp_targets: list[TcpTarget] = field(default_factory=list)
+    labels: list[str] = field(default_factory=list)
+    safe_user_guidance: list[str] = field(default_factory=list)
+    escalation_guidance: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class RedactionSummary:
+    """Human-readable and machine-readable description of bundle redactions."""
+
+    level: RedactionLevel
+    counts: dict[str, int] = field(default_factory=dict)
+    notes: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class SupportBundleFile:
+    """Manifest entry for a file placed in a support bundle."""
+
+    path: str
+    sha256: str
+    size_bytes: int
+
+
+@dataclass(slots=True)
+class SupportBundleManifest:
+    """Structured metadata describing a support bundle export."""
+
+    bundle_format_version: str
+    generated_at: str
+    app_version: str
+    schema_version: str
+    redaction_level: RedactionLevel
+    raw_command_capture_included: bool
+    selected_checks: list[str]
+    profile_id: str | None = None
+    issue_category: str | None = None
+    files: list[SupportBundleFile] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -325,6 +471,10 @@ class EndpointDiagnosticResult:
     metadata: Metadata
     platform: PlatformInfo
     facts: CollectedFacts
+    schema_version: str = "1.1.0"
     findings: list[Finding] = field(default_factory=list)
     probable_fault_domain: FaultDomain = "unknown"
     warnings: list[DiagnosticWarning] = field(default_factory=list)
+    execution: list[DomainExecution] = field(default_factory=list)
+    guided_experience: GuidedExperience | None = None
+    raw_command_capture: list[RawCommandCapture] = field(default_factory=list)

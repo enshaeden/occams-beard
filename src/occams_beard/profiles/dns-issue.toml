@@ -1,0 +1,26 @@
+id = "dns-issue"
+name = "DNS Issue"
+description = "Focused profile for name-resolution problems while generic network reachability may still work."
+issue_category = "DNS issue"
+recommended_checks = ["network", "routing", "dns", "connectivity"]
+dns_hosts = ["github.com", "python.org", "pypi.org"]
+labels = ["dns", "resolution"]
+safe_user_guidance = [
+  "Rerun once after verifying the endpoint is using the intended DNS settings or VPN state.",
+  "Compare hostname failures with numeric-IP TCP results before assuming general internet loss.",
+]
+escalation_guidance = [
+  "Escalate if DNS failures persist while numeric external IP targets still succeed.",
+  "Escalate if internal DNS names fail only on one network or VPN path.",
+]
+
+[[tcp_targets]]
+host = "1.1.1.1"
+port = 53
+label = "cloudflare-dns"
+
+[[tcp_targets]]
+host = "8.8.8.8"
+port = 53
+label = "google-dns"
+

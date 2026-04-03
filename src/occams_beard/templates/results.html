@@ -1,42 +1,326 @@
 {% extends "layout.html" %}
 
 {% block content %}
-  <section class="summary-grid">
-    <article class="card summary-card">
-      <p class="eyebrow">Summary</p>
-      <h2>{{ result.facts.host.hostname }}</h2>
-      <dl class="summary-list">
-        <div>
-          <dt>Platform</dt>
-          <dd>{{ result.platform.system }} {{ result.platform.release }} ({{ result.platform.machine }})</dd>
-        </div>
-        <div>
-          <dt>Probable fault domain</dt>
-          <dd><span class="fault-domain">{{ result.probable_fault_domain }}</span></dd>
-        </div>
-        <div>
-          <dt>Generated</dt>
-          <dd>{{ result.metadata.generated_at }}</dd>
-        </div>
-        <div>
-          <dt>Elapsed</dt>
-          <dd>{{ result.metadata.elapsed_ms }} ms</dd>
-        </div>
-      </dl>
-    </article>
+  <section class="answer-shell {% if view.mode == 'support' %}answer-shell-support{% endif %}">
+    <article class="card answer-card stack-lg">
+      <div class="result-status-line">
+        <span class="mode-chip">{{ view.mode_label }}</span>
+        <span class="status-pill status-{{ view.status_tone }}">{{ view.status_label }}</span>
+      </div>
 
-    <article class="card summary-card">
-      <p class="eyebrow">Actions</p>
-      <h2>Artifacts</h2>
       <div class="stack-sm">
-        <a class="primary-button" href="{{ url_for('download_json', run_id=record.run_id) }}">Download JSON</a>
-        <a class="ghost-button" href="{{ rerun_url }}">Run Again With These Inputs</a>
+        <h2>{{ view.headline }}</h2>
+        <p class="lede">{{ view.top_takeaway }}</p>
+      </div>
+
+      <article class="info-panel answer-next-step stack-sm">
+        <p class="eyebrow">Answer</p>
+        <div class="stack-xs">
+          <h3>Primary next step</h3>
+          <p>{{ view.primary_next_step }}</p>
+        </div>
+      </article>
+
+      <dl class="summary-list">
+        {% for item in view.answer_meta %}
+          <div>
+            <dt>{{ item.label }}</dt>
+            <dd>{{ item.value }}</dd>
+          </div>
+        {% endfor %}
+      </dl>
+
+      <div class="actions" data-results-hero-actions>
+        {% if view.continue_with_support_url %}
+          <a class="primary-button" href="{{ view.continue_with_support_url }}" data-results-action="continue-support">Continue With Support</a>
+        {% endif %}
+        <a class="{% if not view.continue_with_support_url and view.mode != 'support' %}primary-button{% else %}ghost-button{% endif %}" href="{{ rerun_url }}" data-results-action="rerun">
+          {{ "Review Plan and Run Again" if view.mode == "support" else "Run Again" }}
+        </a>
+        {% if view.previous_results_url %}
+          <a class="ghost-button" href="{{ view.previous_results_url }}" data-results-action="previous-results">View Earlier Results</a>
+        {% endif %}
       </div>
     </article>
+
+    {% if view.mode == "support" %}
+      <article class="card bundle-priority-card stack-md">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Primary Handoff</p>
+            <h2>Download Support Bundle</h2>
+          </div>
+          <span class="status-pill status-attention">Support first</span>
+        </div>
+        {% include "_support_bundle_form.html" %}
+      </article>
+    {% endif %}
   </section>
 
-  {% include "partials/findings.html" %}
-  {% include "partials/facts_summary.html" %}
-  {% include "partials/connectivity.html" %}
-  {% include "partials/warnings.html" %}
+  <section class="card decision-card stack-lg">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Decision Support</p>
+        <h2>What to do with this run</h2>
+      </div>
+    </div>
+
+    <div class="decision-grid">
+      <section class="decision-section stack-sm">
+        <h3>What we know</h3>
+        {% if view.what_we_know %}
+          <ul class="result-list">
+            {% for item in view.what_we_know %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted">The main answer above captures the confirmed evidence from this run.</p>
+        {% endif %}
+      </section>
+
+      <section class="decision-section stack-sm">
+        <h3>What likely happened</h3>
+        {% if view.likely_happened %}
+          <ul class="result-list">
+            {% for item in view.likely_happened %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted">This run did not isolate a separate interpretation beyond the confirmed evidence.</p>
+        {% endif %}
+      </section>
+
+      <section class="decision-section stack-sm">
+        <h3>What you can do now</h3>
+        <ul class="result-list">
+          {% for item in view.next_steps %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="decision-section stack-sm">
+        <h3>What was tested</h3>
+        <dl class="summary-list">
+          {% for item in view.what_was_tested_summary %}
+            <div>
+              <dt>{{ item.label }}</dt>
+              <dd>{{ item.value }}</dd>
+            </div>
+          {% endfor %}
+        </dl>
+
+        <div class="domain-list">
+          {% for domain in view.selected_domains %}
+            <article class="domain-row {% if domain.subdued %}domain-row-subdued{% endif %}">
+              <div class="stack-xs">
+                <div class="row-inline">
+                  <strong>{{ domain.label }}</strong>
+                  <span class="status-pill status-{{ domain.badge_tone }}">{{ domain.badge_label }}</span>
+                </div>
+                <p class="muted">{{ domain.summary }}</p>
+              </div>
+              <div class="domain-meta">
+                <span>{{ domain.duration_label }}</span>
+                <span>{{ domain.scope_label }}</span>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+
+        {% if view.optional_domains %}
+          <p class="field-help">Optional deeper areas not selected: {{ view.optional_domains | join(", ") }}.</p>
+        {% endif %}
+      </section>
+
+      <section class="decision-section stack-sm">
+        <h3>Important warnings and privacy</h3>
+        {% if view.warning_notes %}
+          <div class="stack-xs">
+            <p class="field-label">Warnings</p>
+            <ul class="warning-list">
+              {% for item in view.warning_notes %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        <div class="stack-xs">
+          <p class="field-label">Privacy</p>
+          <ul class="result-list">
+            {% for item in view.privacy_notes %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+
+      <section class="decision-section stack-sm">
+        <h3>What remains uncertain</h3>
+        <ul class="result-list">
+          {% for item in view.uncertainty_notes %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+
+        {% if view.escalation_guidance %}
+          <div class="stack-xs">
+            <p class="field-label">{{ "Support guidance" if view.mode == "support" else "Continue with support when" }}</p>
+            <ul class="result-list">
+              {% for item in view.escalation_guidance %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="decision-section stack-sm">
+        <h3>{{ "Additional exports" if view.mode == "support" else "Support and export" }}</h3>
+        <p class="muted">{{ view.support_actions_intro }}</p>
+
+        {% if view.mode == "support" %}
+          {% if view.previous_results_url %}
+            <div class="actions">
+              <a class="ghost-button" href="{{ view.previous_results_url }}">View Earlier Results</a>
+            </div>
+          {% else %}
+            <p class="field-help">For most guided runs, the support bundle above is the only export support needs.</p>
+          {% endif %}
+        {% else %}
+          {% include "_support_bundle_form.html" %}
+        {% endif %}
+      </section>
+    </div>
+  </section>
+
+  <section class="technical-review stack-md">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Technical Review</p>
+        <h2>Detailed findings and evidence</h2>
+      </div>
+    </div>
+
+    <details class="details-card" data-results-details="technical-findings" {% if view.technical_open %}open{% endif %}>
+      <summary>
+        <span>Technical findings</span>
+        <span class="summary-meta">
+          {{ view.evidence_based_findings | length }} evidence-based
+          {% if view.heuristic_findings %}
+            · {{ view.heuristic_findings | length }} heuristic
+          {% endif %}
+        </span>
+      </summary>
+      <div class="details-body stack-md">
+        {% if view.evidence_based_findings %}
+          <div class="stack-sm">
+            <p class="field-label">Evidence-based conclusions</p>
+            {% for finding in view.evidence_based_findings %}
+              <article class="finding-card severity-{{ finding.severity }}">
+                <div class="finding-header">
+                  <span class="severity-badge severity-{{ finding.severity }}">{{ finding.severity_label }}</span>
+                  <h3>{{ finding.title }}</h3>
+                </div>
+                <p>{{ finding.plain_language }}</p>
+                {% if finding.evidence_summary %}
+                  <p><strong>Evidence summary:</strong> {{ finding.evidence_summary }}</p>
+                {% endif %}
+                <ul class="result-list">
+                  {% for item in finding.evidence %}
+                    <li>{{ item }}</li>
+                  {% endfor %}
+                </ul>
+                <p class="muted">
+                  {{ finding.fault_domain }} · confidence {{ finding.confidence }}
+                </p>
+              </article>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if view.heuristic_findings %}
+          <div class="stack-sm">
+            <p class="field-label">Heuristic guidance</p>
+            {% for finding in view.heuristic_findings %}
+              <article class="finding-card severity-{{ finding.severity }}">
+                <div class="finding-header">
+                  <span class="severity-badge severity-{{ finding.severity }}">{{ finding.severity_label }}</span>
+                  <h3>{{ finding.title }}</h3>
+                </div>
+                <p>{{ finding.plain_language }}</p>
+                {% if finding.evidence_summary %}
+                  <p><strong>Signal summary:</strong> {{ finding.evidence_summary }}</p>
+                {% endif %}
+                <p class="muted">{{ finding.probable_cause }}</p>
+              </article>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if not view.evidence_based_findings and not view.heuristic_findings %}
+          <div class="empty-state">
+            <h3>No technical findings</h3>
+            <p>The current run did not produce a finding card for this section.</p>
+          </div>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="details-card" data-results-details="check-details" {% if view.technical_open %}open{% endif %}>
+      <summary>
+        <span>Check details</span>
+        <span class="summary-meta">{{ view.selected_domains | length }} selected domain(s)</span>
+      </summary>
+      <div class="details-body stack-md">
+        {% for section in view.technical_sections %}
+          <article class="info-panel stack-sm">
+            <h3>{{ section.title }}</h3>
+            {% if section.has_items %}
+              {% set rows = section["items"] if view.technical_open else section["notable_items"] %}
+              {% if rows %}
+                <ul class="signal-list">
+                  {% for item in rows %}
+                    <li class="signal-row">
+                      <div class="stack-xs">
+                        <div class="row-inline">
+                          <strong>{{ item.label }}</strong>
+                          <span class="status-pill status-{{ item.status }}">{{ item.status_label }}</span>
+                        </div>
+                        <p class="muted">{{ item.detail }}</p>
+                      </div>
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                <p class="muted">No failures, partial results, or unsupported items are shown here.</p>
+              {% endif %}
+              {% if section["passed_count"] and (not view.technical_open or section["notable_items"]) %}
+                <p class="field-help">{{ section["passed_count"] }} passed item(s) hidden to keep this view shorter.</p>
+              {% endif %}
+            {% else %}
+              <p class="muted">{{ section["empty_message"] }}</p>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    </details>
+
+    <details class="details-card" data-results-details="technical-context" {% if view.technical_open %}open{% endif %}>
+      <summary>
+        <span>Technical context</span>
+        <span class="summary-meta">Network, routing, and resolver facts</span>
+      </summary>
+      <div class="details-body">
+        <ul class="result-list">
+          {% for item in view.technical_context %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
+  </section>
 {% endblock %}

@@ -5,20 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title }} | Occam's Beard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% if browser_presence %}
+      <meta name="occams-browser-presence-heartbeat-url" content="{{ browser_presence.heartbeat_url }}">
+      <meta name="occams-browser-presence-closing-url" content="{{ browser_presence.closing_url }}">
+      <meta name="occams-browser-presence-interval-ms" content="{{ browser_presence.interval_ms }}">
+    {% endif %}
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <div class="page-backdrop"></div>
     <header class="page-shell page-header">
-      <div>
-        <p class="eyebrow">Local Operator Console</p>
+      <div class="brand-block stack-sm">
+        <p class="eyebrow">Local-first diagnostics</p>
         <h1>Occam's Beard</h1>
-        <p class="subtitle">Run local diagnostics, review evidence, and export structured results without leaving the host.</p>
+        <p class="subtitle">
+          Check your device safely, follow support-guided plans when needed,
+          and keep results local unless you choose to export them.
+        </p>
       </div>
-      <nav class="header-actions">
-        <a class="ghost-button" href="{{ url_for('index') }}">New Run</a>
+      <nav class="header-actions" aria-label="Primary">
+        <a class="ghost-button" href="{{ url_for('index') }}">Start Over</a>
       </nav>
     </header>
-    <main class="page-shell">
+    <main class="page-shell page-main" id="main-content" tabindex="-1">
       {% block content %}{% endblock %}
     </main>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
 </html>

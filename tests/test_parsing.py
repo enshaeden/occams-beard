@@ -10,16 +10,18 @@ from occams_beard.utils.parsing import (
     parse_arp_table,
     parse_ifconfig,
     parse_ip_addr_show,
-    parse_ipconfig,
     parse_ip_neigh,
+    parse_ipconfig,
     parse_linux_ip_route,
     parse_netstat_rn,
     parse_ping_output,
+    parse_powershell_dns_server_list,
+    parse_resolv_conf,
     parse_route_get_default,
     parse_route_print,
+    parse_scutil_dns,
     parse_traceroute_output,
 )
-
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
@@ -47,6 +49,24 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(parsed["default_interface"], "lo")
         self.assertEqual(parsed["default_route_state"], "suspect")
         self.assertIn("marked unreachable", " ".join(parsed["observations"]))
+
+    def test_parse_linux_ip_route_prefers_usable_default_over_blackhole(self) -> None:
+        parsed = parse_linux_ip_route(_fixture("linux-ip-route-blackhole-default.txt"))
+
+        self.assertEqual(parsed["default_gateway"], "192.168.50.1")
+        self.assertEqual(parsed["default_interface"], "eth0")
+        self.assertEqual(parsed["default_route_state"], "suspect")
+        self.assertTrue(any("blackhole" in note for note in parsed["observations"]))
+        self.assertEqual(parsed["routes"][2]["interface"], "tun0")
+
+    def test_parse_linux_ip_route_preserves_split_tunnel_routes(self) -> None:
+        parsed = parse_linux_ip_route(_fixture("linux-ip-route-split-tunnel.txt"))
+
+        self.assertEqual(parsed["default_gateway"], "192.168.1.1")
+        self.assertEqual(parsed["default_interface"], "eth0")
+        self.assertEqual(parsed["default_route_state"], "present")
+        self.assertEqual(parsed["routes"][1]["interface"], "tun0")
+        self.assertEqual(parsed["routes"][2]["gateway"], "10.20.0.1")
 
     def test_parse_ip_addr_show_extracts_addresses_and_normalizes_peer_suffixes(self) -> None:
         output = """
@@ -83,6 +103,16 @@ utun2: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380
         self.assertEqual(parsed[1]["name"], "utun2")
         self.assertTrue(parsed[1]["is_up"])
 
+    def test_parse_ifconfig_preserves_tunnel_and_ipv6_variants(self) -> None:
+        parsed = parse_ifconfig(_fixture("macos-ifconfig-utun-variants.txt"))
+
+        self.assertEqual(len(parsed), 3)
+        self.assertEqual(parsed[0]["mac_address"], "aa:bb:cc:dd:ee:ff")
+        self.assertEqual(parsed[1]["name"], "utun3")
+        self.assertTrue(parsed[1]["is_up"])
+        self.assertEqual(parsed[1]["addresses"][1]["family"], "ipv6")
+        self.assertEqual(parsed[2]["name"], "bridge0")
+
     def test_parse_netstat_rn_marks_link_scoped_default_as_suspect(self) -> None:
         output = """
 Routing tables
@@ -101,6 +131,44 @@ default            192.168.1.1        UGScg                 en0
         self.assertEqual(parsed["default_route_state"], "suspect")
         self.assertTrue(any("link-scoped gateway" in note for note in parsed["observations"]))
 
+    def test_parse_netstat_rn_preserves_macos_split_tunnel_routes(self) -> None:
+        parsed = parse_netstat_rn(_fixture("macos-netstat-rn-split-tunnel.txt"))
+
+        self.assertEqual(parsed["default_gateway"], "192.168.1.1")
+        self.assertEqual(parsed["default_interface"], "en0")
+        self.assertEqual(parsed["default_route_state"], "suspect")
+        self.assertTrue(any("link-scoped gateway" in note for note in parsed["observations"]))
+        self.assertEqual(parsed["routes"][2]["interface"], "utun3")
+        self.assertEqual(parsed["routes"][3]["gateway"], "10.8.0.1")
+
+    def test_parse_netstat_rn_supports_legacy_linux_route_table_layout(self) -> None:
+        parsed = parse_netstat_rn(_fixture("linux-netstat-rn-legacy.txt"))
+
+        self.assertEqual(parsed["default_gateway"], "192.168.122.1")
+        self.assertEqual(parsed["default_interface"], "ens3")
+        self.assertEqual(parsed["default_route_state"], "present")
+        self.assertEqual(parsed["routes"][1]["interface"], "tun0")
+
+    def test_parse_netstat_rn_ignores_internet6_section_when_ipv4_section_exists(self) -> None:
+        output = """
+Routing tables
+
+Internet:
+Destination        Gateway            Flags               Netif Expire
+default            192.168.1.1        UGScg                 en0
+
+Internet6:
+Destination                             Gateway
+default                                 fe80::%utun0
+""".strip()
+
+        parsed = parse_netstat_rn(output)
+
+        self.assertEqual(parsed["default_gateway"], "192.168.1.1")
+        self.assertEqual(parsed["default_interface"], "en0")
+        self.assertEqual(parsed["default_route_state"], "present")
+        self.assertEqual(len(parsed["routes"]), 1)
+
     def test_parse_route_print_prefers_usable_windows_default_and_records_observation(self) -> None:
         parsed = parse_route_print(_fixture("windows-route-print-on-link.txt"))
 
@@ -108,7 +176,39 @@ default            192.168.1.1        UGScg                 en0
         self.assertEqual(parsed["default_interface"], "10.10.10.50")
         self.assertEqual(parsed["default_route_state"], "suspect")
         self.assertTrue(any("on-link" in note for note in parsed["observations"]))
-        self.assertEqual(parsed["routes"][0]["note"], "Default route exists but is on-link without an explicit gateway.")
+        self.assertEqual(
+            parsed["routes"][0]["note"],
+            "Default route exists but is on-link without an explicit gateway.",
+        )
+
+    def test_parse_route_print_preserves_split_tunnel_routes(self) -> None:
+        parsed = parse_route_print(_fixture("windows-route-print-vpn-split-tunnel.txt"))
+
+        self.assertEqual(parsed["default_gateway"], "192.168.1.1")
+        self.assertEqual(parsed["default_interface"], "192.168.1.50")
+        self.assertEqual(parsed["default_route_state"], "suspect")
+        self.assertTrue(any("on-link" in note for note in parsed["observations"]))
+        self.assertEqual(parsed["routes"][2]["interface"], "10.8.0.10")
+        self.assertEqual(parsed["routes"][3]["gateway"], "10.8.0.1")
+
+    def test_parse_route_print_supports_localized_section_headers(self) -> None:
+        parsed = parse_route_print(_fixture("windows-route-print-localized-headers.txt"))
+
+        self.assertEqual(parsed["default_gateway"], "10.10.10.1")
+        self.assertEqual(parsed["default_interface"], "10.10.10.50")
+        self.assertEqual(parsed["default_route_state"], "suspect")
+        self.assertTrue(any("on-link" in note for note in parsed["observations"]))
+        self.assertEqual(parsed["routes"][2]["gateway"], "10.8.0.1")
+
+    def test_parse_route_print_records_parse_warning_for_malformed_numeric_line(self) -> None:
+        parsed = parse_route_print(_fixture("windows-route-print-malformed-vpn.txt"))
+
+        self.assertEqual(parsed["default_gateway"], "10.8.0.1")
+        self.assertEqual(parsed["default_interface"], "10.8.0.10")
+        self.assertEqual(parsed["default_route_state"], "suspect")
+        self.assertTrue(any("on-link" in note for note in parsed["observations"]))
+        self.assertEqual(len(parsed["parse_warnings"]), 1)
+        self.assertIn("malformed Windows route line", parsed["parse_warnings"][0])
 
     def test_parse_route_get_default_extracts_gateway_and_interface(self) -> None:
         output = """
@@ -137,6 +237,33 @@ destination: default
         self.assertEqual(parsed[1]["addresses"][1]["address"], "2001:db8::1234:5678")
         self.assertFalse(parsed[2]["is_up"])
 
+    def test_parse_ipconfig_extracts_vpn_adapter_addresses(self) -> None:
+        output = """
+PPP adapter Contoso Secure Access:
+
+   Media State . . . . . . . . . . . : Media connected
+   IPv4 Address. . . . . . . . . . . : 10.8.0.10
+   Link-local IPv6 Address . . . . . : fe80::1234:5678:abcd:ef12
+""".strip()
+
+        parsed = parse_ipconfig(output)
+
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]["name"], "Contoso Secure Access")
+        self.assertTrue(parsed[0]["is_up"])
+        self.assertEqual(parsed[0]["addresses"][0]["address"], "10.8.0.10")
+        self.assertEqual(parsed[0]["addresses"][1]["family"], "ipv6")
+
+    def test_parse_ipconfig_handles_connected_and_disconnected_tunnels(self) -> None:
+        parsed = parse_ipconfig(_fixture("windows-ipconfig-tunnel-variants.txt"))
+
+        self.assertEqual(len(parsed), 3)
+        self.assertEqual(parsed[1]["name"], "WireGuard Tunnel")
+        self.assertTrue(parsed[1]["is_up"])
+        self.assertEqual(parsed[1]["addresses"][1]["family"], "ipv6")
+        self.assertEqual(parsed[2]["name"], "Contoso Legacy VPN")
+        self.assertFalse(parsed[2]["is_up"])
+
     def test_parse_macos_uptime_fallback(self) -> None:
         output = "23:41  up 1 day,  2:34, 4 users, load averages: 2.08 1.95 1.90"
 
@@ -154,6 +281,23 @@ destination: default
         self.assertEqual(parsed[1]["address"], "203.0.113.10")
         self.assertEqual(parsed[2]["note"], "request timed out.")
         self.assertEqual(parsed[3]["note"], "destination net unreachable.")
+
+    def test_parse_traceroute_output_marks_windows_general_failure(self) -> None:
+        parsed = parse_traceroute_output(_fixture("windows-tracert-general-failure.txt"))
+
+        self.assertEqual(len(parsed), 2)
+        self.assertEqual(parsed[0]["note"], "general failure.")
+        self.assertEqual(parsed[1]["note"], "request timed out.")
+
+    def test_parse_traceroute_output_parses_complete_windows_trace(self) -> None:
+        parsed = parse_traceroute_output(_fixture("windows-tracert-complete.txt"))
+
+        self.assertEqual(len(parsed), 4)
+        self.assertEqual(parsed[0]["latency_ms"], 1.0)
+        self.assertEqual(parsed[2]["host"], "ae1.cr1.example.net")
+        self.assertEqual(parsed[2]["address"], "203.0.113.10")
+        self.assertEqual(parsed[3]["address"], "93.184.216.34")
+        self.assertIsNone(parsed[3]["note"])
 
     def test_parse_traceroute_output_accepts_bytes_output(self) -> None:
         output = (
@@ -222,6 +366,34 @@ Interface: 10.10.10.50 --- 0x7
         self.assertEqual(parsed[0]["interface"], "10.10.10.50")
         self.assertEqual(parsed[0]["mac_address"], "aa:bb:cc:dd:ee:ff")
         self.assertEqual(parsed[1]["interface"], "en0")
+
+    def test_parse_resolv_conf_ignores_search_and_options_lines(self) -> None:
+        parsed = parse_resolv_conf(_fixture("linux-resolv-conf-variants.txt"))
+
+        self.assertEqual(parsed, ["10.0.0.53", "1.1.1.1"])
+
+    def test_parse_resolv_conf_preserves_ipv6_nameservers(self) -> None:
+        parsed = parse_resolv_conf(_fixture("linux-resolv-conf-ipv6-variants.txt"))
+
+        self.assertEqual(
+            parsed,
+            ["10.0.0.53", "2606:4700:4700::1111", "1.1.1.1"],
+        )
+
+    def test_parse_scutil_dns_dedupes_scoped_nameservers(self) -> None:
+        parsed = parse_scutil_dns(_fixture("macos-scutil-dns-variants.txt"))
+
+        self.assertEqual(
+            parsed,
+            ["10.0.0.53", "2001:4860:4860::8888", "10.8.0.53", "fe80::1%utun3"],
+        )
+
+    def test_parse_powershell_dns_server_list_dedupes_and_strips_blank_lines(self) -> None:
+        parsed = parse_powershell_dns_server_list(
+            _fixture("windows-dns-server-addresses-variants.txt")
+        )
+
+        self.assertEqual(parsed, ["10.0.0.2", "fe80::1", "1.1.1.1"])
 
 
 if __name__ == "__main__":

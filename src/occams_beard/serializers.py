@@ -13,7 +13,13 @@ from occams_beard.models import EndpointDiagnosticResult
 def to_json_dict(result: EndpointDiagnosticResult) -> dict[str, Any]:
     """Convert a result model into a JSON-friendly dictionary."""
 
-    return asdict(result)
+    payload = asdict(result)
+    payload.pop("raw_command_capture", None)
+    schema_version = payload.pop("schema_version", result.schema_version)
+    return {
+        "schema_version": schema_version,
+        **payload,
+    }
 
 
 def to_json_text(result: EndpointDiagnosticResult) -> str:

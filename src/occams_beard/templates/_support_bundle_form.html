@@ -1,0 +1,68 @@
+<p class="muted">{{ view.bundle_intro }}</p>
+
+<div class="info-panel bundle-status-panel stack-sm">
+  <div class="row-inline">
+    <strong>{{ view.bundle_raw_capture_label }}</strong>
+    <span class="status-pill status-{% if result.raw_command_capture %}clear{% else %}not_run{% endif %}">
+      {{ "Available" if result.raw_command_capture else "Not collected" }}
+    </span>
+  </div>
+  <p class="muted">{{ view.bundle_raw_capture_note }}</p>
+</div>
+
+<div class="stack-xs">
+  <p class="field-label">Bundle contents</p>
+  <ul class="result-list">
+    {% for item in view.bundle_contents %}
+      <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<form method="get" action="{{ url_for('download_support_bundle', run_id=record.run_id) }}" class="stack-md">
+  <div class="stack-xs">
+    <p class="field-label">Choose a redaction level</p>
+    <p class="field-help">{{ view.bundle_redaction_note }}</p>
+    <div class="redaction-grid">
+      <label class="redaction-option">
+        <input type="radio" name="redaction_level" value="safe" checked>
+        <span class="redaction-copy">
+          <strong>Safe</strong>
+          <span>Recommended for most support handoffs.</span>
+        </span>
+      </label>
+      <label class="redaction-option">
+        <input type="radio" name="redaction_level" value="strict">
+        <span class="redaction-copy">
+          <strong>Strict</strong>
+          <span>Hide more values when support only needs broad evidence.</span>
+        </span>
+      </label>
+      <label class="redaction-option">
+        <input type="radio" name="redaction_level" value="none">
+        <span class="redaction-copy">
+          <strong>None</strong>
+          <span>Keep the collected values unredacted.</span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <label class="toggle" for="include_raw">
+    <input
+      id="include_raw"
+      type="checkbox"
+      name="include_raw"
+      value="1"
+      {% if not result.raw_command_capture %}disabled{% endif %}
+    >
+    <span>Include raw command capture if this run collected it</span>
+  </label>
+
+  <p class="field-help">The bundle downloads locally. You can review it before you share it.</p>
+
+  <div class="actions" data-results-export-actions>
+    <button type="submit" class="primary-button" data-results-action="download-support-bundle">Download Support Bundle</button>
+    <a class="ghost-button" href="{{ url_for('download_json', run_id=record.run_id) }}" data-results-action="download-json">Download Result JSON</a>
+  </div>
+</form>

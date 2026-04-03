@@ -38,7 +38,9 @@ def build_result() -> EndpointDiagnosticResult:
         ),
         resources=ResourceState(
             cpu=CpuState(logical_cpus=4, utilization_percent_estimate=20.0),
-            memory=MemoryState(total_bytes=1000, available_bytes=500, free_bytes=400, pressure_level="normal"),
+            memory=MemoryState(
+                total_bytes=1000, available_bytes=500, free_bytes=400, pressure_level="normal"
+            ),
             disks=[],
         ),
         network=NetworkState(
@@ -82,9 +84,13 @@ class SerializerTests(unittest.TestCase):
 
         payload = to_json_dict(result)
 
+        self.assertEqual(payload["schema_version"], "1.1.0")
         self.assertIn("metadata", payload)
         self.assertIn("facts", payload)
         self.assertEqual(payload["platform"]["system"], "Linux")
+        self.assertNotIn("raw_command_capture", payload)
+        self.assertIn("battery", payload["facts"]["resources"])
+        self.assertIn("storage_devices", payload["facts"]["resources"])
 
     def test_write_json_file_persists_valid_json(self) -> None:
         result = build_result()

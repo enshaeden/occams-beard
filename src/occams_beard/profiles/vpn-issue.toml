@@ -1,0 +1,26 @@
+id = "vpn-issue"
+name = "VPN Issue"
+description = "Profile for tunnel-state and private-resource access problems on endpoints that rely on VPN connectivity."
+issue_category = "VPN issue"
+recommended_checks = ["network", "routing", "dns", "connectivity", "vpn", "services"]
+dns_hosts = ["github.com"]
+labels = ["vpn", "private-access"]
+safe_user_guidance = [
+  "Confirm the VPN client reports a connected state before rerunning.",
+  "If possible, retry the private target once after reconnecting the VPN client.",
+]
+escalation_guidance = [
+  "Escalate if a tunnel-like interface is present but private service checks still fail.",
+  "Escalate if the VPN path changes the default route unexpectedly or DNS behavior differs from the baseline network.",
+]
+
+[[tcp_targets]]
+host = "github.com"
+port = 443
+label = "public-baseline"
+
+[[tcp_targets]]
+host = "10.0.0.10"
+port = 443
+label = "private-service"
+

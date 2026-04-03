@@ -1,0 +1,17 @@
+Windows IP Configuration
+
+Ethernet adapter Ethernet:
+
+   Media State . . . . . . . . . . . : Media connected
+   Physical Address. . . . . . . . . : 00-11-22-33-44-55
+   IPv4 Address. . . . . . . . . . . : 192.168.50.24(Preferred)
+
+Ethernet adapter WireGuard Tunnel:
+
+   Media State . . . . . . . . . . . : Media connected
+   IPv4 Address. . . . . . . . . . . : 10.6.0.10(Preferred)
+   IPv6 Address. . . . . . . . . . . : 2001:db8::1(Preferred)
+
+PPP adapter Contoso Legacy VPN:
+
+   Media State . . . . . . . . . . . : Media disconnected

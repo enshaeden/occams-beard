@@ -1,0 +1,26 @@
+id = "no-internet"
+name = "No Internet"
+description = "Baseline internet-access profile for endpoints that cannot reach common external services."
+issue_category = "no internet"
+recommended_checks = ["host", "resources", "network", "routing", "dns", "connectivity"]
+dns_hosts = ["github.com", "python.org"]
+labels = ["baseline", "egress"]
+safe_user_guidance = [
+  "Verify the endpoint is connected to the intended wired or wireless network.",
+  "If Wi-Fi is in use, reconnect once and wait for a fresh DHCP assignment before rerunning diagnostics.",
+]
+escalation_guidance = [
+  "Escalate if the host still has no default route after reconnecting.",
+  "Escalate if every external TCP check fails across multiple known-good public targets.",
+]
+
+[[tcp_targets]]
+host = "github.com"
+port = 443
+label = "github-https"
+
+[[tcp_targets]]
+host = "1.1.1.1"
+port = 53
+label = "cloudflare-dns"
+

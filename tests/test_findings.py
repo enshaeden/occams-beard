@@ -6,12 +6,13 @@ import unittest
 
 from occams_beard.findings import evaluate_selected_findings
 from occams_beard.models import (
+    BatteryState,
     CollectedFacts,
     ConnectivityState,
     CpuState,
+    DiskVolume,
     DnsResolutionCheck,
     DnsState,
-    DiskVolume,
     HostBasics,
     InterfaceAddress,
     MemoryState,
@@ -21,6 +22,7 @@ from occams_beard.models import (
     RouteSummary,
     ServiceCheck,
     ServiceState,
+    StorageDeviceHealth,
     TcpConnectivityCheck,
     TcpTarget,
     TraceHop,
@@ -78,7 +80,11 @@ def build_base_facts() -> CollectedFacts:
         ),
         dns=DnsState(
             resolvers=["1.1.1.1"],
-            checks=[DnsResolutionCheck(hostname="github.com", success=True, resolved_addresses=["140.82.114.3"])],
+            checks=[
+                DnsResolutionCheck(
+                    hostname="github.com", success=True, resolved_addresses=["140.82.114.3"]
+                )
+            ],
         ),
         connectivity=ConnectivityState(
             internet_reachable=True,
@@ -110,8 +116,12 @@ class FindingsTests(unittest.TestCase):
         )
         facts.connectivity.internet_reachable = False
         facts.connectivity.tcp_checks = [
-            TcpConnectivityCheck(target=TcpTarget(host="github.com", port=443), success=False, error="timeout"),
-            TcpConnectivityCheck(target=TcpTarget(host="1.1.1.1", port=53), success=False, error="timeout"),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="github.com", port=443), success=False, error="timeout"
+            ),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="1.1.1.1", port=53), success=False, error="timeout"
+            ),
         ]
 
         findings, probable_fault_domain = evaluate_selected_findings(
@@ -124,9 +134,13 @@ class FindingsTests(unittest.TestCase):
 
     def test_dns_failure_with_raw_ip_success_maps_to_dns(self) -> None:
         facts = build_base_facts()
-        facts.dns.checks = [DnsResolutionCheck(hostname="github.com", success=False, error="temporary failure")]
+        facts.dns.checks = [
+            DnsResolutionCheck(hostname="github.com", success=False, error="temporary failure")
+        ]
         facts.connectivity.tcp_checks = [
-            TcpConnectivityCheck(target=TcpTarget(host="1.1.1.1", port=53), success=True, latency_ms=10.0)
+            TcpConnectivityCheck(
+                target=TcpTarget(host="1.1.1.1", port=53), success=True, latency_ms=10.0
+            )
         ]
 
         findings, probable_fault_domain = evaluate_selected_findings(
@@ -140,12 +154,18 @@ class FindingsTests(unittest.TestCase):
     def test_route_and_dns_success_with_external_tcp_failures_maps_to_internet_edge(self) -> None:
         facts = build_base_facts()
         facts.dns.checks = [
-            DnsResolutionCheck(hostname="github.com", success=True, resolved_addresses=["140.82.114.3"])
+            DnsResolutionCheck(
+                hostname="github.com", success=True, resolved_addresses=["140.82.114.3"]
+            )
         ]
         facts.connectivity.internet_reachable = False
         facts.connectivity.tcp_checks = [
-            TcpConnectivityCheck(target=TcpTarget(host="github.com", port=443), success=False, error="timeout"),
-            TcpConnectivityCheck(target=TcpTarget(host="1.1.1.1", port=53), success=False, error="refused"),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="github.com", port=443), success=False, error="timeout"
+            ),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="1.1.1.1", port=53), success=False, error="refused"
+            ),
         ]
 
         findings, probable_fault_domain = evaluate_selected_findings(
@@ -161,8 +181,12 @@ class FindingsTests(unittest.TestCase):
         facts.network.active_interfaces = ["eth1"]
         facts.connectivity.internet_reachable = False
         facts.connectivity.tcp_checks = [
-            TcpConnectivityCheck(target=TcpTarget(host="github.com", port=443), success=False, error="timeout"),
-            TcpConnectivityCheck(target=TcpTarget(host="1.1.1.1", port=53), success=False, error="timeout"),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="github.com", port=443), success=False, error="timeout"
+            ),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="1.1.1.1", port=53), success=False, error="timeout"
+            ),
         ]
 
         findings, probable_fault_domain = evaluate_selected_findings(
@@ -186,8 +210,12 @@ class FindingsTests(unittest.TestCase):
         )
         facts.connectivity.internet_reachable = False
         facts.connectivity.tcp_checks = [
-            TcpConnectivityCheck(target=TcpTarget(host="github.com", port=443), success=False, error="timeout"),
-            TcpConnectivityCheck(target=TcpTarget(host="1.1.1.1", port=53), success=False, error="timeout"),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="github.com", port=443), success=False, error="timeout"
+            ),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="1.1.1.1", port=53), success=False, error="timeout"
+            ),
         ]
 
         findings, probable_fault_domain = evaluate_selected_findings(
@@ -197,12 +225,16 @@ class FindingsTests(unittest.TestCase):
 
         self.assertEqual(probable_fault_domain, "local_network")
         self.assertEqual(findings[0].identifier, "default-route-present-but-inconsistent")
-        self.assertNotIn("route-and-dns-ok-external-tcp-failure", [finding.identifier for finding in findings])
+        self.assertNotIn(
+            "route-and-dns-ok-external-tcp-failure", [finding.identifier for finding in findings]
+        )
 
     def test_partial_dns_success_is_heuristic_dns_finding(self) -> None:
         facts = build_base_facts()
         facts.dns.checks = [
-            DnsResolutionCheck(hostname="github.com", success=True, resolved_addresses=["140.82.114.3"]),
+            DnsResolutionCheck(
+                hostname="github.com", success=True, resolved_addresses=["140.82.114.3"]
+            ),
             DnsResolutionCheck(hostname="python.org", success=False, error="temporary failure"),
         ]
 
@@ -213,8 +245,46 @@ class FindingsTests(unittest.TestCase):
 
         identifiers = [finding.identifier for finding in findings]
         self.assertIn("dns-partial-resolution", identifiers)
-        partial_finding = next(finding for finding in findings if finding.identifier == "dns-partial-resolution")
+        partial_finding = next(
+            finding for finding in findings if finding.identifier == "dns-partial-resolution"
+        )
         self.assertTrue(partial_finding.heuristic)
+
+    def test_suspect_route_with_mixed_public_tcp_results_stays_heuristic(self) -> None:
+        facts = build_base_facts()
+        facts.network.route_summary = RouteSummary(
+            default_gateway="10.10.10.1",
+            default_interface="eth0",
+            has_default_route=True,
+            routes=[],
+            default_route_state="suspect",
+            observations=["Default route exists but is on-link without an explicit gateway."],
+        )
+        facts.connectivity.tcp_checks = [
+            TcpConnectivityCheck(
+                target=TcpTarget(host="github.com", port=443),
+                success=True,
+                latency_ms=18.0,
+            ),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="1.1.1.1", port=53),
+                success=False,
+                error="timeout",
+            ),
+        ]
+
+        findings, _probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["network", "routing", "dns", "connectivity"],
+        )
+
+        identifiers = [finding.identifier for finding in findings]
+        self.assertIn("mixed-external-tcp-results", identifiers)
+        self.assertNotIn("route-and-dns-ok-external-tcp-failure", identifiers)
+        mixed_finding = next(
+            finding for finding in findings if finding.identifier == "mixed-external-tcp-results"
+        )
+        self.assertTrue(mixed_finding.heuristic)
 
     def test_active_interface_without_address_maps_to_local_network(self) -> None:
         facts = build_base_facts()
@@ -237,7 +307,9 @@ class FindingsTests(unittest.TestCase):
         self.assertEqual(probable_fault_domain, "local_network")
         self.assertEqual(findings[0].identifier, "active-interface-no-local-address")
 
-    def test_selected_service_failure_with_internet_reachability_maps_to_upstream_network(self) -> None:
+    def test_selected_service_failure_with_internet_reachability_maps_to_upstream_network(
+        self,
+    ) -> None:
         facts = build_base_facts()
         facts.services = ServiceState(
             checks=[
@@ -275,7 +347,49 @@ class FindingsTests(unittest.TestCase):
         )
 
         self.assertEqual(probable_fault_domain, "local_host")
-        self.assertTrue(any(finding.identifier.startswith("low-disk-space-") for finding in findings))
+        self.assertTrue(
+            any(finding.identifier.startswith("low-disk-space-") for finding in findings)
+        )
+
+    def test_explicit_battery_service_state_generates_local_host_finding(self) -> None:
+        facts = build_base_facts()
+        facts.resources.battery = BatteryState(
+            present=True,
+            charge_percent=82,
+            status="Charging",
+            cycle_count=410,
+            condition="Service Recommended",
+            health_percent=74.0,
+        )
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["resources"],
+        )
+
+        self.assertEqual(probable_fault_domain, "local_host")
+        self.assertEqual(findings[0].identifier, "battery-health-degraded")
+
+    def test_storage_health_failure_generates_high_severity_local_host_finding(self) -> None:
+        facts = build_base_facts()
+        facts.resources.storage_devices = [
+            StorageDeviceHealth(
+                device_id="disk0",
+                model="Demo SSD",
+                protocol="NVMe",
+                medium="SSD",
+                health_status="Failing",
+                operational_status="Degraded",
+            )
+        ]
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["storage"],
+        )
+
+        self.assertEqual(probable_fault_domain, "local_host")
+        self.assertEqual(findings[0].identifier, "storage-device-health-failure")
 
     def test_vpn_signal_with_private_target_failure_is_heuristic(self) -> None:
         facts = build_base_facts()

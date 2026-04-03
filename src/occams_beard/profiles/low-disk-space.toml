@@ -1,0 +1,15 @@
+id = "low-disk-space"
+name = "Low Disk Space"
+description = "Profile for suspected storage exhaustion on the local endpoint."
+issue_category = "low disk space"
+recommended_checks = ["host", "resources", "storage"]
+labels = ["storage", "capacity"]
+safe_user_guidance = [
+  "Remove or archive only known non-essential local files if that is already part of the documented operator process.",
+  "Do not delete application or system data unless you have verified approval and rollback guidance.",
+]
+escalation_guidance = [
+  "Escalate if critical volumes remain above the low-space threshold after safe cleanup.",
+  "Escalate before deleting managed application data or security logs.",
+]
+

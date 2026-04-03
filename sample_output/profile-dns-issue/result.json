@@ -1,0 +1,491 @@
+{
+  "schema_version": "1.1.0",
+  "metadata": {
+    "project_name": "occams-beard",
+    "version": "0.1.0",
+    "generated_at": "2026-04-01T00:05:00+00:00",
+    "elapsed_ms": 201,
+    "selected_checks": [
+      "network",
+      "routing",
+      "dns",
+      "connectivity"
+    ],
+    "profile_id": "dns-issue",
+    "profile_name": "DNS Issue",
+    "issue_category": "DNS issue"
+  },
+  "platform": {
+    "system": "macOS",
+    "release": "15.0",
+    "version": "demo-build",
+    "machine": "arm64",
+    "python_version": "3.13.4"
+  },
+  "facts": {
+    "host": {
+      "hostname": "field-macbook",
+      "operating_system": "Darwin",
+      "kernel": "24.0.0",
+      "current_user": "operator",
+      "uptime_seconds": 9200
+    },
+    "resources": {
+      "cpu": {
+        "logical_cpus": null,
+        "load_average_1m": null,
+        "load_average_5m": null,
+        "load_average_15m": null,
+        "utilization_percent_estimate": null
+      },
+      "memory": {
+        "total_bytes": null,
+        "available_bytes": null,
+        "free_bytes": null,
+        "pressure_level": null
+      },
+      "disks": [],
+      "battery": null,
+      "storage_devices": []
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "en0",
+          "is_up": true,
+          "mac_address": "aa:bb:cc:dd:ee:ff",
+          "addresses": [
+            {
+              "family": "ipv4",
+              "address": "192.168.0.25",
+              "netmask": "24",
+              "is_loopback": false
+            }
+          ],
+          "mtu": 1500,
+          "type_hint": "ethernet"
+        }
+      ],
+      "local_addresses": [
+        "192.168.0.25"
+      ],
+      "active_interfaces": [
+        "en0"
+      ],
+      "arp_neighbors": [],
+      "route_summary": {
+        "default_gateway": "192.168.0.1",
+        "default_interface": "en0",
+        "has_default_route": true,
+        "routes": [
+          {
+            "destination": "default",
+            "gateway": "192.168.0.1",
+            "interface": "en0",
+            "metric": null,
+            "note": null
+          }
+        ],
+        "default_route_state": "present",
+        "observations": []
+      }
+    },
+    "dns": {
+      "resolvers": [
+        "192.168.0.1"
+      ],
+      "checks": [
+        {
+          "hostname": "github.com",
+          "success": false,
+          "resolved_addresses": [],
+          "error": "temporary failure in name resolution",
+          "duration_ms": 10
+        },
+        {
+          "hostname": "python.org",
+          "success": false,
+          "resolved_addresses": [],
+          "error": "temporary failure in name resolution",
+          "duration_ms": 11
+        },
+        {
+          "hostname": "pypi.org",
+          "success": false,
+          "resolved_addresses": [],
+          "error": "temporary failure in name resolution",
+          "duration_ms": 12
+        }
+      ]
+    },
+    "connectivity": {
+      "internet_reachable": true,
+      "tcp_checks": [
+        {
+          "target": {
+            "host": "1.1.1.1",
+            "port": 53,
+            "label": "cloudflare-dns"
+          },
+          "success": true,
+          "latency_ms": 14.2,
+          "error": null,
+          "ip_used": "1.1.1.1",
+          "duration_ms": 14
+        },
+        {
+          "target": {
+            "host": "8.8.8.8",
+            "port": 53,
+            "label": "google-dns"
+          },
+          "success": true,
+          "latency_ms": 15.1,
+          "error": null,
+          "ip_used": "8.8.8.8",
+          "duration_ms": 15
+        }
+      ],
+      "ping_checks": [],
+      "trace_results": []
+    },
+    "vpn": {
+      "signals": []
+    },
+    "services": {
+      "checks": []
+    }
+  },
+  "findings": [
+    {
+      "identifier": "dns-failure-raw-ip-success",
+      "severity": "high",
+      "title": "DNS resolution failed but raw IP connectivity succeeded",
+      "summary": "The endpoint can reach an external IP directly, but hostname resolution failed.",
+      "evidence": [
+        "DNS hostnames that failed to resolve: github.com (temporary failure in name resolution), python.org (temporary failure in name resolution), pypi.org (temporary failure in name resolution).",
+        "Numeric IP TCP success observed: 1.1.1.1:53 (ok), 8.8.8.8:53 (ok)."
+      ],
+      "probable_cause": "The most likely failure domain is the local or upstream DNS resolver path.",
+      "fault_domain": "dns",
+      "confidence": 0.92,
+      "heuristic": false,
+      "plain_language": "The endpoint can reach a numeric external IP, but hostname lookups are failing.",
+      "evidence_summary": "DNS hostnames that failed to resolve: github.com (temporary failure in name resolution), python.org (temporary failure in name resolution), pypi.org (temporary failure in name resolution). Numeric IP TCP success observed: 1.1.1.1:53 (ok), 8.8.8.8:53 (ok).",
+      "safe_next_actions": [
+        "Compare the endpoint's resolver settings with the expected network or VPN profile.",
+        "Rerun once after reconnecting the network or VPN so the resolver path is refreshed."
+      ],
+      "escalation_triggers": [
+        "Escalate if numeric IP access still works while hostname lookups keep failing."
+      ],
+      "uncertainty_notes": [
+        "The finding isolates the failure toward DNS behavior, not whether the problem is local resolver selection or upstream resolver reachability."
+      ]
+    }
+  ],
+  "probable_fault_domain": "dns",
+  "warnings": [],
+  "execution": [
+    {
+      "domain": "host",
+      "label": "Host basics",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 4,
+      "summary": "Collected endpoint identity and uptime facts as a baseline domain.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "host-basics",
+          "label": "Collect host basics",
+          "status": "passed",
+          "duration_ms": 4,
+          "target": null,
+          "details": [
+            "Hostname: field-macbook.",
+            "Kernel: 24.0.0."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "resources",
+      "label": "Resource snapshot",
+      "status": "not_run",
+      "selected": false,
+      "duration_ms": null,
+      "summary": "This domain was not selected for the run.",
+      "warnings": [],
+      "probes": [],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "storage",
+      "label": "Storage snapshot",
+      "status": "not_run",
+      "selected": false,
+      "duration_ms": null,
+      "summary": "This domain was not selected for the run.",
+      "warnings": [],
+      "probes": [],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "network",
+      "label": "Interface inventory",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 13,
+      "summary": "Collected interface state, local addresses, and neighbor context.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "interface-inventory",
+          "label": "Collect interface inventory",
+          "status": "passed",
+          "duration_ms": 13,
+          "target": null,
+          "details": [
+            "Interfaces collected: 1."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "arp-neighbor-cache",
+          "label": "Collect ARP or neighbor cache",
+          "status": "passed",
+          "duration_ms": 13,
+          "target": null,
+          "details": [
+            "Neighbor entries collected: 0."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "routing",
+      "label": "Routing inventory",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 7,
+      "summary": "Collected route table and default-route interpretation.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "route-inventory",
+          "label": "Collect routing summary",
+          "status": "passed",
+          "duration_ms": 7,
+          "target": null,
+          "details": [
+            "Default route present: yes.",
+            "Default route state: present."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "dns",
+      "label": "DNS checks",
+      "status": "partial",
+      "selected": true,
+      "duration_ms": 38,
+      "summary": "Collected resolver configuration and hostname resolution checks.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "resolver-inventory",
+          "label": "Determine configured resolvers",
+          "status": "passed",
+          "duration_ms": 38,
+          "target": null,
+          "details": [
+            "Resolvers: 192.168.0.1."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "dns:github.com",
+          "label": "Resolve github.com",
+          "status": "failed",
+          "duration_ms": 10,
+          "target": "github.com",
+          "details": [
+            "Lookup failed: temporary failure in name resolution."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "dns:python.org",
+          "label": "Resolve python.org",
+          "status": "failed",
+          "duration_ms": 11,
+          "target": "python.org",
+          "details": [
+            "Lookup failed: temporary failure in name resolution."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "dns:pypi.org",
+          "label": "Resolve pypi.org",
+          "status": "failed",
+          "duration_ms": 12,
+          "target": "pypi.org",
+          "details": [
+            "Lookup failed: temporary failure in name resolution."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    },
+    {
+      "domain": "connectivity",
+      "label": "Generic connectivity",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 34,
+      "summary": "Collected generic DNS-independent and TCP path checks.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "tcp:1.1.1.1:53",
+          "label": "TCP 1.1.1.1:53",
+          "status": "passed",
+          "duration_ms": 14,
+          "target": "1.1.1.1:53",
+          "details": [
+            "Connected in 14.2 ms."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "tcp:8.8.8.8:53",
+          "label": "TCP 8.8.8.8:53",
+          "status": "passed",
+          "duration_ms": 15,
+          "target": "8.8.8.8:53",
+          "details": [
+            "Connected in 15.1 ms."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "ping:1.1.1.1",
+          "label": "Ping 1.1.1.1",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "1.1.1.1",
+          "details": [
+            "Ping was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "trace:1.1.1.1",
+          "label": "Trace 1.1.1.1",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "1.1.1.1",
+          "details": [
+            "Traceroute was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "ping:8.8.8.8",
+          "label": "Ping 8.8.8.8",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "8.8.8.8",
+          "details": [
+            "Ping was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "trace:8.8.8.8",
+          "label": "Trace 8.8.8.8",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "8.8.8.8",
+          "details": [
+            "Traceroute was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    },
+    {
+      "domain": "vpn",
+      "label": "VPN heuristics",
+      "status": "not_run",
+      "selected": false,
+      "duration_ms": null,
+      "summary": "This domain was not selected for the run.",
+      "warnings": [],
+      "probes": [],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "services",
+      "label": "Configured services",
+      "status": "not_run",
+      "selected": false,
+      "duration_ms": null,
+      "summary": "This domain was not selected for the run.",
+      "warnings": [],
+      "probes": [],
+      "creates_network_egress": true
+    }
+  ],
+  "guided_experience": {
+    "issue_category": "DNS issue",
+    "profile_id": "dns-issue",
+    "profile_name": "DNS Issue",
+    "what_we_know": [
+      "The endpoint can reach a numeric external IP, but hostname lookups are failing."
+    ],
+    "likely_happened": [
+      "The most likely failure domain is the local or upstream DNS resolver path."
+    ],
+    "safe_next_steps": [
+      "Compare the endpoint's resolver settings with the expected network or VPN profile.",
+      "Rerun once after reconnecting the network or VPN so the resolver path is refreshed.",
+      "Rerun once after verifying the endpoint is using the intended DNS settings or VPN state.",
+      "Compare hostname failures with numeric-IP TCP results before assuming general internet loss."
+    ],
+    "escalation_guidance": [
+      "Escalate if numeric IP access still works while hostname lookups keep failing.",
+      "Escalate if DNS failures persist while numeric external IP targets still succeed.",
+      "Escalate if internal DNS names fail only on one network or VPN path."
+    ],
+    "uncertainty_notes": [
+      "The finding isolates the failure toward DNS behavior, not whether the problem is local resolver selection or upstream resolver reachability.",
+      "DNS checks was only partially collected or produced mixed results."
+    ]
+  }
+}

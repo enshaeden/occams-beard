@@ -3,13 +3,76 @@
 from __future__ import annotations
 
 import re
+from typing import TypedDict
 
 
-def parse_linux_ip_route(output: str) -> dict[str, object]:
+class ParsedRouteEntry(TypedDict):
+    destination: str
+    gateway: str | None
+    interface: str | None
+    metric: int | None
+    note: str | None
+
+
+class ParsedRouteData(TypedDict):
+    default_gateway: str | None
+    default_interface: str | None
+    has_default_route: bool
+    routes: list[ParsedRouteEntry]
+    default_route_state: str
+    observations: list[str]
+    parse_warnings: list[str]
+
+
+class ParsedInterfaceAddress(TypedDict):
+    family: str
+    address: str
+    netmask: str | None
+    is_loopback: bool
+
+
+class ParsedInterface(TypedDict):
+    name: str
+    is_up: bool
+    mtu: int | None
+    mac_address: str | None
+    addresses: list[ParsedInterfaceAddress]
+
+
+class ParsedTraceHop(TypedDict):
+    hop: int
+    host: str | None
+    address: str | None
+    latency_ms: float | None
+    note: str | None
+
+
+class ParsedNeighbor(TypedDict):
+    ip_address: str
+    mac_address: str | None
+    interface: str | None
+    state: str | None
+
+
+def empty_route_data() -> ParsedRouteData:
+    """Return an empty routing payload with the expected shape."""
+
+    return {
+        "default_gateway": None,
+        "default_interface": None,
+        "has_default_route": False,
+        "routes": [],
+        "default_route_state": "missing",
+        "observations": [],
+        "parse_warnings": [],
+    }
+
+
+def parse_linux_ip_route(output: str) -> ParsedRouteData:
     """Parse `ip route show` output into a compact structure."""
 
-    default_routes: list[dict[str, object]] = []
-    routes: list[dict[str, object]] = []
+    default_routes: list[ParsedRouteEntry] = []
+    routes: list[ParsedRouteEntry] = []
     observations: list[str] = []
     parse_warnings: list[str] = []
 
@@ -31,8 +94,12 @@ def parse_linux_ip_route(output: str) -> dict[str, object]:
         interface = interface_match.group(1) if interface_match else None
         metric = _extract_metric(normalized_line)
         destination_label = "default" if destination == "default" else destination
-        note = route_note or _default_route_note(gateway, interface) if destination_label == "default" else route_note
-        route = {
+        note = (
+            route_note or _default_route_note(gateway, interface)
+            if destination_label == "default"
+            else route_note
+        )
+        route: ParsedRouteEntry = {
             "destination": destination_label,
             "gateway": gateway,
             "interface": interface,
@@ -44,20 +111,16 @@ def parse_linux_ip_route(output: str) -> dict[str, object]:
             default_routes.append(route)
 
     selected_default = _select_default_route(default_routes)
-    default_gateway = selected_default.get("gateway") if selected_default else None
-    default_interface = selected_default.get("interface") if selected_default else None
+    default_gateway = selected_default["gateway"] if selected_default else None
+    default_interface = selected_default["interface"] if selected_default else None
     if len(default_routes) > 1:
         observations.append(
-            "Multiple default routes were collected; the summary prefers the most specific usable entry with the lowest metric."
+            "Multiple default routes were collected; the summary prefers the "
+            "most specific usable entry with the lowest metric."
         )
     for route in default_routes:
-        if isinstance(route.get("note"), str):
-            observations.append(str(route["note"]))
-    if selected_default and not observations:
-        observations.append(
-            f"Default route summary selected interface {selected_default.get('interface') or 'unknown'}."
-        )
-
+        if route["note"] is not None:
+            observations.append(route["note"])
     return {
         "default_gateway": default_gateway,
         "default_interface": default_interface,
@@ -69,7 +132,7 @@ def parse_linux_ip_route(output: str) -> dict[str, object]:
     }
 
 
-def parse_route_get_default(output: str) -> dict[str, object]:
+def parse_route_get_default(output: str) -> ParsedRouteData:
     """Parse macOS `route -n get default` output."""
 
     gateway_match = re.search(r"^\s*gateway:\s+(\S+)", output, re.MULTILINE)
@@ -78,19 +141,19 @@ def parse_route_get_default(output: str) -> dict[str, object]:
     interface = interface_match.group(1) if interface_match else None
 
     observations: list[str] = []
-    routes = []
+    routes: list[ParsedRouteEntry] = []
     if gateway or interface:
         note = _default_route_note(gateway, interface)
         if note:
             observations.append(note)
         routes.append(
-            {
-                "destination": "default",
-                "gateway": gateway,
-                "interface": interface,
-                "metric": None,
-                "note": note,
-            }
+            ParsedRouteEntry(
+                destination="default",
+                gateway=gateway,
+                interface=interface,
+                metric=None,
+                note=note,
+            )
         )
 
     return {
@@ -104,39 +167,19 @@ def parse_route_get_default(output: str) -> dict[str, object]:
     }
 
 
-def parse_route_print(output: str) -> dict[str, object]:
+def parse_route_print(output: str) -> ParsedRouteData:
     """Parse Windows `route print` output into a compact structure."""
 
-    default_routes: list[dict[str, object]] = []
-    routes: list[dict[str, object]] = []
+    default_routes: list[ParsedRouteEntry] = []
+    routes: list[ParsedRouteEntry] = []
     observations: list[str] = []
     parse_warnings: list[str] = []
-    in_ipv4_table = False
-    in_active_routes = False
 
     for raw_line in output.splitlines():
         stripped = raw_line.strip()
         if not stripped:
             continue
 
-        if stripped.startswith("IPv4 Route Table"):
-            in_ipv4_table = True
-            in_active_routes = False
-            continue
-        if stripped.startswith("IPv6 Route Table"):
-            if in_ipv4_table:
-                break
-            continue
-        if not in_ipv4_table:
-            continue
-        if stripped.startswith("Active Routes:"):
-            in_active_routes = True
-            continue
-        if stripped.startswith("Persistent Routes:"):
-            in_active_routes = False
-            continue
-        if not in_active_routes or stripped.startswith("Network Destination"):
-            continue
         if not re.match(r"^\d+\.\d+\.\d+\.\d+", stripped):
             continue
 
@@ -145,10 +188,12 @@ def parse_route_print(output: str) -> dict[str, object]:
             parse_warnings.append(f"Ignored a malformed Windows route line: {stripped}")
             continue
         destination, netmask, gateway, interface, metric_text = parts[:5]
-        destination_label = "default" if destination == "0.0.0.0" and netmask == "0.0.0.0" else destination
+        destination_label = (
+            "default" if destination == "0.0.0.0" and netmask == "0.0.0.0" else destination
+        )
         metric = int(metric_text) if metric_text.isdigit() else None
         note = _default_route_note(gateway, interface) if destination_label == "default" else None
-        route = {
+        route: ParsedRouteEntry = {
             "destination": destination_label,
             "gateway": gateway,
             "interface": interface,
@@ -160,15 +205,16 @@ def parse_route_print(output: str) -> dict[str, object]:
             default_routes.append(route)
 
     selected_default = _select_default_route(default_routes)
-    default_gateway = selected_default.get("gateway") if selected_default else None
-    default_interface = selected_default.get("interface") if selected_default else None
+    default_gateway = selected_default["gateway"] if selected_default else None
+    default_interface = selected_default["interface"] if selected_default else None
     if len(default_routes) > 1:
         observations.append(
-            "Multiple Windows default routes were collected; the summary prefers the most specific usable entry with the lowest metric."
+            "Multiple Windows default routes were collected; the summary "
+            "prefers the most specific usable entry with the lowest metric."
         )
     for route in default_routes:
-        if isinstance(route.get("note"), str):
-            observations.append(str(route["note"]))
+        if route["note"] is not None:
+            observations.append(route["note"])
 
     return {
         "default_gateway": default_gateway,
@@ -181,17 +227,31 @@ def parse_route_print(output: str) -> dict[str, object]:
     }
 
 
-def parse_netstat_rn(output: str) -> dict[str, object]:
+def parse_netstat_rn(output: str) -> ParsedRouteData:
     """Parse Unix `netstat -rn` output."""
 
-    default_routes: list[dict[str, object]] = []
-    routes: list[dict[str, object]] = []
+    default_routes: list[ParsedRouteEntry] = []
+    routes: list[ParsedRouteEntry] = []
     observations: list[str] = []
     parse_warnings: list[str] = []
+    saw_section_header = False
+    in_internet_section = False
 
     for raw_line in output.splitlines():
         line = raw_line.strip()
-        if not line or line.startswith(("Routing", "Destination", "Internet:", "Kernel")):
+        if not line:
+            continue
+        if line == "Internet:":
+            saw_section_header = True
+            in_internet_section = True
+            continue
+        if line.startswith("Internet6:"):
+            if in_internet_section:
+                break
+            continue
+        if saw_section_header and not in_internet_section:
+            continue
+        if line.startswith(("Routing", "Destination", "Kernel")):
             continue
         parts = line.split()
         if len(parts) < 4:
@@ -204,7 +264,7 @@ def parse_netstat_rn(output: str) -> dict[str, object]:
         if destination in {"default", "0.0.0.0"}:
             destination = "default"
         note = _default_route_note(gateway, interface) if destination == "default" else None
-        route = {
+        route: ParsedRouteEntry = {
             "destination": destination,
             "gateway": gateway,
             "interface": interface,
@@ -216,15 +276,16 @@ def parse_netstat_rn(output: str) -> dict[str, object]:
             default_routes.append(route)
 
     selected_default = _select_default_route(default_routes)
-    default_gateway = selected_default.get("gateway") if selected_default else None
-    default_interface = selected_default.get("interface") if selected_default else None
+    default_gateway = selected_default["gateway"] if selected_default else None
+    default_interface = selected_default["interface"] if selected_default else None
     if len(default_routes) > 1:
         observations.append(
-            "Multiple default routes were collected from netstat; the summary prefers the most specific usable entry."
+            "Multiple default routes were collected from netstat; the summary "
+            "prefers the most specific usable entry."
         )
     for route in default_routes:
-        if isinstance(route.get("note"), str):
-            observations.append(str(route["note"]))
+        if route["note"] is not None:
+            observations.append(route["note"])
 
     return {
         "default_gateway": default_gateway,
@@ -237,11 +298,11 @@ def parse_netstat_rn(output: str) -> dict[str, object]:
     }
 
 
-def parse_ip_addr_show(output: str) -> list[dict[str, object]]:
+def parse_ip_addr_show(output: str) -> list[ParsedInterface]:
     """Parse Linux `ip addr show` output."""
 
-    interfaces: list[dict[str, object]] = []
-    current: dict[str, object] | None = None
+    interfaces: list[ParsedInterface] = []
+    current: ParsedInterface | None = None
 
     for raw_line in output.splitlines():
         if re.match(r"^\d+:\s", raw_line):
@@ -299,11 +360,11 @@ def parse_ip_addr_show(output: str) -> list[dict[str, object]]:
     return interfaces
 
 
-def parse_ifconfig(output: str) -> list[dict[str, object]]:
+def parse_ifconfig(output: str) -> list[ParsedInterface]:
     """Parse `ifconfig` output from Unix-like systems."""
 
-    interfaces: list[dict[str, object]] = []
-    current: dict[str, object] | None = None
+    interfaces: list[ParsedInterface] = []
+    current: ParsedInterface | None = None
 
     for raw_line in output.splitlines():
         if raw_line and not raw_line.startswith(("\t", " ")):
@@ -366,11 +427,11 @@ def parse_ifconfig(output: str) -> list[dict[str, object]]:
     return interfaces
 
 
-def parse_ipconfig(output: str) -> list[dict[str, object]]:
+def parse_ipconfig(output: str) -> list[ParsedInterface]:
     """Parse Windows `ipconfig /all` output into interface records."""
 
-    interfaces: list[dict[str, object]] = []
-    current: dict[str, object] | None = None
+    interfaces: list[ParsedInterface] = []
+    current: ParsedInterface | None = None
 
     for raw_line in output.splitlines():
         line = raw_line.rstrip()
@@ -449,14 +510,17 @@ def parse_ping_output(output: str | bytes) -> dict[str, float | None]:
             "packet_loss_percent": _extract_packet_loss(normalized_output),
         }
 
-    return {"average_latency_ms": None, "packet_loss_percent": _extract_packet_loss(normalized_output)}
+    return {
+        "average_latency_ms": None,
+        "packet_loss_percent": _extract_packet_loss(normalized_output),
+    }
 
 
-def parse_traceroute_output(output: str | bytes) -> list[dict[str, object]]:
+def parse_traceroute_output(output: str | bytes) -> list[ParsedTraceHop]:
     """Parse a traceroute or tracert output into hops."""
 
     normalized_output = _coerce_text_output(output)
-    hops: list[dict[str, object]] = []
+    hops: list[ParsedTraceHop] = []
 
     for raw_line in normalized_output.splitlines():
         line = raw_line.strip()
@@ -498,7 +562,9 @@ def parse_traceroute_output(output: str | bytes) -> list[dict[str, object]]:
                 "hop": hop_number,
                 "host": host,
                 "address": address,
-                "latency_ms": round(sum(latency_values) / len(latency_values), 1) if latency_values else None,
+                "latency_ms": round(sum(latency_values) / len(latency_values), 1)
+                if latency_values
+                else None,
                 "note": note,
             }
         )
@@ -514,16 +580,18 @@ def _coerce_text_output(output: str | bytes) -> str:
     return output
 
 
-def parse_ip_neigh(output: str) -> list[dict[str, object]]:
+def parse_ip_neigh(output: str) -> list[ParsedNeighbor]:
     """Parse Linux `ip neigh show` output into neighbor entries."""
 
-    neighbors: list[dict[str, object]] = []
+    neighbors: list[ParsedNeighbor] = []
     for raw_line in output.splitlines():
         line = raw_line.strip()
         if not line:
             continue
 
-        ip_match = re.match(r"^(\S+)\s+dev\s+(\S+)(?:\s+lladdr\s+(\S+))?(?:\s+router)?\s+(\S+)?", line)
+        ip_match = re.match(
+            r"^(\S+)\s+dev\s+(\S+)(?:\s+lladdr\s+(\S+))?(?:\s+router)?\s+(\S+)?", line
+        )
         if not ip_match:
             continue
 
@@ -540,10 +608,10 @@ def parse_ip_neigh(output: str) -> list[dict[str, object]]:
     return neighbors
 
 
-def parse_arp_table(output: str) -> list[dict[str, object]]:
+def parse_arp_table(output: str) -> list[ParsedNeighbor]:
     """Parse `arp -a` output from macOS, Linux, or Windows."""
 
-    neighbors: list[dict[str, object]] = []
+    neighbors: list[ParsedNeighbor] = []
     current_interface: str | None = None
 
     for raw_line in output.splitlines():
@@ -602,7 +670,30 @@ def parse_resolv_conf(output: str) -> list[str]:
             parts = line.split()
             if len(parts) >= 2:
                 resolvers.append(parts[1])
-    return resolvers
+    return _dedupe_strings(resolvers)
+
+
+def parse_scutil_dns(output: str) -> list[str]:
+    """Parse macOS `scutil --dns` output into a resolver list."""
+
+    resolvers: list[str] = []
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        match = re.match(r"^nameserver\[\d+\]\s*:\s*(\S+)", line)
+        if match:
+            resolvers.append(match.group(1))
+    return _dedupe_strings(resolvers)
+
+
+def parse_powershell_dns_server_list(output: str) -> list[str]:
+    """Parse PowerShell-expanded DNS server output into a resolver list."""
+
+    resolvers: list[str] = []
+    for raw_line in output.splitlines():
+        value = raw_line.strip()
+        if value:
+            resolvers.append(value)
+    return _dedupe_strings(resolvers)
 
 
 def _extract_metric(line: str) -> int | None:
@@ -632,18 +723,21 @@ def _normalize_mac_address(value: str | None) -> str | None:
 def _extract_linux_route_qualifier(line: str) -> tuple[str | None, str]:
     for qualifier in ("unreachable", "blackhole", "prohibit", "throw"):
         if line.startswith(f"{qualifier} "):
-            return f"Default route is marked {qualifier}." if " default" in f" {line}" else qualifier, line[len(qualifier) + 1 :]
+            return (
+                f"Default route is marked {qualifier}." if " default" in f" {line}" else qualifier,
+                line[len(qualifier) + 1 :],
+            )
     return None, line
 
 
-def _select_default_route(routes: list[dict[str, object]]) -> dict[str, object] | None:
+def _select_default_route(routes: list[ParsedRouteEntry]) -> ParsedRouteEntry | None:
     if not routes:
         return None
     return min(
         routes,
         key=lambda route: (
-            1 if route.get("note") else 0,
-            route.get("metric") if isinstance(route.get("metric"), int) else 1_000_000,
+            1 if route["note"] else 0,
+            route["metric"] if route["metric"] is not None else 1_000_000,
         ),
     )
 
@@ -660,18 +754,25 @@ def _default_route_note(gateway: str | None, interface: str | None) -> str | Non
     if gateway and gateway.lower() == "on-link":
         return "Default route exists but is on-link without an explicit gateway."
     if gateway and gateway.lower().startswith("link#"):
-        return f"Default route uses link-scoped gateway {gateway}, so next-hop reachability is less explicit."
+        return (
+            f"Default route uses link-scoped gateway {gateway}, so next-hop "
+            "reachability is less explicit."
+        )
     return None
 
 
 def _dedupe_messages(messages: list[str]) -> list[str]:
+    return _dedupe_strings(messages)
+
+
+def _dedupe_strings(values: list[str]) -> list[str]:
     seen: set[str] = set()
     ordered: list[str] = []
-    for message in messages:
-        if not message or message in seen:
+    for value in values:
+        if not value or value in seen:
             continue
-        seen.add(message)
-        ordered.append(message)
+        seen.add(value)
+        ordered.append(value)
     return ordered
 
 
@@ -703,6 +804,8 @@ def _extract_trace_host(remainder: str, address: str | None) -> str | None:
     if not candidate:
         return address
     lowered = candidate.lower()
-    if lowered.startswith(("request timed out", "destination ", "trace complete", "general failure")):
+    if lowered.startswith(
+        ("request timed out", "destination ", "trace complete", "general failure")
+    ):
         return None
     return candidate.split()[0]

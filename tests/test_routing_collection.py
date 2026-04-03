@@ -49,7 +49,9 @@ class RoutingCollectionTests(unittest.TestCase):
         route_summary, warnings = collect_route_summary()
 
         self.assertEqual(route_summary.default_route_state, "suspect")
-        self.assertEqual(route_summary.observations, ["Multiple Windows default routes were collected."])
+        self.assertEqual(
+            route_summary.observations, ["Multiple Windows default routes were collected."]
+        )
         self.assertEqual(warnings, [])
 
     @patch("occams_beard.collectors.routing.current_platform", return_value="linux")

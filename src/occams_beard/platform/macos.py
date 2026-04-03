@@ -6,10 +6,15 @@ import re
 from datetime import datetime
 
 from occams_beard.utils.parsing import (
+    ParsedInterface,
+    ParsedNeighbor,
+    ParsedRouteData,
+    empty_route_data,
     parse_arp_table,
     parse_ifconfig,
     parse_netstat_rn,
     parse_route_get_default,
+    parse_scutil_dns,
 )
 from occams_beard.utils.subprocess import CommandResult, run_command
 
@@ -63,7 +68,47 @@ def read_memory_snapshot() -> dict[str, int | None]:
     }
 
 
-def read_interfaces() -> tuple[list[dict[str, object]], CommandResult]:
+def read_battery_snapshot() -> dict[str, object] | None:
+    """Read battery health information from built-in macOS commands."""
+
+    profiler_result = run_command(["system_profiler", "SPPowerDataType"], timeout=8.0)
+    pmset_result = run_command(["pmset", "-g", "batt"], timeout=8.0)
+
+    profiler_snapshot = (
+        _parse_system_profiler_battery(profiler_result.stdout)
+        if profiler_result.succeeded
+        else None
+    )
+    pmset_snapshot = _parse_pmset_battery(pmset_result.stdout) if pmset_result.succeeded else None
+
+    if _snapshot_marks_battery_absent(profiler_snapshot) or _snapshot_marks_battery_absent(
+        pmset_snapshot
+    ):
+        return {"present": False}
+    if profiler_snapshot is None and pmset_snapshot is None:
+        return None
+
+    snapshot: dict[str, object] = {"present": True}
+    for source in (profiler_snapshot, pmset_snapshot):
+        if source is None:
+            continue
+        for key, value in source.items():
+            if key == "present" or value is None:
+                continue
+            snapshot[key] = value
+    return snapshot
+
+
+def read_storage_device_health() -> list[dict[str, object]] | None:
+    """Read storage-device health information from `diskutil info -all`."""
+
+    result = run_command(["diskutil", "info", "-all"], timeout=8.0)
+    if not result.succeeded:
+        return None
+    return _parse_diskutil_storage_devices(result.stdout)
+
+
+def read_interfaces() -> tuple[list[ParsedInterface], CommandResult]:
     """Collect interface inventory via `ifconfig`."""
 
     result = run_command(["ifconfig"])
@@ -72,49 +117,35 @@ def read_interfaces() -> tuple[list[dict[str, object]], CommandResult]:
     return [], result
 
 
-def read_routes() -> tuple[dict[str, object], CommandResult]:
+def read_routes() -> tuple[ParsedRouteData, CommandResult]:
     """Collect routing data via `netstat -rn` with default-route enrichment."""
 
     gateway_result = run_command(["route", "-n", "get", "default"])
     gateway_data = (
         parse_route_get_default(gateway_result.stdout)
         if gateway_result.succeeded
-        else {
-            "default_gateway": None,
-            "default_interface": None,
-            "has_default_route": False,
-            "routes": [],
-            "default_route_state": "missing",
-            "observations": [],
-            "parse_warnings": [],
-        }
+        else empty_route_data()
     )
 
     table_result = run_command(["netstat", "-rn"])
     if table_result.succeeded:
         route_data = parse_netstat_rn(table_result.stdout)
         if gateway_data["has_default_route"]:
-            route_data["default_gateway"] = gateway_data["default_gateway"] or route_data["default_gateway"]
+            route_data["default_gateway"] = (
+                gateway_data["default_gateway"] or route_data["default_gateway"]
+            )
             route_data["default_interface"] = (
                 gateway_data["default_interface"] or route_data["default_interface"]
             )
             route_data["has_default_route"] = True
-            if not any(route.get("destination") == "default" for route in route_data["routes"]):
+            if not any(route["destination"] == "default" for route in route_data["routes"]):
                 route_data["routes"] = [*gateway_data["routes"], *route_data["routes"]]
         return route_data, table_result
 
     if gateway_result.succeeded:
         return gateway_data, gateway_result
 
-    return {
-        "default_gateway": None,
-        "default_interface": None,
-        "has_default_route": False,
-        "routes": [],
-        "default_route_state": "missing",
-        "observations": [],
-        "parse_warnings": [],
-    }, table_result
+    return empty_route_data(), table_result
 
 
 def read_resolvers() -> list[str]:
@@ -123,23 +154,112 @@ def read_resolvers() -> list[str]:
     result = run_command(["scutil", "--dns"])
     if not result.succeeded:
         return []
-
-    resolvers: list[str] = []
-    for raw_line in result.stdout.splitlines():
-        line = raw_line.strip()
-        if line.startswith("nameserver["):
-            _, _, value = line.partition(":")
-            resolvers.append(value.strip())
-    return resolvers
+    return parse_scutil_dns(result.stdout)
 
 
-def read_arp_neighbors() -> tuple[list[dict[str, object]], CommandResult]:
+def read_arp_neighbors() -> tuple[list[ParsedNeighbor], CommandResult]:
     """Collect supplemental ARP cache data."""
 
-    result = run_command(["arp", "-a"])
+    result = run_command(["arp", "-an"], timeout=3.0)
     if result.succeeded:
         return parse_arp_table(result.stdout), result
     return [], result
+
+
+def _parse_system_profiler_battery(output: str) -> dict[str, object] | None:
+    lowered = output.lower()
+    if "no battery information found" in lowered or "no batteries available" in lowered:
+        return {"present": False}
+
+    snapshot: dict[str, object] = {}
+    charge_match = re.search(r"^\s*State of Charge \(%\):\s*(\d+)\s*$", output, re.MULTILINE)
+    if charge_match:
+        snapshot["charge_percent"] = int(charge_match.group(1))
+
+    cycle_match = re.search(r"^\s*Cycle Count:\s*(\d+)\s*$", output, re.MULTILINE)
+    if cycle_match:
+        snapshot["cycle_count"] = int(cycle_match.group(1))
+
+    condition_match = re.search(r"^\s*Condition:\s*(.+?)\s*$", output, re.MULTILINE)
+    if condition_match:
+        snapshot["condition"] = condition_match.group(1).strip()
+
+    maximum_capacity_match = re.search(
+        r"^\s*Maximum Capacity:\s*([\d.]+)%\s*$",
+        output,
+        re.MULTILINE,
+    )
+    if maximum_capacity_match:
+        snapshot["health_percent"] = float(maximum_capacity_match.group(1))
+
+    if snapshot:
+        snapshot["present"] = True
+        return snapshot
+    return None
+
+
+def _parse_pmset_battery(output: str) -> dict[str, object] | None:
+    lowered = output.lower()
+    if "no batteries" in lowered or "no battery" in lowered:
+        return {"present": False}
+
+    match = re.search(r"(\d+)%;\s*([^;]+);", output)
+    if not match:
+        return None
+
+    return {
+        "present": True,
+        "charge_percent": int(match.group(1)),
+        "status": match.group(2).strip(),
+    }
+
+
+def _parse_diskutil_storage_devices(output: str) -> list[dict[str, object]]:
+    devices: list[dict[str, object]] = []
+    for block in re.split(r"\n\s*\n", output.strip()):
+        fields: dict[str, str] = {}
+        for line in block.splitlines():
+            if ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            fields[key.strip()] = value.strip()
+
+        device_id = fields.get("Device Identifier")
+        if not device_id:
+            continue
+
+        part_of_whole = fields.get("Part of Whole")
+        if part_of_whole and part_of_whole != device_id:
+            continue
+
+        model = fields.get("Device / Media Name") or fields.get("Media Name")
+        protocol = fields.get("Protocol")
+        health_status = fields.get("SMART Status")
+        if fields.get("Solid State") == "Yes":
+            medium = "SSD"
+        elif fields.get("Solid State") == "No":
+            medium = "HDD"
+        else:
+            medium = None
+
+        if not any((model, protocol, health_status, medium)):
+            continue
+
+        devices.append(
+            {
+                "device_id": device_id,
+                "model": model,
+                "protocol": protocol,
+                "medium": medium,
+                "health_status": health_status,
+                "operational_status": None,
+            }
+        )
+    return devices
+
+
+def _snapshot_marks_battery_absent(snapshot: dict[str, object] | None) -> bool:
+    return snapshot is not None and snapshot.get("present") is False
 
 
 def _parse_uptime_seconds(output: str) -> int | None:

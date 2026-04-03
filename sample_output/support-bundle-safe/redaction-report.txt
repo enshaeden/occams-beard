@@ -1,0 +1,13 @@
+Occam's Beard Redaction Report
+================================
+Level: safe
+
+Notes
+- Safe redaction hides endpoint identifiers, hostnames, private addresses, and MAC addresses while preserving overall diagnostic shape.
+
+Counts
+- endpoint-host: 3
+- hostname: 34
+- mac-address: 1
+- private-ip: 6
+- user: 2

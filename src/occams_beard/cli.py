@@ -9,10 +9,11 @@ import sys
 from occams_beard.defaults import (
     ALLOWED_CHECKS,
 )
+from occams_beard.profile_catalog import get_profile_catalog
 from occams_beard.report import render_report
-from occams_beard.serializers import write_json_file
 from occams_beard.runner import build_run_options, run_diagnostics
-
+from occams_beard.serializers import write_json_file
+from occams_beard.support_bundle import write_support_bundle
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,8 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--checks",
         metavar="LIST",
         help=(
-            "Comma-separated diagnostic domains. "
-            f"Supported values: {', '.join(ALLOWED_CHECKS)}."
+            f"Comma-separated diagnostic domains. Supported values: {', '.join(ALLOWED_CHECKS)}."
         ),
     )
 
@@ -62,7 +62,10 @@ def build_parser() -> argparse.ArgumentParser:
     target_group.add_argument(
         "--target-file",
         metavar="PATH",
-        help="Load TCP targets from a JSON array of host:port strings or {host, port, label} objects.",
+        help=(
+            "Load TCP targets from a JSON array of host:port strings or "
+            "{host, port, label} objects."
+        ),
     )
     target_group.add_argument(
         "--dns-host",
@@ -71,12 +74,41 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Repeat to add DNS resolution hostnames.",
     )
+    target_group.add_argument(
+        "--profile",
+        metavar="PROFILE_ID",
+        help="Use a built-in or local diagnostics profile as the default issue scenario.",
+    )
+    target_group.add_argument(
+        "--list-profiles",
+        action="store_true",
+        help="List available built-in and local profiles and exit.",
+    )
 
     output_group = run_parser.add_argument_group("Output")
     output_group.add_argument(
         "--json-out",
         metavar="PATH",
         help="Write structured JSON output to PATH.",
+    )
+    output_group.add_argument(
+        "--support-bundle",
+        metavar="PATH",
+        help=(
+            "Write a support bundle to PATH. Use a .zip suffix for a zip "
+            "archive or a directory path for loose files."
+        ),
+    )
+    output_group.add_argument(
+        "--redaction-level",
+        choices=["none", "safe", "strict"],
+        default="safe",
+        help="Redaction level for support bundle export. Default: safe.",
+    )
+    output_group.add_argument(
+        "--bundle-include-raw",
+        action="store_true",
+        help="Capture and include raw command output in the support bundle. Off by default.",
     )
     output_group.add_argument(
         "--suppress-report",
@@ -127,30 +159,58 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_command(args: argparse.Namespace) -> int:
+    if getattr(args, "list_profiles", False):
+        catalog = get_profile_catalog()
+        for profile in catalog.profiles:
+            print(
+                f"{profile.profile_id}\t{profile.issue_category}\t{profile.name}\t{profile.description}"
+            )
+        for issue in catalog.issues:
+            print(
+                f"Skipped {issue.source} profile file {issue.path}: {issue.reason}.",
+                file=sys.stderr,
+            )
+        return 0
+
     options = build_run_options(
         checks=args.checks,
         targets=args.target,
         target_file=args.target_file,
         dns_hosts=args.dns_host,
+        profile_id=getattr(args, "profile", None),
         enable_ping=args.enable_ping,
         enable_trace=args.enable_trace,
+        capture_raw_commands=getattr(args, "bundle_include_raw", False),
     )
-    LOGGER.info("Running host and network diagnostics for checks: %s", ", ".join(options.selected_checks))
+    LOGGER.info(
+        "Running host and network diagnostics for checks: %s", ", ".join(options.selected_checks)
+    )
     LOGGER.debug(
-        "Diagnostics input summary: tcp_targets=%d dns_hosts=%d json_out=%s suppress_report=%s "
-        "enable_ping=%s enable_trace=%s",
+        "Diagnostics input summary: tcp_targets=%d dns_hosts=%d json_out=%s support_bundle=%s "
+        "suppress_report=%s enable_ping=%s enable_trace=%s profile=%s raw_capture=%s",
         len(options.targets),
         len(options.dns_hosts),
         bool(args.json_out),
+        bool(getattr(args, "support_bundle", None)),
         args.suppress_report,
         options.enable_ping,
         options.enable_trace,
+        options.profile.profile_id if options.profile else None,
+        options.capture_raw_commands,
     )
     result = run_diagnostics(options)
 
     json_path = None
     if args.json_out:
         json_path = str(write_json_file(result, args.json_out))
+
+    if getattr(args, "support_bundle", None):
+        write_support_bundle(
+            result,
+            args.support_bundle,
+            redaction_level=getattr(args, "redaction_level", "safe"),
+            include_raw_command_capture=getattr(args, "bundle_include_raw", False),
+        )
 
     if not args.suppress_report:
         print(render_report(result, json_path=json_path))
@@ -178,6 +238,9 @@ def _run_examples_text() -> str:
         "Examples:\n"
         "  occams-beard run\n"
         "  occams-beard run --json-out report.json\n"
+        "  occams-beard run --list-profiles\n"
+        "  occams-beard run --profile no-internet\n"
+        "  occams-beard run --support-bundle bundle.zip --redaction-level safe\n"
         "  occams-beard run --checks network,dns,connectivity\n"
         "  occams-beard run --target github.com:443 --target 1.1.1.1:53\n"
         "  occams-beard run --target-file sample_output/example-targets.json\n"

@@ -1,0 +1,39 @@
+{
+  "bundle_format_version": "1.0.0",
+  "generated_at": "2026-04-01T00:15:00+00:00",
+  "app_version": "0.1.0",
+  "schema_version": "1.1.0",
+  "redaction_level": "safe",
+  "raw_command_capture_included": false,
+  "selected_checks": [
+    "network",
+    "routing",
+    "dns",
+    "connectivity",
+    "vpn"
+  ],
+  "profile_id": null,
+  "issue_category": null,
+  "files": [
+    {
+      "path": "redaction-report.txt",
+      "sha256": "0cf2073f9967712758499e77e94cc97c2b928713e0b51e37da87f45ca9958242",
+      "size_bytes": 303
+    },
+    {
+      "path": "report.txt",
+      "sha256": "324aa91b56997ca738f179ef8c5599c599672a776c5e0ac1ef1c3c814c504bda",
+      "size_bytes": 7714
+    },
+    {
+      "path": "result.json",
+      "sha256": "1df6587714aee18bf99cb7b343c8895f4a3c683b717356bdd05f30587eb457ac",
+      "size_bytes": 18576
+    }
+  ],
+  "notes": [],
+  "extra": {
+    "warning_count": 2,
+    "finding_count": 2
+  }
+}

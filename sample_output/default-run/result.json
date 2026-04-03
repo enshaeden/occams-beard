@@ -1,0 +1,618 @@
+{
+  "schema_version": "1.1.0",
+  "metadata": {
+    "project_name": "occams-beard",
+    "version": "0.1.0",
+    "generated_at": "2026-04-01T00:00:00+00:00",
+    "elapsed_ms": 182,
+    "selected_checks": [
+      "host",
+      "resources",
+      "storage",
+      "network",
+      "routing",
+      "dns",
+      "connectivity",
+      "vpn",
+      "services"
+    ],
+    "profile_id": null,
+    "profile_name": null,
+    "issue_category": null
+  },
+  "platform": {
+    "system": "Linux",
+    "release": "6.8.0",
+    "version": "demo-build",
+    "machine": "x86_64",
+    "python_version": "3.13.4"
+  },
+  "facts": {
+    "host": {
+      "hostname": "workstation-01",
+      "operating_system": "Linux",
+      "kernel": "6.8.0",
+      "current_user": "operator",
+      "uptime_seconds": 86400
+    },
+    "resources": {
+      "cpu": {
+        "logical_cpus": 8,
+        "load_average_1m": 0.62,
+        "load_average_5m": 0.54,
+        "load_average_15m": 0.49,
+        "utilization_percent_estimate": 7.8
+      },
+      "memory": {
+        "total_bytes": 17179869184,
+        "available_bytes": 9600000000,
+        "free_bytes": 7400000000,
+        "pressure_level": "normal"
+      },
+      "disks": [
+        {
+          "path": "/",
+          "total_bytes": 500107862016,
+          "used_bytes": 245000000000,
+          "free_bytes": 255107862016,
+          "percent_used": 49.0
+        }
+      ],
+      "battery": {
+        "present": false,
+        "charge_percent": null,
+        "status": null,
+        "cycle_count": null,
+        "condition": null,
+        "health_percent": null
+      },
+      "storage_devices": [
+        {
+          "device_id": "nvme0n1",
+          "model": "Demo SSD",
+          "protocol": "NVMe",
+          "medium": "SSD",
+          "health_status": "Healthy",
+          "operational_status": "OK"
+        }
+      ]
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "eth0",
+          "is_up": true,
+          "mac_address": "52:54:00:12:34:56",
+          "addresses": [
+            {
+              "family": "ipv4",
+              "address": "192.168.1.50",
+              "netmask": "24",
+              "is_loopback": false
+            }
+          ],
+          "mtu": 1500,
+          "type_hint": "ethernet"
+        }
+      ],
+      "local_addresses": [
+        "192.168.1.50"
+      ],
+      "active_interfaces": [
+        "eth0"
+      ],
+      "arp_neighbors": [
+        {
+          "ip_address": "192.168.1.1",
+          "mac_address": "aa:bb:cc:dd:ee:ff",
+          "interface": "eth0",
+          "state": "reachable"
+        }
+      ],
+      "route_summary": {
+        "default_gateway": "192.168.1.1",
+        "default_interface": "eth0",
+        "has_default_route": true,
+        "routes": [
+          {
+            "destination": "default",
+            "gateway": "192.168.1.1",
+            "interface": "eth0",
+            "metric": 100,
+            "note": null
+          }
+        ],
+        "default_route_state": "present",
+        "observations": []
+      }
+    },
+    "dns": {
+      "resolvers": [
+        "1.1.1.1",
+        "8.8.8.8"
+      ],
+      "checks": [
+        {
+          "hostname": "github.com",
+          "success": true,
+          "resolved_addresses": [
+            "140.82.113.3"
+          ],
+          "error": null,
+          "duration_ms": 12
+        },
+        {
+          "hostname": "python.org",
+          "success": true,
+          "resolved_addresses": [
+            "151.101.64.223"
+          ],
+          "error": null,
+          "duration_ms": 14
+        }
+      ]
+    },
+    "connectivity": {
+      "internet_reachable": true,
+      "tcp_checks": [
+        {
+          "target": {
+            "host": "github.com",
+            "port": 443,
+            "label": "github-https"
+          },
+          "success": true,
+          "latency_ms": 28.1,
+          "error": null,
+          "ip_used": "140.82.113.3",
+          "duration_ms": 28
+        },
+        {
+          "target": {
+            "host": "1.1.1.1",
+            "port": 53,
+            "label": "cloudflare-dns"
+          },
+          "success": true,
+          "latency_ms": 14.2,
+          "error": null,
+          "ip_used": "1.1.1.1",
+          "duration_ms": 14
+        }
+      ],
+      "ping_checks": [],
+      "trace_results": []
+    },
+    "vpn": {
+      "signals": []
+    },
+    "services": {
+      "checks": [
+        {
+          "target": {
+            "host": "github.com",
+            "port": 443,
+            "label": "github-https"
+          },
+          "success": true,
+          "latency_ms": 30.0,
+          "error": null,
+          "duration_ms": 30
+        },
+        {
+          "target": {
+            "host": "1.1.1.1",
+            "port": 53,
+            "label": "cloudflare-dns"
+          },
+          "success": true,
+          "latency_ms": 16.0,
+          "error": null,
+          "duration_ms": 16
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "identifier": "healthy-baseline",
+      "severity": "info",
+      "title": "No major diagnostic findings detected",
+      "summary": "The collected facts did not match any enabled fault rule.",
+      "evidence": [
+        "Deterministic rule evaluation completed without triggering supported fault signatures."
+      ],
+      "probable_cause": "No major failure domain was identified from the collected evidence.",
+      "fault_domain": "healthy",
+      "confidence": 0.8,
+      "heuristic": false,
+      "plain_language": "The collected evidence did not match any of the tool's major fault signatures.",
+      "evidence_summary": "Deterministic rule evaluation completed without triggering supported fault signatures.",
+      "safe_next_actions": [
+        "If the problem is still happening, rerun with the most relevant optional probes or a narrower profile."
+      ],
+      "escalation_triggers": [
+        "Escalate if the user-impacting issue is still reproducible but the current evidence stays inconclusive."
+      ],
+      "uncertainty_notes": [
+        "This result only says the current rules did not match a known signature; it does not prove the endpoint is healthy in every layer."
+      ]
+    }
+  ],
+  "probable_fault_domain": "healthy",
+  "warnings": [],
+  "execution": [
+    {
+      "domain": "host",
+      "label": "Host basics",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 4,
+      "summary": "Collected endpoint identity and uptime facts as a baseline domain.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "host-basics",
+          "label": "Collect host basics",
+          "status": "passed",
+          "duration_ms": 4,
+          "target": null,
+          "details": [
+            "Hostname: workstation-01.",
+            "Kernel: 6.8.0."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "resources",
+      "label": "Resource snapshot",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 18,
+      "summary": "Collected local CPU, memory, and battery state when available.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "resource-snapshot",
+          "label": "Collect CPU and memory facts",
+          "status": "passed",
+          "duration_ms": 18,
+          "target": null,
+          "details": [
+            "Logical CPUs: 8.",
+            "Memory pressure: normal."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "battery-health",
+          "label": "Collect battery health",
+          "status": "skipped",
+          "duration_ms": 18,
+          "target": null,
+          "details": [
+            "No local battery was detected on this endpoint."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "storage",
+      "label": "Storage snapshot",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 7,
+      "summary": "Collected filesystem capacity and storage-device health when available.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "disk-usage",
+          "label": "Collect disk usage",
+          "status": "passed",
+          "duration_ms": 7,
+          "target": null,
+          "details": [
+            "Volumes collected: 1."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "storage-device-health",
+          "label": "Collect storage-device health",
+          "status": "passed",
+          "duration_ms": 7,
+          "target": null,
+          "details": [
+            "Storage devices collected: 1.",
+            "Reported health states: nvme0n1=Healthy."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "network",
+      "label": "Interface inventory",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 12,
+      "summary": "Collected interface state, local addresses, and neighbor context.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "interface-inventory",
+          "label": "Collect interface inventory",
+          "status": "passed",
+          "duration_ms": 12,
+          "target": null,
+          "details": [
+            "Interfaces collected: 1."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "arp-neighbor-cache",
+          "label": "Collect ARP or neighbor cache",
+          "status": "passed",
+          "duration_ms": 12,
+          "target": null,
+          "details": [
+            "Neighbor entries collected: 1."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "routing",
+      "label": "Routing inventory",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 9,
+      "summary": "Collected route table and default-route interpretation.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "route-inventory",
+          "label": "Collect routing summary",
+          "status": "passed",
+          "duration_ms": 9,
+          "target": null,
+          "details": [
+            "Default route present: yes.",
+            "Default route state: present."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "dns",
+      "label": "DNS checks",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 26,
+      "summary": "Collected resolver configuration and hostname resolution checks.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "resolver-inventory",
+          "label": "Determine configured resolvers",
+          "status": "passed",
+          "duration_ms": 26,
+          "target": null,
+          "details": [
+            "Resolvers: 1.1.1.1, 8.8.8.8."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "dns:github.com",
+          "label": "Resolve github.com",
+          "status": "passed",
+          "duration_ms": 12,
+          "target": "github.com",
+          "details": [
+            "Resolved to 140.82.113.3."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "dns:python.org",
+          "label": "Resolve python.org",
+          "status": "passed",
+          "duration_ms": 14,
+          "target": "python.org",
+          "details": [
+            "Resolved to 151.101.64.223."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    },
+    {
+      "domain": "connectivity",
+      "label": "Generic connectivity",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 43,
+      "summary": "Collected generic DNS-independent and TCP path checks.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "tcp:github.com:443",
+          "label": "TCP github.com:443",
+          "status": "passed",
+          "duration_ms": 28,
+          "target": "github.com:443",
+          "details": [
+            "Connected in 28.1 ms."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "tcp:1.1.1.1:53",
+          "label": "TCP 1.1.1.1:53",
+          "status": "passed",
+          "duration_ms": 14,
+          "target": "1.1.1.1:53",
+          "details": [
+            "Connected in 14.2 ms."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "ping:github.com",
+          "label": "Ping github.com",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "github.com",
+          "details": [
+            "Ping was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "trace:github.com",
+          "label": "Trace github.com",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "github.com",
+          "details": [
+            "Traceroute was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "ping:1.1.1.1",
+          "label": "Ping 1.1.1.1",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "1.1.1.1",
+          "details": [
+            "Ping was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "trace:1.1.1.1",
+          "label": "Trace 1.1.1.1",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "1.1.1.1",
+          "details": [
+            "Traceroute was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    },
+    {
+      "domain": "vpn",
+      "label": "VPN heuristics",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 2,
+      "summary": "Evaluated tunnel-interface and route heuristics.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "vpn-heuristics",
+          "label": "Evaluate VPN and tunnel signals",
+          "status": "passed",
+          "duration_ms": 2,
+          "target": null,
+          "details": [
+            "No VPN-like interfaces or default-route tunnel hints were detected."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "services",
+      "label": "Configured services",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 27,
+      "summary": "Collected TCP checks for intended service targets.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "service:github.com:443",
+          "label": "Service github-https:443",
+          "status": "passed",
+          "duration_ms": 30,
+          "target": "github.com:443",
+          "details": [
+            "Connected in 30.0 ms."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "service:1.1.1.1:53",
+          "label": "Service cloudflare-dns:53",
+          "status": "passed",
+          "duration_ms": 16,
+          "target": "1.1.1.1:53",
+          "details": [
+            "Connected in 16.0 ms."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    }
+  ],
+  "guided_experience": {
+    "issue_category": null,
+    "profile_id": null,
+    "profile_name": null,
+    "what_we_know": [
+      "The collected evidence did not match any of the tool's major fault signatures."
+    ],
+    "likely_happened": [
+      "No major failure domain was identified from the collected evidence."
+    ],
+    "safe_next_steps": [
+      "If the problem is still happening, rerun with the most relevant optional probes or a narrower profile."
+    ],
+    "escalation_guidance": [
+      "Escalate if the user-impacting issue is still reproducible but the current evidence stays inconclusive."
+    ],
+    "uncertainty_notes": [
+      "This result only says the current rules did not match a known signature; it does not prove the endpoint is healthy in every layer."
+    ]
+  }
+}

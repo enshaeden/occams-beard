@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
 Name: occams-beard
 Version: 0.1.0
-Summary: Cross-platform host and network diagnostics and lightweight remediation analysis for systems engineering portfolios.
+Summary: Cross-platform host and network diagnostics with local support-ready artifacts.
 Author: Justin Sadow
 License: MIT
 Keywords: diagnostics,endpoint,networking,systems-engineering,python
@@ -21,315 +21,217 @@ Requires-Dist: mypy>=1.10.0; extra == "dev"
 
 # Occam's Beard
 
-Occam's Beard is a local, cross-platform host and network diagnostics project focused on clear, evidence-based host and network troubleshooting. It collects bounded local facts, normalizes them into a stable model, evaluates deterministic findings rules, and exposes the same diagnostics core through both a lightweight Flask operator console and a scripting-friendly CLI.
+## What this is
 
-The project is designed to answer practical operator questions without turning into a platform:
-- Is the endpoint online and correctly routed?
-- Does DNS work, partially work, or fail outright?
-- Can the host reach generic external paths?
-- Can it reach the specific endpoints or services that matter to the operator?
-- Is there evidence of VPN or tunnel state?
-- Is the host under local resource pressure?
-- Based on collected evidence, what is the most likely fault domain?
+Occam's Beard is a local-first, on-device troubleshooting assistant for host and network diagnostics. It collects bounded local evidence, normalizes that evidence into stable models, evaluates deterministic findings, adds a plain-language explanation layer, and exposes the same run through a CLI and a localhost Flask UI backed by one shared runner.
 
-It is intentionally not an MDM, not a monitoring SaaS, not a remote control plane, and not an AI-heavy troubleshooting assistant.
+The current target is a self-service troubleshooting assistant that safely collects local diagnostic evidence, interprets it deterministically, explains the result in plain language, guides the user through safe next steps, and produces support-ready artifacts without requiring a cloud dependency by default.
 
-## Review Guide
+## Why it exists
 
-If you are reviewing the repository on GitHub, the fastest path is:
+Endpoint failures often sit between desktop support, systems administration, and network operations. In many environments the first response still depends on one-off commands, screenshots, and ad hoc interpretation, which produces inconsistent evidence and weak handoffs. Occam's Beard keeps that workflow local, bounded, inspectable, and repeatable.
 
-1. This README for scope, interfaces, and current repository layout.
-2. [`sample_output/`](sample_output/) for representative JSON and terminal-report artifacts.
-3. [`docs/diagnostic-model.md`](docs/diagnostic-model.md) for the normalized collection and reasoning model.
-4. [`docs/finding-rules.md`](docs/finding-rules.md) for deterministic findings and confidence guidance.
-5. [`docs/platform-notes.md`](docs/platform-notes.md) for cross-platform tradeoffs and graceful degradation notes.
-6. [`architecture/decisions.md`](architecture/decisions.md) for rationale, audit logging, and change-safety notes.
+## What it is not
 
-## What It Proves
+- not a cloud-dependent SaaS
+- not a resident agent or daemon
+- not a fleet control plane
+- not an auto-remediation system
+- not an LLM-first black box
 
-For endpoint, infrastructure, and systems engineering work, the project is intended to demonstrate:
-- endpoint and OS-level diagnostic fluency
-- network troubleshooting judgment
-- deterministic reasoning from raw evidence
-- disciplined Python engineering with clear layering
-- safe, maintainable local tooling that degrades gracefully
+## Current strengths
 
-## Scope
+- one shared execution path for CLI and web
+- deterministic findings as the source of truth
+- normalized models before reasoning
+- bounded subprocess and hostname-resolution execution
+- local-only support artifacts by default
+- minimal runtime dependency footprint
 
-Included:
-- host basics
-- resource state
-- storage checks
-- interface and routing state
-- DNS tests
-- TCP connectivity checks
-- optional ping and traceroute
-- heuristic VPN indicators
-- configurable service and port checks
-- deterministic fault-domain analysis
+## Current capabilities
 
-Explicitly excluded:
-- remote management
-- persistent agents or daemons
-- SaaS control planes
-- user accounts or RBAC
-- cloud storage or synchronization
-- automatic remediation actions
-- LLM-generated summaries
+- schema-versioned machine-readable output
+- first-class execution status by domain and probe
+- additive battery and storage-device health facts under the existing `resources` and `storage` domains
+- local issue profiles under [`src/occams_beard/profiles/`](src/occams_beard/profiles/)
+- guided self-service summaries in the web UI and report output
+- support-bundle export with redaction and optional raw command capture
+- standalone support-bundle validation for directory and zip exports
+- invalid optional local profile files are skipped instead of breaking the profile catalog
 
-## Supported Platforms
+## Architecture
 
-- macOS
-- Linux
-- Windows
+The repo keeps the existing layered split:
 
-Baseline checks do not require sudo or administrator privileges. Some richer checks, such as traceroute visibility or full interface detail, remain subject to platform and command availability.
+- `collectors/`: gather raw endpoint evidence
+- `models.py`: define normalized shapes
+- `findings.py`: map normalized facts to deterministic findings
+- `runner.py`: validate inputs and execute the shared run flow
+- `serializers.py`, `report.py`, `support_bundle.py`: render the same result for different consumers
+- `bundle_validator.py`: verify support-bundle manifests, hashes, and schema consistency
+- `cli.py`, `app.py`, `launcher.py`: thin interfaces over the same runner
 
-Windows support is intentionally practical rather than overclaimed: common `ipconfig`, `route print`, `ping`, and `tracert` output variants are covered with captured fixtures, but deeper localization-specific parsing still fails conservatively and may emit warnings instead of strong claims.
+## Usage
 
-## Architecture Overview
-
-The codebase uses a deliberately small layered design:
-- `collectors/` gather raw host, network, DNS, connectivity, storage, service, and VPN facts
-- `models.py` normalizes facts into stable structures
-- `findings.py` applies deterministic, evidence-based rules
-- `runner.py` is the shared diagnostics execution path used by both interfaces
-- `serializers.py` emits machine-readable JSON
-- `report.py` renders a concise terminal-friendly operator report
-- `cli.py` parses automation-oriented inputs and renders terminal output
-- `app.py` renders the local Flask interface with server-side templates
-
-This separation keeps reporting concerns out of collection code, keeps the findings engine free from UI logic, and avoids duplicating orchestration between the CLI and the web app.
-
-## Interfaces
-
-For normal human use, start the local web app:
+Setup:
 
 ```bash
-occams-beard-web
-```
-
-Or:
-
-```bash
-python -m occams_beard.app
-```
-
-For a launcher that starts the local server and opens the browser automatically:
-
-```bash
-occams-beard-operator
-```
-
-On macOS, you can also double-click [`scripts/open-operator-interface.command`](scripts/open-operator-interface.command). The script prefers the project-local virtual environment when present and can bootstrap a local `.venv` plus package install on a fresh checkout.
-
-The CLI remains the right interface for scripting and automation:
-
-```bash
-occams-beard run
-```
-
-With no flags, the CLI executes the default diagnostic suite, uses built-in DNS and TCP targets, prints the human-readable report, and exits `0` when diagnostics complete even if findings are present.
-
-## Module Paths
-
-The repository, package metadata, CLI entry points, JSON metadata, and Python module path now all align on the Occam's Beard identity:
-- human-facing name: `Occam's Beard`
-- package/module path: `occams_beard`
-- CLI and artifact slug: `occams-beard`
-
-## Connectivity vs. Service Checks
-
-The project keeps two closely related but distinct concepts:
-
-- `connectivity` means generic path reachability. These checks answer whether the endpoint can get off-box, resolve names, and establish baseline external TCP paths.
-- `services` means intended endpoint or application reachability. These checks answer whether the specific destinations the operator cares about are reachable.
-
-The transport may overlap, but the reasoning does not. Findings use generic connectivity to judge broad path health and use service checks to judge target-specific reachability.
-
-## Repository Layout
-
-```text
-occams-beard/
-├── README.md
-├── architecture/
-│   └── decisions.md
-├── docs/
-│   ├── diagnostic-model.md
-│   ├── finding-rules.md
-│   ├── platform-notes.md
-│   ├── problem-statement.md
-│   └── roadmap.md
-├── sample_output/
-├── scripts/
-├── src/
-│   └── occams_beard/
-├── tests/
-└── pyproject.toml
-```
-
-## Installation
-
-```bash
-cd occams-beard
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Runtime dependencies are intentionally small. Flask is used for the local operator interface, while the diagnostics engine itself remains stdlib-first. The optional `dev` extras install formatting, linting, and type-check tooling.
-
-## Web Workflow
-
-By default the local app binds to `127.0.0.1:5000`. If that port is already occupied, the dedicated launcher automatically selects another open localhost port and opens that URL instead.
-
-The browser workflow is intentionally small:
-
-1. Review or adjust the prefilled diagnostic domains, TCP targets, and DNS hosts.
-2. Optionally enable ping or traceroute.
-3. Run diagnostics with one button.
-4. Review the probable fault domain, findings, evidence, snapshots, and warnings.
-5. Download the JSON artifact for sharing or later analysis.
-
-The app is local-only and intentionally does not include authentication, persistence, user accounts, live updates, or remote fleet concepts.
-
-## CLI Examples
-
-1. Plain default run
+Run the default suite:
 
 ```bash
 occams-beard run
 ```
 
-2. Save JSON
+List available profiles:
 
 ```bash
-occams-beard run --json-out report.json
+occams-beard run --list-profiles
 ```
 
-3. Limit checks
+Run a profile:
 
 ```bash
-occams-beard run --checks network,dns,connectivity
+occams-beard run --profile no-internet
 ```
 
-4. Add custom targets
+Export schema-versioned JSON:
 
 ```bash
-occams-beard run --target github.com:443 --target 1.1.1.1:53
+occams-beard run --json-out result.json
 ```
 
-5. Use a target file
+Export a redacted support bundle:
 
 ```bash
-occams-beard run --target-file sample_output/example-targets.json
+occams-beard run --profile vpn-issue --support-bundle bundle.zip --redaction-level safe
 ```
 
-6. Enable ping and trace
+Opt in to raw command capture for the support bundle:
 
 ```bash
-occams-beard run --enable-ping --enable-trace --verbose
+occams-beard run --support-bundle bundle.zip --bundle-include-raw
 ```
 
-7. Suppress the human-readable report
+Validate an existing support bundle:
 
 ```bash
-occams-beard run --suppress-report --json-out report.json
+occams-beard-validate-bundle bundle.zip
 ```
 
-The `python -m occams_beard.main run ...` form is equivalent to the examples above.
-
-`--target-file` accepts a JSON array of either `host:port` strings or objects shaped like `{"host": "github.com", "port": 443, "label": "github-https"}` so repeated service checks can stay config-driven without introducing a database or service layer.
-
-## Run Options
-
-- `--checks`: comma-separated diagnostic domains to run. Supported values are `host`, `resources`, `storage`, `network`, `routing`, `dns`, `connectivity`, `vpn`, and `services`.
-- `--json-out`: write structured JSON output to a file.
-- `--suppress-report`: skip the human-readable terminal report for machine-oriented workflows.
-- `--target`: repeat to add TCP targets as `host:port`.
-- `--target-file`: load TCP targets from a JSON array of `host:port` strings or `{host, port, label}` objects.
-- `--dns-host`: repeat to add DNS resolution hostnames.
-- `--enable-ping`: add best-effort ping checks.
-- `--enable-trace`: add best-effort traceroute or tracert checks.
-- `--verbose`: enable INFO-level logging.
-- `--debug`: enable DEBUG-level logging.
-
-## Example Human-Readable Output
-
-```text
-Occam's Beard Report
-====================
-
-Summary
-- Host: workstation-01
-- Platform: Linux 6.8.0 (x86_64)
-- Internet reachable: yes
-- Default route present: yes
-- Probable fault domain: healthy
-- Fault-domain basis: No major diagnostic findings detected (0.80 confidence)
-```
-
-The report intentionally distinguishes between:
-- observed facts
-- derived findings
-- heuristic conclusions where certainty is limited
-
-## JSON Output Shape
-
-The JSON output includes:
-- metadata
-- platform information
-- collected facts
-- findings
-- probable fault domain
-- warnings and degraded checks
-
-Representative samples are committed in [`sample_output/`](sample_output/), including both machine-readable JSON and terminal-style report artifacts for healthy, DNS-failure, no-route, resource-pressure, and VPN-heuristic scenarios.
-
-## Documentation Map
-
-- [`docs/problem-statement.md`](docs/problem-statement.md): purpose, scope, and operator problem framing
-- [`docs/diagnostic-model.md`](docs/diagnostic-model.md): collection layers, normalized models, and failure handling
-- [`docs/finding-rules.md`](docs/finding-rules.md): deterministic findings logic and confidence guidance
-- [`docs/platform-notes.md`](docs/platform-notes.md): per-platform sources, security notes, and performance tradeoffs
-- [`docs/roadmap.md`](docs/roadmap.md): release scope, next steps, and rollback framing
-- [`architecture/decisions.md`](architecture/decisions.md): design rationale, audit log, unresolved issues, and change safety
-- [`sample_output/README.md`](sample_output/README.md): sample artifact inventory and review notes
-
-## Tooling and Verification
+Run the localhost web UI:
 
 ```bash
-cd occams-beard
-python3 -m unittest discover -s tests -p 'test_*.py'
-python3 -m black --check src tests
-python3 -m ruff check src tests
-python3 -m mypy src
+occams-beard-web
 ```
 
-The test suite focuses on runner behavior, Flask routes and rendering, parser fixtures, deterministic findings, JSON serialization, report rendering, and collector normalization without depending on live endpoint state.
+Run the local launcher:
 
-## Dependencies, Limitations, and Tradeoffs
+```bash
+occams-beard-operator
+```
 
-Dependencies introduced or modified:
-- no new runtime dependencies were introduced in this documentation cleanup
-- Flask remains the only runtime dependency for the local operator interface
+## Web flow
 
-Known limitations and tradeoffs:
-- Windows collection still relies on PowerShell and common built-in networking tools; localized output and older host variations need broader fixture coverage
-- VPN detection is heuristic by design and never claims certainty
-- traceroute and ping coverage depend on command availability and network policy
-- CPU utilization is an estimate, not a profiler-grade measurement
-- module execution examples use `python -m occams_beard...`
+The Flask UI now starts with two explicit paths:
 
-Rollback strategy:
-- revert this identity rename pass if you need the prior naming immediately
-- revert the package-path, entrypoint, launcher, and metadata changes together if you need to restore the prior identity
+1. `Check My Device`
+   - symptom-led entry for non-technical employees
+   - works as a normal server-rendered flow even without JavaScript
+   - safe recommended checks selected automatically
+   - JavaScript only auto-loads the recommended plan as a progressive enhancement
+   - advanced controls stay hidden until a symptom-backed plan is loaded
+2. `Work With Support`
+   - technician-directed profile and deeper plan selection
+   - visible advanced controls, probe choices, and capture consent
+   - support-bundle handoff emphasized
+3. both paths transition through a live local progress page that updates by selected domain from execution records instead of a generic waiting overlay
+4. both paths render the same deterministic result object through a simpler results page:
+   - what we know
+   - what likely happened
+   - what you can do now
+   - when to contact support
+   - technical detail collapsed by default for self-serve runs
+5. self-serve runs can continue into guided support without losing the earlier result
 
-## Future Improvements
+## Support bundles
 
-Future improvements are documented rather than folded into this pass when they would expand scope more than diagnostic credibility:
+Support bundles are local-only and can include:
 
-- broaden parser fixture coverage for more Windows and Linux variants
-- improve route interpretation for split-tunnel and policy-route cases
-- add optional raw-command fixture packs for integration-style parser testing
-- add constrained proxy and captive-portal visibility checks only if they can remain deterministic and local
+- `result.json`
+- `report.txt`
+- `manifest.json`
+- `redaction-report.txt`
+- `raw-commands.json` when raw capture was explicitly enabled
+
+See [`docs/support-workflow.md`](docs/support-workflow.md) and [`docs/privacy-and-threat-model.md`](docs/privacy-and-threat-model.md).
+
+## Documentation map
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): setup, contribution rules, and documentation policy
+- [`CHANGELOG.md`](CHANGELOG.md): unreleased and released changes
+- [`docs/roadmap.md`](docs/roadmap.md): target product, current posture, remaining blockers, and next milestones
+- [`architecture/decisions.md`](architecture/decisions.md): architecture rationale and non-goals
+- [`docs/diagnostic-model.md`](docs/diagnostic-model.md): execution flow and model boundaries
+- [`docs/finding-rules.md`](docs/finding-rules.md): deterministic findings boundary and finding output
+- [`docs/result-schema.md`](docs/result-schema.md): machine-readable result contract
+- [`docs/profile-format.md`](docs/profile-format.md): local profile format
+- [`docs/privacy-and-threat-model.md`](docs/privacy-and-threat-model.md): privacy and bundle redaction posture
+- [`docs/platform-notes.md`](docs/platform-notes.md): platform-specific collection notes
+- [`docs/support-workflow.md`](docs/support-workflow.md): support-ready handoff and bundle export flow
+- [`docs/ACCESSIBILITY_NOTES.md`](docs/ACCESSIBILITY_NOTES.md): verified UI accessibility work and remaining manual validation gaps
+
+## Development
+
+Run tests:
+
+```bash
+PYTHONPATH=src:tests .venv/bin/python -m unittest discover -s tests -v
+```
+
+Static analysis:
+
+```bash
+.venv/bin/ruff check src tests scripts
+.venv/bin/mypy src tests/support.py scripts/refresh_sample_output.py scripts/live_smoke_validate.py
+```
+
+Check documentation structure:
+
+```bash
+python scripts/check_docs.py
+```
+
+Refresh canonical sample artifacts:
+
+```bash
+.venv/bin/python scripts/refresh_sample_output.py
+```
+
+Run bounded live smoke validation on the current host:
+
+```bash
+.venv/bin/python scripts/live_smoke_validate.py --json-out live-smoke-summary.json
+```
+
+Validate a committed or operator-supplied support bundle:
+
+```bash
+.venv/bin/python -m occams_beard.bundle_validator sample_output/support-bundle-safe
+```
+
+CI blocks on documentation structure, unit tests, `ruff`, `mypy`, and bounded live smoke validation on GitHub-hosted Ubuntu, macOS, and Windows runners. `ruff` `E501` remains part of the blocking path.
+
+## Known limits
+
+- no cloud upload path
+- no remediation actions
+- no persistent history beyond local session state in the web UI
+- raw command capture remains opt-in because it can contain sensitive local data
+- battery and storage-device health facts are opportunistic and stay read-only; some endpoints will expose little or no health detail without elevation
+- optional local profile overrides can be skipped when malformed; built-in profiles remain strict
+- committed sample artifacts under [`sample_output/`](sample_output/) are deterministic review fixtures, not live captures from a production endpoint
