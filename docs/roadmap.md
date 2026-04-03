@@ -2,7 +2,7 @@
 
 ## Target Product
 
-Occam's Beard is aimed at a self-service, on-device troubleshooting assistant that safely collects local diagnostic evidence, interprets it deterministically, explains the result in plain language, guides the user through safe next steps, and produces support-ready artifacts without requiring a cloud dependency by default.
+Occam's Beard is a local-first troubleshooting assistant with deterministic diagnostics and support-ready export. It safely collects local diagnostic evidence, interprets it deterministically, explains likely fault domains in plain language, guides the user through safe next steps, and produces support-ready artifacts without requiring a cloud dependency.
 
 ## Product Boundaries
 
@@ -12,6 +12,8 @@ The operating model remains:
 - read-mostly diagnostics
 - deterministic findings
 - one shared runner
+- bounded explanation layer
+- support-ready bundle export and validation
 - no background agent
 - no cloud dependency by default
 - no automatic remediation
@@ -48,6 +50,9 @@ The operating model remains:
 
 ## Explicitly Out of Scope
 
+- persistent management systems
+- RMM or fleet-control behavior
+- remote agent platforms
 - control-plane behavior
 - background agents
 - dashboards

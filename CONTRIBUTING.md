@@ -49,7 +49,7 @@ Run bounded live smoke validation on the current host:
 
 ## Current CI Scope
 
-Verified by inspection of [`.github/workflows/ci.yml`](.github/workflows/ci.yml), the blocking CI path currently includes:
+Verified against the current project automation, the blocking CI path currently includes:
 
 - documentation structure must pass
 - unit tests must pass
@@ -59,7 +59,7 @@ Verified by inspection of [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
 `ruff` `E501` and the staged `mypy` target are part of the blocking path.
 
-When this scope changes, update [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [`.github/workflows/ci.yml`](.github/workflows/ci.yml) in the same change.
+When this scope changes, update [README.md](README.md) and [CONTRIBUTING.md](CONTRIBUTING.md) in the same change.
 
 ## Documentation Policy
 

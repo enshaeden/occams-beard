@@ -22,6 +22,8 @@ This schema version is separate from the application version. The application ca
 
 Raw command capture is intentionally excluded from `result.json`. If enabled, it lives only in the support bundle as `raw-commands.json`.
 
+`guided_experience` is a deterministic explanation surface derived from findings and execution state. It is not an independent reasoning engine and should not contradict or bypass `findings`.
+
 ## Additive `1.1.0` Fields
 
 Schema `1.1.0` adds two optional fields under `facts.resources`:

@@ -23,6 +23,10 @@
 
 ### Changed
 
+- The local web interface is now split into focused `web/` modules for route composition, form parsing, session orchestration, progress shaping, and result presentation so the shared runner remains the architectural center.
+- The deterministic explanation layer now lives under `explanations.py`, with `assistant.py` retained only as a compatibility facade.
+- Core documentation, UI copy, and architecture notes now define Occam's Beard explicitly as a local-first troubleshooting assistant with deterministic diagnostics and support-ready export, with stronger non-goals around fleet, management, and generalized assistant behavior.
+- Support-bundle export is now documented more explicitly as a core local handoff surface rather than an incidental download path.
 - The localhost web app now starts with two clear paths: `Check My Device` and `Work With Support`.
 - Hostname resolution in DNS checks and trace-target preparation is now time-bounded and reported as partial instead of blocking the whole run.
 - The self-serve web path now works without JavaScript, with JavaScript limited to auto-loading the recommended plan as a progressive enhancement.

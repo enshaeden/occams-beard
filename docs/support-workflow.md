@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This workflow turns a local diagnostics run into a support-ready handoff without requiring a cloud dependency.
+This workflow turns a local diagnostics run into a support-ready handoff without requiring a cloud dependency. Support bundles are a core product surface, not an incidental export.
 
 ## Standard Flow
 
@@ -18,6 +18,13 @@ This workflow turns a local diagnostics run into a support-ready handoff without
    - when to contact support
    - what remains uncertain
 5. Export a support bundle with the appropriate redaction level.
+
+This workflow exists to support only four product flows:
+
+1. collect trustworthy local evidence
+2. explain likely fault domains clearly
+3. produce support-ready handoff artifacts
+4. help a user or operator choose safe next steps
 
 ## Bundle Contents
 
@@ -39,6 +46,12 @@ python -m occams_beard.bundle_validator PATH
 ```
 
 The validator checks the manifest, listed files, hashes, sizes, raw-capture presence, and schema-version consistency.
+
+## Boundaries
+
+- Bundle export and validation stay local-first and file-based.
+- There is no built-in upload path, remote collection path, or persistent service behind bundles.
+- Bundle mechanics stay subordinate to the diagnostics result model; they are not a second platform inside the repo.
 
 ## Recommended Redaction Use
 

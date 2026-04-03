@@ -2,9 +2,9 @@
 
 ## What this is
 
-Occam's Beard is a local-first, on-device troubleshooting assistant for host and network diagnostics. It collects bounded local evidence, normalizes that evidence into stable models, evaluates deterministic findings, adds a plain-language explanation layer, and exposes the same run through a CLI and a localhost Flask UI backed by one shared runner.
+Occam's Beard is a local-first troubleshooting assistant with deterministic diagnostics and support-ready export. It collects bounded local evidence, normalizes that evidence into stable models, evaluates deterministic findings, adds a structured explanation layer, and exposes the same run through a CLI and a localhost Flask UI backed by one shared runner.
 
-The current target is a self-service troubleshooting assistant that safely collects local diagnostic evidence, interprets it deterministically, explains the result in plain language, guides the user through safe next steps, and produces support-ready artifacts without requiring a cloud dependency by default.
+Its product scope is intentionally narrow: collect trustworthy local evidence, explain likely fault domains clearly, produce support-ready handoff artifacts, and help a user or operator choose safe next steps.
 
 ## Why it exists
 
@@ -14,8 +14,13 @@ Endpoint failures often sit between desktop support, systems administration, and
 
 - not a cloud-dependent SaaS
 - not a resident agent or daemon
+- not an RMM
+- not a remote monitoring platform
+- not a persistent management system
 - not a fleet control plane
+- not a generalized device-management product
 - not an auto-remediation system
+- not an open-ended AI assistant
 - not an LLM-first black box
 
 ## Current strengths
@@ -23,6 +28,7 @@ Endpoint failures often sit between desktop support, systems administration, and
 - one shared execution path for CLI and web
 - deterministic findings as the source of truth
 - normalized models before reasoning
+- explanation stays subordinate to deterministic findings
 - bounded subprocess and hostname-resolution execution
 - local-only support artifacts by default
 - minimal runtime dependency footprint
@@ -46,8 +52,10 @@ The repo keeps the existing layered split:
 - `models.py`: define normalized shapes
 - `findings.py`: map normalized facts to deterministic findings
 - `runner.py`: validate inputs and execute the shared run flow
+- `explanations.py`: convert deterministic findings into bounded plain-language guidance
 - `serializers.py`, `report.py`, `support_bundle.py`: render the same result for different consumers
 - `bundle_validator.py`: verify support-bundle manifests, hashes, and schema consistency
+- `web/`: local route composition, form parsing, session progress, and presentation helpers
 - `cli.py`, `app.py`, `launcher.py`: thin interfaces over the same runner
 
 ## Usage
@@ -115,7 +123,7 @@ occams-beard-operator
 ```
 
 On macOS, you can also double-click
-[`Open Device Check.command`](Open%20Device%20Check.command)
+[`Open Device Check.command`](<Open Device Check.command>)
 from the repo root. It starts the local interface without leaving a Terminal
 window on screen and stops the local server after the browser page is closed.
 
@@ -142,9 +150,11 @@ The Flask UI now starts with two explicit paths:
    - technical detail collapsed by default for self-serve runs
 5. self-serve runs can continue into guided support without losing the earlier result
 
+The web layer is intentionally thin. Route handling, form parsing, progress shaping, and result presentation live under [`src/occams_beard/web/`](src/occams_beard/web/) so the shared runner, findings, and bundle/export model remain the center of gravity.
+
 ## Support bundles
 
-Support bundles are local-only and can include:
+Support bundles are a core product surface for support handoff. They stay local-only and can include:
 
 - `result.json`
 - `report.txt`
@@ -215,6 +225,7 @@ CI blocks on documentation structure, unit tests, `ruff`, `mypy`, and bounded li
 - no cloud upload path
 - no remediation actions
 - no persistent history beyond local session state in the web UI
+- no multi-user or fleet-management model
 - raw command capture remains opt-in because it can contain sensitive local data
 - battery and storage-device health facts are opportunistic and stay read-only; some endpoints will expose little or no health detail without elevation
 - optional local profile overrides can be skipped when malformed; built-in profiles remain strict

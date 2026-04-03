@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from typing import cast
 
 from occams_beard import __version__
-from occams_beard.assistant import build_guided_experience, enrich_findings
 from occams_beard.collectors.connectivity import collect_connectivity_state
 from occams_beard.collectors.dns import collect_dns_state
 from occams_beard.collectors.network import collect_network_state
@@ -468,3 +467,4 @@ def _update_domain_steps(
 ) -> None:
     completed_steps_by_domain[domain] = completed_steps
     emit_progress(active_domain=domain)
+from occams_beard.explanations import build_guided_experience, enrich_findings

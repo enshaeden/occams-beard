@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import json
+from io import BytesIO
 import tempfile
 import unittest
 import zipfile
 
 from occams_beard.models import RawCommandCapture
 from occams_beard.privacy import BundleRedactor
-from occams_beard.support_bundle import build_support_bundle_contents, write_support_bundle
+from occams_beard.support_bundle import (
+    build_support_bundle_archive,
+    build_support_bundle_contents,
+    write_support_bundle,
+)
 from support import build_sample_result
 
 
@@ -92,6 +97,19 @@ class SupportBundleTests(unittest.TestCase):
             ["manifest.json", "redaction-report.txt", "report.txt", "result.json"],
         )
         self.assertEqual(manifest["redaction_level"], "strict")
+
+    def test_build_support_bundle_archive_returns_zip_payload(self) -> None:
+        result = build_sample_result()
+
+        payload = build_support_bundle_archive(result, redaction_level="safe")
+
+        with zipfile.ZipFile(BytesIO(payload), "r") as archive:
+            members = sorted(archive.namelist())
+
+        self.assertEqual(
+            members,
+            ["manifest.json", "redaction-report.txt", "report.txt", "result.json"],
+        )
 
     def test_support_bundle_redacts_uncatalogued_ipv6_addresses_from_raw_capture(self) -> None:
         result = build_sample_result()

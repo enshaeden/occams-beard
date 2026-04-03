@@ -2,16 +2,16 @@
 
 ## Design
 
-Occam's Beard still follows the same execution flow:
+Occam's Beard follows one shared diagnostics execution flow:
 
 ```text
-CLI / Web
+CLI / Web / Launcher / Support Bundle Export
   -> build_run_options
   -> shared runner
   -> collectors
   -> normalized models
   -> deterministic findings
-  -> execution status + guided summary
+  -> execution status + deterministic explanation
   -> JSON / report / support bundle / HTML
 ```
 
@@ -21,8 +21,9 @@ CLI / Web
 - `models.py` defines normalized facts, findings, execution records, guided summaries, and support-bundle metadata.
 - `findings.py` evaluates deterministic rules only from collected evidence.
 - `execution.py` turns the completed run into per-domain and per-probe execution status.
-- `assistant.py` adds deterministic plain-language guidance on top of findings.
+- `explanations.py` adds deterministic plain-language guidance on top of findings.
 - `serializers.py`, `report.py`, and `support_bundle.py` render the same result object for different consumers.
+- `web/` keeps route composition, form parsing, run-session orchestration, progress shaping, and result presentation above the shared result model.
 
 ## Current Capabilities
 
@@ -39,5 +40,6 @@ CLI / Web
 - platform parsing stays below findings
 - hardware facts stay additive under `resources` and `storage`; there is no new top-level hardware domain
 - UI stays above the result model
-- support artifacts remain local
+- explanation stays bounded to evidence already collected
+- support artifacts remain local and explicit
 - no automatic remediation is introduced

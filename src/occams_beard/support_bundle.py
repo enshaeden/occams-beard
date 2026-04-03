@@ -1,4 +1,4 @@
-"""Support-bundle export for local diagnostics runs."""
+"""Support-ready bundle export for local diagnostics runs."""
 
 from __future__ import annotations
 
@@ -118,13 +118,13 @@ def write_support_bundle(
     return path
 
 
-def support_bundle_response_body(
+def build_support_bundle_archive(
     result: EndpointDiagnosticResult,
     *,
     redaction_level: RedactionLevel = "safe",
     include_raw_command_capture: bool = False,
 ) -> bytes:
-    """Return an in-memory zip payload suitable for a web download response."""
+    """Return an in-memory zip archive for explicit support handoff."""
 
     files, _manifest = build_support_bundle_contents(
         result,
@@ -138,6 +138,21 @@ def support_bundle_response_body(
         for relative_path, payload in sorted(files.items()):
             archive.writestr(relative_path, payload)
     return buffer.getvalue()
+
+
+def support_bundle_response_body(
+    result: EndpointDiagnosticResult,
+    *,
+    redaction_level: RedactionLevel = "safe",
+    include_raw_command_capture: bool = False,
+) -> bytes:
+    """Compatibility wrapper for building a support-bundle download payload."""
+
+    return build_support_bundle_archive(
+        result,
+        redaction_level=redaction_level,
+        include_raw_command_capture=include_raw_command_capture,
+    )
 
 
 def _render_redaction_report(summary) -> str:

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "occams-beard"
 version = "0.1.0"
-description = "Cross-platform host and network diagnostics with local support-ready artifacts."
+description = "Local-first troubleshooting assistant with deterministic diagnostics and support-ready export."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
