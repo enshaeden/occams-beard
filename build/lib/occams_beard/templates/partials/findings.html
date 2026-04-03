@@ -1,0 +1,37 @@
+<section class="card stack-md">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Findings</p>
+      <h2>Evidence and Fault Domain</h2>
+    </div>
+  </div>
+
+  {% if result.findings %}
+    <div class="stack-md">
+      {% for finding in result.findings %}
+        <article class="finding-card severity-{{ finding.severity }}">
+          <div class="finding-header">
+            <span class="severity-badge severity-{{ finding.severity }}">{{ finding.severity }}</span>
+            <h3>{{ finding.title }}</h3>
+          </div>
+          <p>{{ finding.summary }}</p>
+          <ul class="evidence-list">
+            {% for evidence in finding.evidence %}
+              <li>{{ evidence }}</li>
+            {% endfor %}
+          </ul>
+          <div class="finding-meta">
+            <span><strong>Fault domain:</strong> {{ finding.fault_domain }}</span>
+            <span><strong>Confidence:</strong> {{ "%.2f"|format(finding.confidence) }}</span>
+            <span><strong>{{ "Heuristic conclusion" if finding.heuristic else "Probable cause" }}:</strong> {{ finding.probable_cause }}</span>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h3>No major findings detected</h3>
+      <p>The collected evidence did not trigger any supported fault signature for the selected checks.</p>
+    </div>
+  {% endif %}
+</section>

@@ -5,8 +5,8 @@ from __future__ import annotations
 import tempfile
 import unittest
 
-from endpoint_diagnostics_lab.defaults import DEFAULT_CHECKS, DEFAULT_TCP_TARGETS
-from endpoint_diagnostics_lab.utils.validation import (
+from occams_beard.defaults import DEFAULT_CHECKS, DEFAULT_TCP_TARGETS
+from occams_beard.utils.validation import (
     load_targets_file,
     parse_check_selection,
     parse_host_port_target,

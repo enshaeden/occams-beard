@@ -1,6 +1,6 @@
 # Occam's Beard
 
-Occam's Beard is a local, cross-platform endpoint diagnostics project focused on clear, evidence-based host and network troubleshooting. It collects bounded local facts, normalizes them into a stable model, evaluates deterministic findings rules, and exposes the same diagnostics core through both a lightweight Flask operator console and a scripting-friendly CLI.
+Occam's Beard is a local, cross-platform host and network diagnostics project focused on clear, evidence-based host and network troubleshooting. It collects bounded local facts, normalizes them into a stable model, evaluates deterministic findings rules, and exposes the same diagnostics core through both a lightweight Flask operator console and a scripting-friendly CLI.
 
 The project is designed to answer practical operator questions without turning into a platform:
 - Is the endpoint online and correctly routed?
@@ -91,7 +91,7 @@ occams-beard-web
 Or:
 
 ```bash
-python -m endpoint_diagnostics_lab.app
+python -m occams_beard.app
 ```
 
 For a launcher that starts the local server and opens the browser automatically:
@@ -110,9 +110,12 @@ occams-beard run
 
 With no flags, the CLI executes the default diagnostic suite, uses built-in DNS and TCP targets, prints the human-readable report, and exits `0` when diagnostics complete even if findings are present.
 
-## Compatibility Note
+## Module Paths
 
-The install/package slug, CLI entry points, and emitted JSON metadata now use `occams-beard`. The Python import package remains `endpoint_diagnostics_lab` for stability, so `python -m endpoint_diagnostics_lab.app` and similar module-based workflows still work.
+The repository, package metadata, CLI entry points, JSON metadata, and Python module path now all align on the Occam's Beard identity:
+- human-facing name: `Occam's Beard`
+- package/module path: `occams_beard`
+- CLI and artifact slug: `occams-beard`
 
 ## Connectivity vs. Service Checks
 
@@ -139,7 +142,7 @@ occams-beard/
 ├── sample_output/
 ├── scripts/
 ├── src/
-│   └── endpoint_diagnostics_lab/
+│   └── occams_beard/
 ├── tests/
 └── pyproject.toml
 ```
@@ -213,7 +216,7 @@ occams-beard run --enable-ping --enable-trace --verbose
 occams-beard run --suppress-report --json-out report.json
 ```
 
-The `python -m endpoint_diagnostics_lab.main run ...` form is equivalent to the examples above.
+The `python -m occams_beard.main run ...` form is equivalent to the examples above.
 
 `--target-file` accepts a JSON array of either `host:port` strings or objects shaped like `{"host": "github.com", "port": 443, "label": "github-https"}` so repeated service checks can stay config-driven without introducing a database or service layer.
 
@@ -295,11 +298,11 @@ Known limitations and tradeoffs:
 - VPN detection is heuristic by design and never claims certainty
 - traceroute and ping coverage depend on command availability and network policy
 - CPU utilization is an estimate, not a profiler-grade measurement
-- Python imports still use `endpoint_diagnostics_lab` for compatibility
+- module execution examples use `python -m occams_beard...`
 
 Rollback strategy:
-- revert this documentation and branding pass if you need the prior naming immediately
-- revert the `pyproject.toml`, CLI parser, launcher, and JSON metadata changes if you need to restore the old slug immediately
+- revert this identity rename pass if you need the prior naming immediately
+- revert the package-path, entrypoint, launcher, and metadata changes together if you need to restore the prior identity
 
 ## Future Improvements
 

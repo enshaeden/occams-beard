@@ -1,0 +1,4 @@
+[console_scripts]
+occams-beard = occams_beard.cli:main
+occams-beard-operator = occams_beard.launcher:main
+occams-beard-web = occams_beard.app:main

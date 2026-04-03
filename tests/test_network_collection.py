@@ -5,16 +5,16 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from endpoint_diagnostics_lab.collectors.network import collect_network_state
-from endpoint_diagnostics_lab.utils.subprocess import CommandResult
+from occams_beard.collectors.network import collect_network_state
+from occams_beard.utils.subprocess import CommandResult
 
 
 class NetworkCollectionTests(unittest.TestCase):
     """Validate interface normalization and warning behavior."""
 
-    @patch("endpoint_diagnostics_lab.collectors.network.current_platform", return_value="linux")
-    @patch("endpoint_diagnostics_lab.collectors.network.linux.read_arp_neighbors")
-    @patch("endpoint_diagnostics_lab.collectors.network.linux.read_interfaces")
+    @patch("occams_beard.collectors.network.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.network.linux.read_arp_neighbors")
+    @patch("occams_beard.collectors.network.linux.read_interfaces")
     def test_collect_network_state_normalizes_active_interfaces(
         self,
         mock_read_interfaces,
@@ -79,9 +79,9 @@ class NetworkCollectionTests(unittest.TestCase):
         self.assertEqual(network_state.arp_neighbors[0].ip_address, "192.168.1.1")
         self.assertEqual(warnings, [])
 
-    @patch("endpoint_diagnostics_lab.collectors.network.current_platform", return_value="linux")
-    @patch("endpoint_diagnostics_lab.collectors.network.linux.read_arp_neighbors")
-    @patch("endpoint_diagnostics_lab.collectors.network.linux.read_interfaces")
+    @patch("occams_beard.collectors.network.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.network.linux.read_arp_neighbors")
+    @patch("occams_beard.collectors.network.linux.read_interfaces")
     def test_collect_network_state_uses_more_conservative_interface_type_inference(
         self,
         mock_read_interfaces,
@@ -138,9 +138,9 @@ class NetworkCollectionTests(unittest.TestCase):
         self.assertEqual(network_state.interfaces[2].type_hint, "unknown")
         self.assertEqual(warnings, [])
 
-    @patch("endpoint_diagnostics_lab.collectors.network.current_platform", return_value="linux")
-    @patch("endpoint_diagnostics_lab.collectors.network.linux.read_arp_neighbors")
-    @patch("endpoint_diagnostics_lab.collectors.network.linux.read_interfaces")
+    @patch("occams_beard.collectors.network.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.network.linux.read_arp_neighbors")
+    @patch("occams_beard.collectors.network.linux.read_interfaces")
     def test_collect_network_state_logs_warning_when_command_fails(
         self,
         mock_read_interfaces,
@@ -175,9 +175,9 @@ class NetworkCollectionTests(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertEqual(warnings[0].code, "interface-command-failed")
 
-    @patch("endpoint_diagnostics_lab.collectors.network.current_platform", return_value="linux")
-    @patch("endpoint_diagnostics_lab.collectors.network.linux.read_arp_neighbors")
-    @patch("endpoint_diagnostics_lab.collectors.network.linux.read_interfaces")
+    @patch("occams_beard.collectors.network.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.network.linux.read_arp_neighbors")
+    @patch("occams_beard.collectors.network.linux.read_interfaces")
     def test_collect_network_state_logs_supplemental_warning_when_arp_collection_fails(
         self,
         mock_read_interfaces,

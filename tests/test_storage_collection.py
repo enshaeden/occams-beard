@@ -6,16 +6,16 @@ import shutil
 import unittest
 from unittest.mock import patch
 
-from endpoint_diagnostics_lab.collectors.storage import collect_storage_state
-from endpoint_diagnostics_lab.utils.subprocess import CommandResult
+from occams_beard.collectors.storage import collect_storage_state
+from occams_beard.utils.subprocess import CommandResult
 
 
 class StorageCollectionTests(unittest.TestCase):
     """Validate storage mount filtering and warning behavior."""
 
-    @patch("endpoint_diagnostics_lab.collectors.storage.current_platform", return_value="macos")
-    @patch("endpoint_diagnostics_lab.collectors.storage.shutil.disk_usage")
-    @patch("endpoint_diagnostics_lab.collectors.storage.run_command")
+    @patch("occams_beard.collectors.storage.current_platform", return_value="macos")
+    @patch("occams_beard.collectors.storage.shutil.disk_usage")
+    @patch("occams_beard.collectors.storage.run_command")
     def test_collect_storage_state_filters_macos_pseudo_filesystems(
         self,
         mock_run_command,

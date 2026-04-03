@@ -8,8 +8,8 @@ import unittest
 from contextlib import redirect_stderr
 from unittest.mock import patch
 
-from endpoint_diagnostics_lab import cli
-from endpoint_diagnostics_lab.runner import DiagnosticsRunOptions
+from occams_beard import cli
+from occams_beard.runner import DiagnosticsRunOptions
 from support import build_sample_result
 
 
@@ -57,7 +57,7 @@ class CliTests(unittest.TestCase):
         self.assertTrue(args.debug)
 
     def test_main_passes_default_run_arguments_to_handler(self) -> None:
-        with patch("endpoint_diagnostics_lab.cli._run_command", return_value=0) as mock_run_command:
+        with patch("occams_beard.cli._run_command", return_value=0) as mock_run_command:
             result = cli.main(["run"])
 
         self.assertEqual(result, 0)
@@ -85,8 +85,8 @@ class CliTests(unittest.TestCase):
         self.assertIn("Supported values:", stderr.getvalue())
 
     def test_main_returns_non_zero_when_execution_fails(self) -> None:
-        with patch("endpoint_diagnostics_lab.cli._run_command", side_effect=RuntimeError("boom")):
-            with self.assertLogs("endpoint_diagnostics_lab.cli", level="ERROR") as captured:
+        with patch("occams_beard.cli._run_command", side_effect=RuntimeError("boom")):
+            with self.assertLogs("occams_beard.cli", level="ERROR") as captured:
                 result = cli.main(["run"])
 
         self.assertEqual(result, 1)
@@ -113,11 +113,11 @@ class CliTests(unittest.TestCase):
         )
         result_with_findings = build_sample_result()
 
-        with patch("endpoint_diagnostics_lab.cli.build_run_options", return_value=options), patch(
-            "endpoint_diagnostics_lab.cli.run_diagnostics",
+        with patch("occams_beard.cli.build_run_options", return_value=options), patch(
+            "occams_beard.cli.run_diagnostics",
             return_value=result_with_findings,
         ), patch(
-            "endpoint_diagnostics_lab.cli.render_report",
+            "occams_beard.cli.render_report",
             return_value="report",
         ), patch("builtins.print"):
             result = cli._run_command(args)

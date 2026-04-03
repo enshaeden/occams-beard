@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import unittest
 
-from endpoint_diagnostics_lab.findings import evaluate_selected_findings
-from endpoint_diagnostics_lab.models import (
+from occams_beard.findings import evaluate_selected_findings
+from occams_beard.models import (
     CollectedFacts,
     ConnectivityState,
     CpuState,

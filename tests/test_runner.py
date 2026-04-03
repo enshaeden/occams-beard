@@ -5,9 +5,9 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from endpoint_diagnostics_lab.defaults import DEFAULT_CHECKS
-from endpoint_diagnostics_lab.models import DnsState, Finding, HostBasics, TcpTarget
-from endpoint_diagnostics_lab.runner import DiagnosticsRunOptions, build_run_options, run_diagnostics
+from occams_beard.defaults import DEFAULT_CHECKS
+from occams_beard.models import DnsState, Finding, HostBasics, TcpTarget
+from occams_beard.runner import DiagnosticsRunOptions, build_run_options, run_diagnostics
 
 
 class RunnerTests(unittest.TestCase):
@@ -40,7 +40,7 @@ class RunnerTests(unittest.TestCase):
         )
 
         with patch(
-            "endpoint_diagnostics_lab.runner.collect_host_basics",
+            "occams_beard.runner.collect_host_basics",
             return_value=(
                 HostBasics(
                     hostname="demo-host",
@@ -52,20 +52,20 @@ class RunnerTests(unittest.TestCase):
                 [],
             ),
         ), patch(
-            "endpoint_diagnostics_lab.runner.collect_dns_state",
+            "occams_beard.runner.collect_dns_state",
             return_value=(DnsState(), []),
         ), patch(
-            "endpoint_diagnostics_lab.runner.evaluate_selected_findings",
+            "occams_beard.runner.evaluate_selected_findings",
             return_value=([finding], "dns"),
-        ), patch("endpoint_diagnostics_lab.runner.collect_resource_state") as mock_resources, patch(
-            "endpoint_diagnostics_lab.runner.collect_storage_state"
-        ) as mock_storage, patch("endpoint_diagnostics_lab.runner.collect_network_state") as mock_network, patch(
-            "endpoint_diagnostics_lab.runner.collect_route_summary"
+        ), patch("occams_beard.runner.collect_resource_state") as mock_resources, patch(
+            "occams_beard.runner.collect_storage_state"
+        ) as mock_storage, patch("occams_beard.runner.collect_network_state") as mock_network, patch(
+            "occams_beard.runner.collect_route_summary"
         ) as mock_routes, patch(
-            "endpoint_diagnostics_lab.runner.collect_connectivity_state"
+            "occams_beard.runner.collect_connectivity_state"
         ) as mock_connectivity, patch(
-            "endpoint_diagnostics_lab.runner.collect_service_state"
-        ) as mock_services, patch("endpoint_diagnostics_lab.runner.collect_vpn_state") as mock_vpn:
+            "occams_beard.runner.collect_service_state"
+        ) as mock_services, patch("occams_beard.runner.collect_vpn_state") as mock_vpn:
             result = run_diagnostics(options)
 
         self.assertEqual(result.metadata.selected_checks, ["dns"])

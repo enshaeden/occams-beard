@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "occams-beard"
 version = "0.1.0"
-description = "Cross-platform endpoint diagnostics and lightweight remediation analysis for systems engineering portfolios."
+description = "Cross-platform host and network diagnostics and lightweight remediation analysis for systems engineering portfolios."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
@@ -33,9 +33,9 @@ dev = [
 ]
 
 [project.scripts]
-occams-beard = "endpoint_diagnostics_lab.cli:main"
-occams-beard-web = "endpoint_diagnostics_lab.app:main"
-occams-beard-operator = "endpoint_diagnostics_lab.launcher:main"
+occams-beard = "occams_beard.cli:main"
+occams-beard-web = "occams_beard.app:main"
+occams-beard-operator = "occams_beard.launcher:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -44,7 +44,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-endpoint_diagnostics_lab = ["templates/*.html", "templates/partials/*.html", "static/*.css"]
+occams_beard = ["templates/*.html", "templates/partials/*.html", "static/*.css"]
 
 [tool.unittest]
 test-paths = ["tests"]

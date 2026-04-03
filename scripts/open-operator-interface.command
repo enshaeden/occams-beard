@@ -31,7 +31,7 @@ bootstrap_local_environment() {
 launcher_import_ready() {
   local python_bin="$1"
   PYTHONPATH="${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${python_bin}" -c "from endpoint_diagnostics_lab.launcher import _load_web_dependencies; _load_web_dependencies()" \
+    "${python_bin}" -c "from occams_beard.launcher import _load_web_dependencies; _load_web_dependencies()" \
     >/dev/null 2>&1
 }
 
@@ -54,7 +54,7 @@ fi
 export PYTHONPATH="${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
 cd "${PROJECT_ROOT}"
-"${PYTHON_BIN}" -m endpoint_diagnostics_lab.launcher --no-browser --ready-file "${READY_FILE}" "$@" &
+"${PYTHON_BIN}" -m occams_beard.launcher --no-browser --ready-file "${READY_FILE}" "$@" &
 LAUNCHER_PID=$!
 
 for _ in {1..200}; do

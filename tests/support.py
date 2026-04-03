@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from endpoint_diagnostics_lab.models import (
+from occams_beard.models import (
     CollectedFacts,
     ConnectivityState,
     CpuState,

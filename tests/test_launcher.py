@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
-from endpoint_diagnostics_lab.launcher import (
+from occams_beard.launcher import (
     LauncherDependencyError,
     OperatorLauncherConfig,
     _build_browser_url,
@@ -33,7 +33,7 @@ class LauncherTests(unittest.TestCase):
 
             self.assertEqual(ready_path.read_text(encoding="utf-8"), "http://127.0.0.1:5010\n")
 
-    @patch("endpoint_diagnostics_lab.launcher.launch_operator_interface", return_value=0)
+    @patch("occams_beard.launcher.launch_operator_interface", return_value=0)
     def test_main_delegates_to_launch_operator_interface(self, mock_launch_operator_interface) -> None:
         result = main(["--no-browser", "--port", "5013"])
 
@@ -51,7 +51,7 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(server.server_port, 5000)
         make_server.assert_called_once()
 
-    @patch("endpoint_diagnostics_lab.launcher.LOGGER")
+    @patch("occams_beard.launcher.LOGGER")
     def test_make_server_with_fallback_chooses_ephemeral_port_when_requested_port_is_busy(
         self,
         mock_logger,
@@ -67,7 +67,7 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(make_server.call_args_list[1].args[1], 0)
         mock_logger.warning.assert_called_once()
 
-    @patch("endpoint_diagnostics_lab.launcher.importlib.import_module")
+    @patch("occams_beard.launcher.importlib.import_module")
     def test_load_web_dependencies_raises_clear_error_when_dependency_missing(
         self,
         mock_import_module,
@@ -79,9 +79,9 @@ class LauncherTests(unittest.TestCase):
 
         self.assertIn("dependencies are missing", str(context.exception))
 
-    @patch("endpoint_diagnostics_lab.launcher._open_browser")
-    @patch("endpoint_diagnostics_lab.launcher._wait_for_server", return_value=True)
-    @patch("endpoint_diagnostics_lab.launcher._load_web_dependencies")
+    @patch("occams_beard.launcher._open_browser")
+    @patch("occams_beard.launcher._wait_for_server", return_value=True)
+    @patch("occams_beard.launcher._load_web_dependencies")
     @patch("builtins.print")
     def test_launch_operator_interface_starts_server_and_opens_browser(
         self,
@@ -95,7 +95,7 @@ class LauncherTests(unittest.TestCase):
         mock_load_web_dependencies.return_value = (MagicMock(return_value=object()), MagicMock(return_value=server))
         server.serve_forever.side_effect = None
 
-        with patch("endpoint_diagnostics_lab.launcher.threading.Thread") as mock_thread_class:
+        with patch("occams_beard.launcher.threading.Thread") as mock_thread_class:
             thread = MagicMock()
             thread.is_alive.side_effect = [False]
             mock_thread_class.return_value = thread
@@ -109,9 +109,9 @@ class LauncherTests(unittest.TestCase):
         server.shutdown.assert_called_once()
         thread.join.assert_called_once_with(timeout=5)
 
-    @patch("endpoint_diagnostics_lab.launcher._open_browser")
-    @patch("endpoint_diagnostics_lab.launcher._wait_for_server", return_value=True)
-    @patch("endpoint_diagnostics_lab.launcher._load_web_dependencies")
+    @patch("occams_beard.launcher._open_browser")
+    @patch("occams_beard.launcher._wait_for_server", return_value=True)
+    @patch("occams_beard.launcher._load_web_dependencies")
     @patch("builtins.print")
     def test_launch_operator_interface_writes_ready_file_with_bound_url(
         self,
@@ -129,7 +129,7 @@ class LauncherTests(unittest.TestCase):
 
         with TemporaryDirectory() as temp_dir:
             ready_path = Path(temp_dir) / "ready.txt"
-            with patch("endpoint_diagnostics_lab.launcher.threading.Thread") as mock_thread_class:
+            with patch("occams_beard.launcher.threading.Thread") as mock_thread_class:
                 thread = MagicMock()
                 thread.is_alive.side_effect = [False]
                 mock_thread_class.return_value = thread
@@ -144,9 +144,9 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(ready_text, "http://127.0.0.1:5012\n")
         mock_open_browser.assert_called_once_with("http://127.0.0.1:5012")
 
-    @patch("endpoint_diagnostics_lab.launcher._wait_for_server", return_value=False)
-    @patch("endpoint_diagnostics_lab.launcher._load_web_dependencies")
-    @patch("endpoint_diagnostics_lab.launcher.LOGGER")
+    @patch("occams_beard.launcher._wait_for_server", return_value=False)
+    @patch("occams_beard.launcher._load_web_dependencies")
+    @patch("occams_beard.launcher.LOGGER")
     @patch("builtins.print")
     def test_launch_operator_interface_returns_non_zero_when_server_never_becomes_ready(
         self,
@@ -159,7 +159,7 @@ class LauncherTests(unittest.TestCase):
         server.server_port = 5011
         mock_load_web_dependencies.return_value = (MagicMock(return_value=object()), MagicMock(return_value=server))
 
-        with patch("endpoint_diagnostics_lab.launcher.threading.Thread") as mock_thread_class:
+        with patch("occams_beard.launcher.threading.Thread") as mock_thread_class:
             thread = MagicMock()
             mock_thread_class.return_value = thread
 
@@ -172,9 +172,9 @@ class LauncherTests(unittest.TestCase):
         server.shutdown.assert_called_once()
         thread.join.assert_called_once_with(timeout=5)
 
-    @patch("endpoint_diagnostics_lab.launcher.LOGGER")
+    @patch("occams_beard.launcher.LOGGER")
     @patch(
-        "endpoint_diagnostics_lab.launcher._load_web_dependencies",
+        "occams_beard.launcher._load_web_dependencies",
         side_effect=LauncherDependencyError("missing deps"),
     )
     def test_launch_operator_interface_returns_non_zero_when_dependencies_are_missing(

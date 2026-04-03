@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import unittest
 
-from endpoint_diagnostics_lab.app import create_app
-from endpoint_diagnostics_lab.runner import DiagnosticsRunOptions
+from occams_beard.app import create_app
+from occams_beard.runner import DiagnosticsRunOptions
 from support import build_sample_result
 
 

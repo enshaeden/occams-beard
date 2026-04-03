@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from endpoint_diagnostics_lab.models import (
+from occams_beard.models import (
     CollectedFacts,
     ConnectivityState,
     CpuState,
@@ -30,7 +30,7 @@ from endpoint_diagnostics_lab.models import (
     TcpTarget,
     VpnState,
 )
-from endpoint_diagnostics_lab.report import render_report
+from occams_beard.report import render_report
 
 
 class ReportOutputTests(unittest.TestCase):

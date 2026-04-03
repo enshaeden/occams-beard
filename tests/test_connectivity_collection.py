@@ -5,16 +5,16 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from endpoint_diagnostics_lab.collectors.connectivity import check_trace_target
-from endpoint_diagnostics_lab.utils.subprocess import CommandResult
+from occams_beard.collectors.connectivity import check_trace_target
+from occams_beard.utils.subprocess import CommandResult
 
 
 class ConnectivityCollectionTests(unittest.TestCase):
     """Validate traceroute collection behavior."""
 
-    @patch("endpoint_diagnostics_lab.collectors.connectivity.current_platform", return_value="linux")
-    @patch("endpoint_diagnostics_lab.collectors.connectivity.socket.gethostbyname", return_value="1.1.1.1")
-    @patch("endpoint_diagnostics_lab.collectors.connectivity.run_command")
+    @patch("occams_beard.collectors.connectivity.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.connectivity.socket.gethostbyname", return_value="1.1.1.1")
+    @patch("occams_beard.collectors.connectivity.run_command")
     def test_check_trace_target_marks_completed_trace_when_target_is_reached(
         self,
         mock_run_command,
@@ -42,9 +42,9 @@ class ConnectivityCollectionTests(unittest.TestCase):
         self.assertEqual(trace_result.target_address, "1.1.1.1")
         self.assertEqual(trace_result.last_responding_hop, 2)
 
-    @patch("endpoint_diagnostics_lab.collectors.connectivity.current_platform", return_value="linux")
-    @patch("endpoint_diagnostics_lab.collectors.connectivity.socket.gethostbyname", return_value="140.82.114.3")
-    @patch("endpoint_diagnostics_lab.collectors.connectivity.run_command")
+    @patch("occams_beard.collectors.connectivity.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.connectivity.socket.gethostbyname", return_value="140.82.114.3")
+    @patch("occams_beard.collectors.connectivity.run_command")
     def test_check_trace_target_marks_partial_trace_when_target_not_reached(
         self,
         mock_run_command,
@@ -73,9 +73,9 @@ class ConnectivityCollectionTests(unittest.TestCase):
         self.assertEqual(trace_result.last_responding_hop, 2)
         self.assertIsNone(trace_result.error)
 
-    @patch("endpoint_diagnostics_lab.collectors.connectivity.current_platform", return_value="linux")
-    @patch("endpoint_diagnostics_lab.collectors.connectivity.socket.gethostbyname", side_effect=OSError("no-dns"))
-    @patch("endpoint_diagnostics_lab.collectors.connectivity.run_command")
+    @patch("occams_beard.collectors.connectivity.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.connectivity.socket.gethostbyname", side_effect=OSError("no-dns"))
+    @patch("occams_beard.collectors.connectivity.run_command")
     def test_check_trace_target_warns_when_command_is_unavailable(
         self,
         mock_run_command,

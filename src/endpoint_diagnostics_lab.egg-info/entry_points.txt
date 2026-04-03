@@ -1,4 +1,0 @@
-[console_scripts]
-occams-beard = endpoint_diagnostics_lab.cli:main
-occams-beard-operator = endpoint_diagnostics_lab.launcher:main
-occams-beard-web = endpoint_diagnostics_lab.app:main

@@ -8,7 +8,7 @@ cd "${PROJECT_ROOT}"
 
 OUTPUT_PATH="${1:-${PROJECT_ROOT}/sample_output/latest-demo.json}"
 
-PYTHONPATH=src python3 -m endpoint_diagnostics_lab.main run \
+PYTHONPATH=src python3 -m occams_beard.main run \
   --json-out "${OUTPUT_PATH}" \
   --enable-ping \
   --target github.com:443 \

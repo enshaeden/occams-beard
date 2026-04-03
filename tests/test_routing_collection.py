@@ -5,15 +5,15 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from endpoint_diagnostics_lab.collectors.routing import collect_route_summary
-from endpoint_diagnostics_lab.utils.subprocess import CommandResult
+from occams_beard.collectors.routing import collect_route_summary
+from occams_beard.utils.subprocess import CommandResult
 
 
 class RoutingCollectionTests(unittest.TestCase):
     """Validate route summary normalization and degraded-data warnings."""
 
-    @patch("endpoint_diagnostics_lab.collectors.routing.current_platform", return_value="windows")
-    @patch("endpoint_diagnostics_lab.collectors.routing.windows.read_routes")
+    @patch("occams_beard.collectors.routing.current_platform", return_value="windows")
+    @patch("occams_beard.collectors.routing.windows.read_routes")
     def test_collect_route_summary_preserves_route_observations(
         self,
         mock_read_routes,
@@ -52,8 +52,8 @@ class RoutingCollectionTests(unittest.TestCase):
         self.assertEqual(route_summary.observations, ["Multiple Windows default routes were collected."])
         self.assertEqual(warnings, [])
 
-    @patch("endpoint_diagnostics_lab.collectors.routing.current_platform", return_value="linux")
-    @patch("endpoint_diagnostics_lab.collectors.routing.linux.read_routes")
+    @patch("occams_beard.collectors.routing.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.routing.linux.read_routes")
     def test_collect_route_summary_surfaces_parse_warnings(
         self,
         mock_read_routes,

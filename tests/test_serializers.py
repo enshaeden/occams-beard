@@ -6,7 +6,7 @@ import json
 import tempfile
 import unittest
 
-from endpoint_diagnostics_lab.models import (
+from occams_beard.models import (
     CollectedFacts,
     ConnectivityState,
     CpuState,
@@ -22,7 +22,7 @@ from endpoint_diagnostics_lab.models import (
     ServiceState,
     VpnState,
 )
-from endpoint_diagnostics_lab.serializers import to_json_dict, write_json_file
+from occams_beard.serializers import to_json_dict, write_json_file
 
 
 def build_result() -> EndpointDiagnosticResult:

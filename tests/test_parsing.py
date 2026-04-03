@@ -5,8 +5,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from endpoint_diagnostics_lab.platform.macos import _parse_uptime_seconds
-from endpoint_diagnostics_lab.utils.parsing import (
+from occams_beard.platform.macos import _parse_uptime_seconds
+from occams_beard.utils.parsing import (
     parse_arp_table,
     parse_ifconfig,
     parse_ip_addr_show,

@@ -2,7 +2,7 @@
 
 ## Purpose and Scope
 
-Occam's Beard is intentionally scoped as a local, CLI-first endpoint diagnostics project. The goal is to demonstrate practical systems engineering capability, not to build a remote management platform.
+Occam's Beard is intentionally scoped as a local, CLI-first host and network diagnostics project. The goal is to demonstrate practical systems engineering capability, not to build a remote management platform.
 
 ## Major Decisions
 
@@ -306,7 +306,7 @@ IMPACT:
 Reviewers and operators had to infer why a fault domain was chosen, which reduced credibility and auditability.
 
 AFFECTED COMPONENTS:
-src/endpoint_diagnostics_lab/report.py
+src/occams_beard/report.py
 docs/diagnostic-model.md
 docs/finding-rules.md
 sample_output/
@@ -332,8 +332,8 @@ IMPACT:
 Operators could be told that local storage was critically full even when the reported mount was a simulator or device-backed pseudo-filesystem unrelated to actual host disk exhaustion.
 
 AFFECTED COMPONENTS:
-src/endpoint_diagnostics_lab/collectors/storage.py
-src/endpoint_diagnostics_lab/findings.py
+src/occams_beard/collectors/storage.py
+src/occams_beard/findings.py
 tests/test_storage_collection.py
 docs/platform-notes.md
 
@@ -358,7 +358,7 @@ IMPACT:
 Normal troubleshooting use had unnecessary startup friction and was harder to hand off to non-terminal-first operators.
 
 AFFECTED COMPONENTS:
-src/endpoint_diagnostics_lab/launcher.py
+src/occams_beard/launcher.py
 scripts/open-operator-interface.command
 pyproject.toml
 tests/test_launcher.py
@@ -385,10 +385,10 @@ IMPACT:
 Adding a better operator-facing interface would have increased drift risk between CLI and web behavior, defaults, and findings output.
 
 AFFECTED COMPONENTS:
-src/endpoint_diagnostics_lab/cli.py
-src/endpoint_diagnostics_lab/runner.py
-src/endpoint_diagnostics_lab/app.py
-src/endpoint_diagnostics_lab/templates/
+src/occams_beard/cli.py
+src/occams_beard/runner.py
+src/occams_beard/app.py
+src/occams_beard/templates/
 tests/test_runner.py
 tests/test_app.py
 README.md
@@ -415,7 +415,7 @@ IMPACT:
 The tool could return plausible raw data while still feeling scaffold-like because it failed to synthesize several realistic multi-signal conditions.
 
 AFFECTED COMPONENTS:
-src/endpoint_diagnostics_lab/findings.py
+src/occams_beard/findings.py
 tests/test_findings.py
 docs/finding-rules.md
 
@@ -440,9 +440,9 @@ IMPACT:
 macOS and Windows behavior could degrade into misleading failures or overly broad interface labeling even when the endpoint state itself was fine.
 
 AFFECTED COMPONENTS:
-src/endpoint_diagnostics_lab/collectors/connectivity.py
-src/endpoint_diagnostics_lab/collectors/network.py
-src/endpoint_diagnostics_lab/utils/parsing.py
+src/occams_beard/collectors/connectivity.py
+src/occams_beard/collectors/network.py
+src/occams_beard/utils/parsing.py
 docs/platform-notes.md
 
 ROOT CAUSE:
@@ -466,7 +466,7 @@ IMPACT:
 Some traceroute results may degrade into partial evidence or warnings rather than richly parsed hop metadata.
 
 AFFECTED COMPONENTS:
-src/endpoint_diagnostics_lab/utils/parsing.py
+src/occams_beard/utils/parsing.py
 docs/platform-notes.md
 tests/test_parsing.py
 
@@ -521,10 +521,10 @@ IMPACT:
 Operators had to infer the intended execution model, and a no-flag run did not consistently exercise both connectivity and configured service checks with the same default targets.
 
 AFFECTED COMPONENTS:
-src/endpoint_diagnostics_lab/cli.py
-src/endpoint_diagnostics_lab/defaults.py
-src/endpoint_diagnostics_lab/utils/validation.py
-src/endpoint_diagnostics_lab/collectors/connectivity.py
+src/occams_beard/cli.py
+src/occams_beard/defaults.py
+src/occams_beard/utils/validation.py
+src/occams_beard/collectors/connectivity.py
 README.md
 docs/diagnostic-model.md
 tests/test_cli.py
@@ -555,8 +555,8 @@ README.md
 docs/problem-statement.md
 docs/diagnostic-model.md
 docs/platform-notes.md
-src/endpoint_diagnostics_lab/report.py
-src/endpoint_diagnostics_lab/templates/layout.html
+src/occams_beard/report.py
+src/occams_beard/templates/layout.html
 sample_output/
 
 ROOT CAUSE:
@@ -602,14 +602,14 @@ DESCRIPTION:
 Public package metadata, CLI entry points, and JSON metadata needed a coordinated rename so the installed interface matched the repository and UI branding.
 
 IMPACT:
-Documentation must explain the mismatch, and a future full rename will require coordinated changes across package metadata, CLI entry points, samples, and tests.
+Without a coordinated rename, package metadata, CLI entry points, samples, and tests would keep drifting away from the repository and UI identity.
 
 AFFECTED COMPONENTS:
 pyproject.toml
-src/endpoint_diagnostics_lab/cli.py
-src/endpoint_diagnostics_lab/app.py
-src/endpoint_diagnostics_lab/launcher.py
-src/endpoint_diagnostics_lab/runner.py
+src/occams_beard/cli.py
+src/occams_beard/app.py
+src/occams_beard/launcher.py
+src/occams_beard/runner.py
 sample_output/*.json
 tests/
 README.md
@@ -618,7 +618,7 @@ ROOT CAUSE:
 The package/install slug, operator commands, and emitted metadata had been deferred after the initial branding pass to avoid changing them piecemeal.
 
 RECOMMENDED RESOLUTION:
-Rename the public install/package slug to `occams-beard`, update operator-facing command names and metadata, and keep the Python import package stable until a dedicated module-rename change is justified.
+Rename the public install/package slug to `occams-beard`, update operator-facing command names and metadata, and rename the Python module path to `occams_beard` in the same pass.
 
 STATUS:
 RESOLVED
