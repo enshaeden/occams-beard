@@ -1,17 +1,39 @@
 # Platform Notes
 
-Occam's Beard targets macOS, Linux, and Windows with a standard-library-first approach. Cross-platform diagnostics at the host and network layer always involve tradeoffs, so this document makes those explicit.
+## What this is
 
-## Common Principles
+This document records the platform-specific sources, assumptions, and degradation behavior behind Occam's Beard.
 
-- Baseline functionality should work without elevated privileges.
-- Command execution should be bounded with timeouts.
-- Missing commands should degrade into warnings, not silent failure.
-- Platform differences should be normalized into stable models before findings run.
+## Problem space
 
-## Linux
+Cross-platform diagnostics require different operating system commands, data sources, and parsing rules. Treating those differences as incidental usually produces inconsistent output or stronger claims than the source data supports.
 
-Primary sources:
+## Design approach
+
+Occam's Beard uses a standard-library-first runtime and relies on built-in operating system facilities where needed. Baseline checks are designed to work without elevated privileges, command execution is bounded with timeouts, and missing tools degrade into warnings rather than silent skips.
+
+Platform-specific collection is normalized before findings run. That keeps platform drift out of the reasoning layer and makes partial results explicit.
+
+## Key capabilities
+
+- Cross-platform collection for macOS, Linux, and Windows
+- Platform-specific command selection with bounded execution
+- Stable normalization for interfaces, routes, DNS state, connectivity, and warnings
+- Best-effort optional ping and traceroute collection with platform-aware argument handling
+
+## Architecture
+
+Common rules:
+
+- Baseline collection should succeed without `sudo` or administrator privileges.
+- Missing commands should produce warnings.
+- Optional probes should not block the rest of the run.
+- Supplemental evidence such as ARP or neighbor data should remain contextual.
+
+Primary sources by platform:
+
+Linux:
+
 - `/proc/uptime`
 - `/proc/meminfo`
 - `ip addr show`
@@ -19,20 +41,8 @@ Primary sources:
 - `/etc/resolv.conf`
 - `df -kP`
 
-Fallbacks:
-- `ifconfig`
-- `netstat -rn`
-- `arp -a` when `ip neigh show` is unavailable
+macOS:
 
-Tradeoffs:
-- Linux networking command output varies by distribution and age.
-- Containerized or restricted environments may expose incomplete route or interface data.
-- Neighbor-cache output can be stale or sparse, so ARP evidence is collected as supplemental context only.
-- `traceroute` may be absent even when baseline TCP checks work; the tool warns instead of failing the run.
-
-## macOS
-
-Primary sources:
 - `sysctl`
 - `vm_stat`
 - `ifconfig`
@@ -41,71 +51,65 @@ Primary sources:
 - `scutil --dns`
 - `df -kP`
 
-Tradeoffs:
-- Memory pressure is approximated from free, inactive, and speculative pages rather than using proprietary pressure metrics.
-- macOS interface names such as `utun*` are useful for tunnel heuristics but are still not proof of an active VPN session.
-- `route -n get default` is used to sharpen default-gateway detection, while `netstat -rn` remains the broader route-table source.
-- Storage collection intentionally ignores pseudo-filesystem mounts such as `/dev` and CoreSimulator device volumes because they can report misleading capacity states that do not reflect host disk exhaustion.
-- Some sandboxed or privacy-restricted execution contexts can return partial uptime or resolver data even when the host itself is healthy.
-- `ping` and `traceroute` flags differ from Linux, so the collector uses macOS-specific argument sets and still treats those checks as optional.
+Windows:
 
-## Windows
-
-Primary sources:
 - PowerShell CIM queries
 - `ipconfig /all`
 - `route print`
 - `arp -a`
-- DNS server enumeration through PowerShell
+- PowerShell DNS server enumeration
 
-Tradeoffs:
-- Windows command availability and output formatting can vary more than Unix-like platforms.
-- PowerShell is assumed for richer host data; if it is unavailable, the tool falls back to partial data and warnings.
-- Parser coverage includes common `ipconfig`, `route print`, and `tracert` formatting variants, including degraded and partially incomplete outputs.
-- Full localization support is still not claimed. If output departs too far from the covered patterns, the tool prefers warnings and conservative route-state observations over guessing.
-- `tracert` and `ping` use Windows-specific timeout semantics, so their output remains best-effort rather than authoritative.
+Connectivity sources:
 
-## Connectivity Checks
+- generic TCP checks use direct socket connections
+- ping uses platform-specific `ping` semantics
+- traceroute uses `traceroute` or `tracert` with platform-aware parsing
 
-TCP:
-- uses direct `socket.create_connection`
-- does not require shelling out for the core reachability signal
-- supports operator-supplied targets from CLI arguments or a JSON target file
+## Usage
 
-Ping:
-- optional
-- depends on `ping` availability and network policy
-- uses platform-specific arguments rather than assuming Linux flags on every Unix-like host
+Use this document when you need to understand why a platform returned partial data or why a probe was reported as degraded.
 
-Traceroute:
-- optional
-- depends on `traceroute` or `tracert`
-- prefers numeric hop output where supported to reduce parser ambiguity
-- distinguishes target reached, partial progress, command failure, and unavailable-command cases
-- partial or failed results are still useful evidence and should not be over-interpreted
+Examples:
 
-## VPN Detection
+```bash
+occams-beard run --enable-ping --enable-trace
+```
 
-VPN detection is intentionally heuristic. The current release uses:
-- interface name patterns
-- usable-address presence on tunnel-like interfaces
-- route-default interface hints
+```bash
+occams-beard run --checks network,routing,dns,connectivity
+```
 
-It does not claim certainty from those facts alone. That is a deliberate design choice to avoid overstating conclusions.
+When the result includes warnings, compare them against the notes here before treating the absence of a detail as evidence of failure.
 
-Some collector heuristics were refined using patterns from an earlier personal troubleshooting script, but the implementation here was rebuilt to fit the project’s structured architecture and evidence model.
+## Tradeoffs and limitations
 
-## Security Considerations
+Linux:
 
-- No secrets are required for baseline operation.
-- No privileged operations are requested automatically.
-- ARP data is summarized rather than dumped wholesale to reduce unnecessary exposure of local peer details in reports.
-- Debug logging should be used carefully in shared environments because command invocation context can still be operationally sensitive.
+- command output varies by distribution and age
+- restricted or containerized environments can expose incomplete route or interface data
+- neighbor-cache output can be stale or sparse
 
-## Performance Notes
+macOS:
 
-- Commands are short-lived and timeout-bounded.
-- Collection is synchronous and predictable for a CLI-first workflow.
-- The first release favors simplicity and auditability over aggressive parallelism.
-- Connectivity collectors remain synchronous so timeout behavior is predictable and easy to reason about in operator workflows.
-- Dedicated MTU probing is intentionally omitted; the report surfaces existing per-interface MTU facts instead of adding a noisier active test.
+- memory pressure is approximated from available page-state data rather than proprietary metrics
+- `utun*` and similar interfaces are useful tunnel signals but not proof of a working VPN session
+- sandboxed or privacy-restricted contexts can return partial uptime or resolver data
+- pseudo-filesystem mounts such as `/dev` and CoreSimulator volumes are excluded from host disk pressure evaluation
+
+Windows:
+
+- richer host data depends on broadly available PowerShell behavior
+- output formatting varies more than on Unix-like platforms
+- localized or older command variants may degrade into warnings or partial route observations
+
+Shared limits:
+
+- traceroute parsing is conservative and some outputs remain only partially parsed
+- ping and traceroute availability depends on command presence and network policy
+- VPN detection is heuristic and based on interface, address, and route signals rather than authoritative session state
+
+## Future work
+
+- Broaden fixture coverage for Windows and traceroute variants
+- Add additional non-privileged fallback probes where sandboxed environments still return partial data
+- Refine tunnel and route interpretation where it can remain conservative

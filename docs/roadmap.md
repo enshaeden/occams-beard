@@ -1,45 +1,58 @@
 # Roadmap
 
-## Current Release Focus
+## What this is
 
-Version `0.1.0` is intentionally narrow:
+This document records the current release boundary for Occam's Beard and the next changes that fit that boundary.
+
+## Problem space
+
+Diagnostics tools tend to accumulate adjacent features quickly: persistence, remote orchestration, dashboards, policy layers, and remediation. Without an explicit roadmap, that expansion obscures the actual operating model of the system.
+
+## Design approach
+
+The roadmap keeps the project narrow. Near-term work should improve evidence quality, parser coverage, and operator clarity without changing the local, deterministic, read-mostly nature of the tool.
+
+## Key capabilities
+
+Current release focus in `0.1.0`:
+
 - local CLI execution
+- local web execution backed by the same runner
 - structured diagnostics collection
 - deterministic findings
-- machine-readable JSON
-- concise operator reporting
-- representative sample artifacts for GitHub review
-- lightweight local formatting, lint, and type-check support
-- representative tests and documentation
+- JSON output and terminal reporting
+- representative tests, documentation, and sample artifacts
 
-## Next Logical Improvements
+## Architecture
 
-### Near Term
+The roadmap follows the existing architecture rather than introducing a second system. Planned work stays inside the current boundaries:
+
+- better fixture coverage and parser hardening
+- more precise routing and tunnel interpretation
+- clearer handling of degraded versus unsupported checks
+- optional local artifacts that support offline review without adding a control plane
+
+## Usage
+
+Use this document to understand what changes fit the current scope before proposing new work. For the current system behavior, start with [`README.md`](../README.md). For the reasoning and platform boundaries, continue with [`docs/diagnostic-model.md`](diagnostic-model.md), [`docs/finding-rules.md`](finding-rules.md), and [`docs/platform-notes.md`](platform-notes.md).
+
+## Tradeoffs and limitations
+
+- The roadmap does not include agents, daemons, dashboards, remote orchestration, centralized storage, or automatic remediation.
+- Configuration remains intentionally small and local.
+- Improvements are prioritized when they strengthen evidence quality or operator clarity rather than broaden product surface area.
+
+## Future work
+
+Near term:
 
 - broaden parser fixture coverage for additional platform variants
 - improve routing interpretation for split-tunnel and policy-route cases
-- add optional saved raw command capture for offline troubleshooting bundles
-- add a richer summary of degraded versus unsupported checks
+- add optional raw command capture for offline troubleshooting bundles
+- improve summaries for degraded versus unsupported checks
 
-### Medium Term
+Later, if the same operating model can be preserved:
 
-- add importable sample fixture packs for integration-style parser tests
-- add constrained baseline checks for proxy visibility and captive portal hints
+- add importable fixture packs for integration-style parser tests
+- add constrained proxy and captive-portal visibility checks
 - support optional configuration files for repeatable service-target bundles
-
-### Intentionally Deferred
-
-- background agents or daemons
-- dashboards or web frontends
-- remote orchestration
-- user accounts and RBAC
-- automatic remediation
-- cloud sync or centralized storage
-
-## Change Safety and Rollback
-
-This first release is fully additive. Rollback is straightforward:
-- remove the `occams-beard/` project directory
-- revert the introducing commit
-
-No migrations, background services, or persistent system changes are performed, so rollback does not require endpoint cleanup.

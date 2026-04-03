@@ -1,8 +1,8 @@
 # Sample Output
 
-This directory is part of the public review surface for the project.
+This directory contains representative output artifacts for static review.
 
-Each scenario includes machine-readable JSON and a terminal-style report artifact:
+Each scenario includes machine-readable JSON and a terminal report:
 
 - [`healthy-endpoint.json`](healthy-endpoint.json) and [`healthy-endpoint.txt`](healthy-endpoint.txt)
 - [`dns-failure.json`](dns-failure.json) and [`dns-failure.txt`](dns-failure.txt)
@@ -10,10 +10,4 @@ Each scenario includes machine-readable JSON and a terminal-style report artifac
 - [`high-resource-pressure.json`](high-resource-pressure.json) and [`high-resource-pressure.txt`](high-resource-pressure.txt)
 - [`vpn-private-target-failure.json`](vpn-private-target-failure.json) and [`vpn-private-target-failure.txt`](vpn-private-target-failure.txt)
 
-These are illustrative artifacts for static review. They are intentionally realistic, but they are not captured from a live production endpoint.
-
-They also reflect the project's conservative review posture:
-- terminal report artifacts and JSON metadata both use the current Occam's Beard naming
-- route summaries can show `present`, `missing`, or `suspect` state
-- route observations are surfaced when collected route data is incomplete or potentially misleading
-- warnings remain the place for degraded collection, not for speculative diagnosis
+The artifacts are review fixtures, not live captures from a production endpoint. They show the current Occam's Beard naming, the shared result shape used by the CLI and web app, route states such as `present`, `missing`, or `suspect`, and the separation between warnings, observed facts, and derived findings.

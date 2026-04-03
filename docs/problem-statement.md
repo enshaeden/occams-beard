@@ -1,54 +1,47 @@
 # Problem Statement
 
-Endpoint failures often land in an uncomfortable space between help-desk triage, systems administration, and network troubleshooting. Operators need to answer basic but operationally important questions quickly:
+## What this is
 
-- Is the host healthy enough to troubleshoot further?
-- Is the network stack configured correctly?
-- Is DNS the problem, or is the problem farther upstream?
-- Is a VPN present, and if so, does it appear to be carrying the expected traffic?
-- Are disk, memory, or CPU pressure contributing to the reported symptoms?
+This document defines the operational problem Occam's Beard is meant to address and the scope it keeps intentionally out of bounds.
 
-In many real environments, the first response is still a loose collection of one-off commands, tribal knowledge, and screenshots. That approach does not scale well, is hard to audit, and produces inconsistent handoffs between operators.
+## Problem space
 
-Occam's Beard addresses that problem with a narrow, local-first diagnostic workflow:
+Endpoint failures often sit between desktop support, systems administration, and network operations. The immediate questions are usually simple but operationally important: whether the host is healthy enough to continue, whether local routing is intact, whether DNS is failing, whether general egress works, whether intended services are reachable, and whether VPN state is relevant. In many environments those answers still come from one-off commands and screenshots, which produces inconsistent evidence and weak handoffs.
 
-- collect a bounded set of cross-platform host and network facts
-- normalize those facts into a stable model
+## Design approach
+
+Occam's Beard addresses that problem with a bounded local workflow:
+
+- collect a fixed set of host and network facts
+- normalize platform-specific output into stable structures
 - evaluate deterministic findings against observed evidence
-- emit both human-readable and machine-readable outputs
+- emit the same result through a terminal report, JSON, and a local web app
 
-This makes the tool useful both for direct operator use and as a portfolio artifact demonstrating practical systems engineering judgment.
+The tool is designed to support diagnosis, not remote administration. It avoids background agents, persistent state, and automatic changes to the endpoint.
 
-## Scope
+## Key capabilities
 
-Included:
-- host basics
-- resource state
-- interface and routing state
-- DNS tests
-- TCP connectivity checks
-- optional ping and traceroute
-- heuristic VPN indicators
-- configurable service and port checks
-- deterministic fault-domain analysis
+- Host, resource, storage, network, routing, DNS, connectivity, VPN, and service collection
+- Deterministic findings tied to explicit evidence
+- Separate reasoning for baseline connectivity and intended service reachability
+- Local operator workflows through a CLI and a web app using the same runner
 
-Explicitly excluded:
-- remote management
-- persistent agents or daemons
-- SaaS control planes
-- user accounts or RBAC
-- cloud storage or synchronization
-- automatic remediation actions
-- LLM-generated summaries
+## Architecture
 
-## Operational Goal
+The architecture is organized around a narrow execution path: collectors gather evidence, models normalize it, the findings engine evaluates it, and interface layers render it. The shared runner sits between operator input and those layers so the CLI and the web app do not drift.
 
-The first release should help a technician or systems engineer answer:
+## Usage
 
-1. Is the endpoint itself unhealthy?
-2. Is the fault local to the host or its network segment?
-3. Is DNS implicated?
-4. Is the issue likely at the internet edge, upstream path, or VPN layer?
-5. What evidence supports that conclusion?
+Use this document to understand project scope before reading the implementation details. For execution and output examples, start with [`README.md`](../README.md). For the collection and reasoning model, continue with [`docs/diagnostic-model.md`](diagnostic-model.md) and [`docs/finding-rules.md`](finding-rules.md).
 
-That balance of practical scope and disciplined reasoning is the point of the project.
+## Tradeoffs and limitations
+
+- The tool does not attempt deep application-layer diagnosis beyond configured service checks.
+- It does not infer causes that were not supported by collected evidence.
+- It does not manage endpoints, persist historical state, or perform remediation.
+- It does not treat missing data as a failure condition unless the observed evidence supports that conclusion.
+
+## Future work
+
+- Refine route interpretation for more policy-routing and split-tunnel cases
+- Expand platform fixture coverage where existing command output is still underspecified

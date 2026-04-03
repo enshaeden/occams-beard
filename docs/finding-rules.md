@@ -1,217 +1,87 @@
 # Finding Rules
 
-The findings engine is deterministic by design. It maps observed evidence to likely fault domains without inventing causes that were not supported by collected facts.
+## What this is
 
-## Rule Design Principles
+This document defines how Occam's Beard turns collected evidence into deterministic findings.
 
-- evidence first
-- no speculative root cause without supporting facts
-- confidence reflects evidence strength, not statistical probability
-- heuristic conclusions are labeled explicitly
-- generic connectivity and intended service reachability are reasoned about separately
+## Problem space
 
-## Current Rule Set
+Diagnostic tools lose credibility when they present likely causes without showing the evidence or when they treat missing data as if it were collected and negative. Findings need to be conservative, reviewable, and explicit about uncertainty.
 
-### Active interface without a usable local address
+## Design approach
 
-Condition:
-- a non-loopback interface is up
-- no non-loopback local address was collected
+The findings engine is evidence-first. It evaluates normalized facts after collection completes and only applies rules supported by the selected diagnostic domains. Confidence is an operator guidance value based on evidence strength, not a statistical claim. Heuristic findings are labeled as such.
 
-Likely fault domain:
-- `local_network`
+Connectivity findings and service findings are separate:
 
-Interpretation:
-- local interface configuration, DHCP assignment, or link-state negotiation is more likely than an upstream outage
+- connectivity findings reason about generic path health
+- service findings reason about intended endpoint reachability
 
-### No default route plus no internet reachability
+That separation prevents a target-specific service failure from being described as a general internet failure.
 
-Condition:
-- routing checks show no default route
-- external TCP connectivity checks do not succeed
+## Key capabilities
 
-Likely fault domain:
-- `local_network`
+- Deterministic rule evaluation over normalized facts
+- Explicit evidence attached to every finding
+- Fault-domain classification across `local_host`, `local_network`, `dns`, `internet_edge`, `upstream_network`, and `vpn`
+- Heuristic labeling where the evidence is suggestive rather than direct
 
-Interpretation:
-- the endpoint or its immediate access network is probably misconfigured or disconnected
+## Architecture
 
-### Default route exists but local routing still looks inconsistent
+The rules are grouped by failure domain:
 
-Condition:
-- routing checks show a default route entry
-- route normalization or interface state marks that route as suspect or inconsistent
-- external TCP connectivity still fails
+- local host state such as memory pressure or disk exhaustion
+- local network state such as missing addressing or suspect routing
+- DNS-specific failure and partial-failure conditions
+- broader connectivity degradation at the internet edge
+- intended service failures that occur despite baseline reachability
+- VPN-related issues inferred from tunnel evidence plus private-target failures
 
-Likely fault domain:
-- `local_network`
+Current rule families include:
 
-Interpretation:
-- a default path exists in the table, but the endpoint still appears locally misrouted, attached to the wrong interface, or missing a usable next hop
+- active interface without a usable local address
+- no default route plus no internet reachability
+- suspect default route with repeated external TCP failure
+- default route and DNS success with repeated external TCP failure
+- mixed external TCP results
+- DNS failure with numeric IP TCP success
+- DNS partial success
+- high memory pressure
+- high CPU and memory pressure with degraded connectivity
+- low disk free space
+- generic internet reachability with public service failure
+- mixed configured service results
+- partial traceroute with successful early hops
+- VPN signal plus private target failure
 
-This rule stays conservative. It does not claim the gateway is down; it only says the host-side route evidence is not strong enough to treat the default route as healthy.
+## Usage
 
-### Default route plus DNS success plus repeated external TCP failure
+Read findings as operator guidance tied to observed evidence. The report and JSON both include the same fields:
 
-Condition:
-- a default route is present
-- the route is not already classified as suspect or locally inconsistent
-- DNS succeeds for at least one hostname
-- multiple external TCP targets fail
-- no external public TCP target succeeds
+- identifier
+- severity
+- title
+- summary
+- evidence
+- probable cause
+- fault domain
+- confidence
+- heuristic flag
 
-Likely fault domain:
-- `internet_edge`
+Example interpretation:
 
-Interpretation:
-- broad routing exists, but egress policy, filtering, or captive interception is more likely than a DNS issue
+- If DNS hostnames fail while a numeric IP target succeeds, the likely fault domain is DNS rather than general egress.
+- If generic connectivity succeeds while configured public service checks fail, the likely fault domain shifts to the intended service path or remote service rather than the local host.
 
-### Mixed external TCP results
+## Tradeoffs and limitations
 
-Condition:
-- at least one public external TCP check succeeds
-- at least one public external TCP check fails
+- The engine does not prescribe remediation.
+- It does not infer business-specific policy or service intent beyond the configured targets.
+- It does not claim certainty for VPN state from interface naming or route hints alone.
+- It does not perform deep application-layer diagnosis beyond TCP reachability of configured services.
+- Mixed results are often heuristic because multiple explanations can fit the same evidence.
 
-Likely fault domain:
-- `internet_edge`
+## Future work
 
-Interpretation:
-- selective filtering, target-specific path differences, or target-side availability may exist
-
-This finding is heuristic because mixed results can still have multiple explanations.
-
-### DNS failure plus raw IP TCP success
-
-Condition:
-- configured DNS hostnames fail to resolve
-- at least one external numeric IP remains reachable over TCP
-
-Likely fault domain:
-- `dns`
-
-Interpretation:
-- routing and basic internet access exist, but hostname resolution is failing
-
-### DNS partial success
-
-Condition:
-- at least one configured hostname resolves
-- at least one configured hostname fails
-
-Likely fault domain:
-- `dns`
-
-Interpretation:
-- split-horizon behavior, resolver inconsistency, or intermittent resolver reachability is more likely than a total DNS outage
-
-This finding is heuristic because the tool does not inspect resolver decision paths directly.
-
-### High memory pressure
-
-Condition:
-- available memory falls to a low ratio relative to total memory
-- confidence increases if CPU estimate is also elevated
-
-Likely fault domain:
-- `local_host`
-
-Interpretation:
-- local resource contention may be degrading applications or interactivity
-
-### High resource pressure plus degraded connectivity
-
-Condition:
-- memory pressure is high
-- CPU estimate is high
-- connectivity checks are also degraded
-
-Likely fault domain:
-- `local_host`
-
-Interpretation:
-- host saturation may be contributing to degraded diagnostics or operator experience, though it does not prove the network is healthy
-
-This finding is heuristic because host pressure and network symptoms can coexist without direct causality.
-
-### Low disk free space
-
-Condition:
-- monitored filesystem free space ratio falls to 10% or below
-
-Likely fault domain:
-- `local_host`
-
-Interpretation:
-- storage exhaustion may affect logging, package updates, caches, or application writes
-
-### Generic internet reachability works but selected public services fail
-
-Condition:
-- generic connectivity checks succeed
-- configured public service checks fail
-- no configured public service check succeeds
-
-Likely fault domain:
-- `upstream_network`
-
-Interpretation:
-- broad internet access exists, but the intended service path, intermediate policy, or the remote service may be impaired
-
-### Mixed configured service results
-
-Condition:
-- at least one configured public service succeeds
-- at least one configured public service fails
-
-Likely fault domain:
-- `upstream_network`
-
-Interpretation:
-- target-specific policy or availability differences are more likely than total endpoint isolation
-
-This finding is heuristic because the tool does not inspect application-layer health directly.
-
-### Partial traceroute with successful early hops
-
-Condition:
-- traceroute returns at least some early hops
-- later hops remain incomplete
-
-Likely fault domain:
-- `upstream_network`
-
-Interpretation:
-- filtering, path control, or ICMP suppression may exist beyond the local network
-
-This finding is heuristic because traceroute behavior depends heavily on network policy.
-
-### VPN signal active plus private target unreachable
-
-Condition:
-- a tunnel or VPN-like interface is detected heuristically
-- private address targets still fail
-
-Likely fault domain:
-- `vpn`
-
-Interpretation:
-- the tunnel may exist but may not be carrying the expected routes or remote access path
-
-This finding is heuristic because interface-name-based VPN detection is not authoritative.
-
-## Confidence Model
-
-Confidence values are operator guidance values describing how strongly the observed evidence supports the finding.
-
-General interpretation:
-- `0.90+`: strong direct evidence
-- `0.70-0.89`: credible evidence with some ambiguity
-- `0.50-0.69`: heuristic or incomplete evidence
-
-## Non-Goals
-
-The findings engine does not:
-- prescribe automatic remediation
-- infer business-specific policies
-- claim certainty for VPN state from naming heuristics alone
-- attempt deep application-layer diagnosis beyond the configured service checks
+- Add more rule coverage for split-tunnel and policy-routing cases without weakening determinism
+- Expand evidence patterns where additional fixture coverage shows stable behavior across platforms
