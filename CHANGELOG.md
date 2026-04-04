@@ -25,6 +25,7 @@
 ### Changed
 
 - Windows host/resource collection now avoids privileged CIM for uptime, memory, and basic battery facts, suppresses the non-actionable `load-average-unsupported` warning on Windows, and falls back to `ipconfig /all` when PowerShell DNS enumeration is denied.
+- The launcher now detects an occupied preferred localhost port, reports the conflicting runtime when possible, falls back to a new port instead of silently reusing the old server, and the UI now exposes runtime metadata plus a `/health/runtime` endpoint.
 - The local web interface is now split into focused `web/` modules for route composition, form parsing, session orchestration, progress shaping, and result presentation so the shared runner remains the architectural center.
 - The deterministic explanation layer now lives under `explanations.py`, with `assistant.py` retained only as a compatibility facade.
 - Core documentation, UI copy, and architecture notes now define Occam's Beard explicitly as a local-first troubleshooting assistant with deterministic diagnostics and support-ready export, with stronger non-goals around fleet, management, and generalized assistant behavior.

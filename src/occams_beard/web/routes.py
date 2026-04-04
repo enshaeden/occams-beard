@@ -97,6 +97,12 @@ def register_web_routes(app: Flask) -> None:
         tracker.record_page_closing()
         return ("", 204)
 
+    @app.get("/health/runtime")
+    def health_runtime():
+        payload = dict(current_app.config["RUNTIME_METADATA"])
+        payload["server_origin"] = request.host_url.rstrip("/")
+        return jsonify(payload)
+
     @app.post("/run")
     def run():
         try:

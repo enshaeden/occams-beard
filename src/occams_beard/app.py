@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 
-from flask import Flask, current_app, url_for
+from flask import Flask, current_app, request, url_for
 
 from occams_beard.runner import build_run_options, run_diagnostics
+from occams_beard.runtime_identity import current_runtime_metadata
 from occams_beard.web.filters import register_template_filters
 from occams_beard.web.routes import register_web_routes
 from occams_beard.web.sessions import RecentRunsStore
@@ -22,6 +24,7 @@ def create_app(config: dict | None = None) -> Flask:
         RUN_RESULTS_STORE=RecentRunsStore(),
         LAUNCHER_BROWSER_PRESENCE_TRACKER=None,
         LAUNCHER_BROWSER_PRESENCE_INTERVAL_MS=15000,
+        RUNTIME_METADATA=current_runtime_metadata(),
     )
     if config:
         app.config.update(config)
@@ -32,15 +35,16 @@ def create_app(config: dict | None = None) -> Flask:
     @app.context_processor
     def inject_launcher_browser_presence() -> dict[str, object]:
         tracker = current_app.config.get("LAUNCHER_BROWSER_PRESENCE_TRACKER")
-        if tracker is None:
-            return {"browser_presence": None}
-        return {
-            "browser_presence": {
+        browser_presence = None
+        if tracker is not None:
+            browser_presence = {
                 "heartbeat_url": url_for("launcher_browser_presence"),
                 "closing_url": url_for("launcher_browser_closing"),
                 "interval_ms": int(current_app.config["LAUNCHER_BROWSER_PRESENCE_INTERVAL_MS"]),
             }
-        }
+        runtime_metadata = deepcopy(current_app.config["RUNTIME_METADATA"])
+        runtime_metadata["server_origin"] = request.host_url.rstrip("/")
+        return {"browser_presence": browser_presence, "runtime_metadata": runtime_metadata}
 
     return app
 

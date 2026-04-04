@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import os
-import tempfile
 import time
 import unittest
+from pathlib import Path
 from threading import Event
 from typing import cast
 from unittest.mock import patch
@@ -19,6 +19,8 @@ from occams_beard.execution import (
 from occams_beard.models import DomainExecution
 from occams_beard.runner import DiagnosticsRunOptions
 from support import build_degraded_partial_result
+
+TEST_TEMP_ROOT = Path(__file__).resolve().parent / ".tmp"
 
 
 class AppTests(unittest.TestCase):
@@ -46,6 +48,17 @@ class AppTests(unittest.TestCase):
 
         self.assertEqual(heartbeat_response.status_code, 404)
         self.assertEqual(closing_response.status_code, 404)
+
+    def test_runtime_health_endpoint_reports_active_runtime_identity(self) -> None:
+        response = self.client.get("/health/runtime")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        assert isinstance(payload, dict)
+        self.assertEqual(payload["app_version"], "0.1.0")
+        self.assertIn("python", payload["interpreter_path"].lower())
+        self.assertEqual(payload["server_origin"], "http://localhost")
 
     def test_launcher_presence_metadata_and_routes_are_enabled_when_configured(self) -> None:
         class PresenceTracker:
@@ -118,6 +131,7 @@ class AppTests(unittest.TestCase):
         self.assertIn("Choose Your Path", text)
         self.assertIn("Check My Device", text)
         self.assertIn("Work With Support", text)
+        self.assertIn("Runtime http://localhost", text)
         self.assertIn("Skip to main content", text)
 
     def test_self_serve_mode_uses_symptom_led_copy_and_collapsed_advanced_settings(self) -> None:
@@ -267,18 +281,21 @@ class AppTests(unittest.TestCase):
         self.assertIn("Switch to Suggested Plan:", text)
 
     def test_support_mode_shows_profile_catalog_issues_without_crashing(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            broken_profile = os.path.join(tempdir, "broken.toml")
-            with open(broken_profile, "w", encoding="utf-8") as handle:
-                handle.write("id = [\n")
+        TEST_TEMP_ROOT.mkdir(exist_ok=True)
+        tempdir = TEST_TEMP_ROOT / "profile-catalog-issues"
+        tempdir.mkdir(exist_ok=True)
+        broken_profile = tempdir / "broken.toml"
+        broken_profile.write_text("id = [\n", encoding="utf-8")
+        self.addCleanup(lambda: broken_profile.unlink(missing_ok=True))
+        self.addCleanup(lambda: tempdir.rmdir() if tempdir.exists() and not any(tempdir.iterdir()) else None)
 
-            with patch.dict(os.environ, {"OCCAMS_BEARD_PROFILE_DIR": tempdir}, clear=False):
-                response = self.client.get("/?mode=support")
+        with patch.dict(os.environ, {"OCCAMS_BEARD_PROFILE_DIR": str(tempdir)}, clear=False):
+            response = self.client.get("/?mode=support")
 
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
         self.assertIn("Some local profiles were skipped.", text)
-        self.assertIn(broken_profile, text)
+        self.assertIn(str(broken_profile), text)
 
     def test_run_progress_status_exposes_live_execution_updates(self) -> None:
         release_run = Event()

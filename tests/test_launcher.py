@@ -13,6 +13,7 @@ from occams_beard.launcher import (
     _build_browser_url,
     _load_web_dependencies,
     _make_server_with_fallback,
+    _probe_runtime_metadata,
     _write_ready_file,
     launch_operator_interface,
     main,
@@ -91,26 +92,62 @@ class LauncherTests(unittest.TestCase):
     def test_make_server_with_fallback_prefers_requested_port_when_available(self) -> None:
         make_server = MagicMock(return_value=MagicMock(server_port=5000))
 
-        server = _make_server_with_fallback(make_server, "127.0.0.1", 5000, object())
+        server, conflict = _make_server_with_fallback(
+            make_server,
+            "127.0.0.1",
+            5000,
+            object(),
+            runtime_metadata={
+                "app_version": "0.1.0",
+                "interpreter_path": "python",
+                "package_path": "pkg",
+            },
+        )
 
         self.assertEqual(server.server_port, 5000)
+        self.assertIsNone(conflict)
         make_server.assert_called_once()
 
     @patch("occams_beard.launcher.LOGGER")
+    @patch("occams_beard.launcher._probe_runtime_metadata")
     def test_make_server_with_fallback_chooses_ephemeral_port_when_requested_port_is_busy(
         self,
+        mock_probe_runtime_metadata,
         mock_logger,
     ) -> None:
         preferred_server_error = OSError(48, "Address already in use")
         fallback_server = MagicMock(server_port=5010)
         make_server = MagicMock(side_effect=[preferred_server_error, fallback_server])
+        mock_probe_runtime_metadata.return_value = {
+            "app_version": "0.1.0",
+            "interpreter_path": "C:/other/python.exe",
+            "package_path": "C:/other/pkg",
+            "pid": 999,
+        }
 
-        server = _make_server_with_fallback(make_server, "127.0.0.1", 5000, object())
+        server, conflict = _make_server_with_fallback(
+            make_server,
+            "127.0.0.1",
+            5000,
+            object(),
+            runtime_metadata={
+                "app_version": "0.1.0",
+                "interpreter_path": "C:/repo/.venv/python.exe",
+                "package_path": "C:/repo/src/occams_beard",
+            },
+        )
 
         self.assertEqual(server.server_port, 5010)
+        self.assertIsNotNone(conflict)
+        assert conflict is not None
+        self.assertEqual(conflict.preferred_url, "http://127.0.0.1:5000")
+        self.assertEqual(conflict.existing_runtime["pid"], 999)
         self.assertEqual(make_server.call_count, 2)
         self.assertEqual(make_server.call_args_list[1].args[1], 0)
         mock_logger.warning.assert_called_once()
+
+    def test_probe_runtime_metadata_returns_none_for_unreachable_server(self) -> None:
+        self.assertIsNone(_probe_runtime_metadata("http://127.0.0.1:59999"))
 
     @patch("occams_beard.launcher.importlib.import_module")
     def test_load_web_dependencies_raises_clear_error_when_dependency_missing(
@@ -192,6 +229,43 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(ready_text, "http://127.0.0.1:5012\n")
         mock_open_browser.assert_called_once_with("http://127.0.0.1:5012")
+
+    @patch("occams_beard.launcher._open_browser")
+    @patch("occams_beard.launcher._wait_for_server", return_value=True)
+    @patch("occams_beard.launcher._load_web_dependencies")
+    @patch("builtins.print")
+    def test_launch_operator_interface_reports_port_conflict_details(
+        self,
+        mock_print,
+        mock_load_web_dependencies,
+        _mock_wait,
+        _mock_open_browser,
+    ) -> None:
+        server = MagicMock()
+        server.server_port = 5015
+        make_server = MagicMock(side_effect=[OSError(48, "Address already in use"), server])
+        mock_load_web_dependencies.return_value = (MagicMock(return_value=object()), make_server)
+
+        with (
+            patch("occams_beard.launcher._probe_runtime_metadata") as mock_probe_runtime_metadata,
+            patch("occams_beard.launcher.threading.Thread") as mock_thread_class,
+        ):
+            thread = MagicMock()
+            thread.is_alive.side_effect = [False]
+            mock_thread_class.return_value = thread
+            mock_probe_runtime_metadata.return_value = {
+                "pid": 4321,
+                "interpreter_path": "C:/Users/other/python.exe",
+                "app_version": "0.1.0",
+                "package_path": "C:/other/src/occams_beard",
+            }
+
+            result = launch_operator_interface(OperatorLauncherConfig())
+
+        self.assertEqual(result, 0)
+        printed_text = "\n".join(call.args[0] for call in mock_print.call_args_list if call.args)
+        self.assertIn("Preferred local URL http://127.0.0.1:5000 was already in use.", printed_text)
+        self.assertIn("Opened this run at http://127.0.0.1:5015 instead.", printed_text)
 
     @patch("occams_beard.launcher._wait_for_server", return_value=False)
     @patch("occams_beard.launcher._load_web_dependencies")

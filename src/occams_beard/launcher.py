@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import logging
 import socket
 import threading
 import time
+import urllib.error
+import urllib.request
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
+
+from occams_beard.runtime_identity import current_runtime_metadata, runtime_fingerprint
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_WAIT_TIMEOUT_SECONDS = 10.0
@@ -82,6 +87,14 @@ class LauncherDependencyError(RuntimeError):
     """Raised when the local operator interface dependencies are unavailable."""
 
 
+@dataclass(slots=True)
+class PortConflictDetails:
+    """Describe an already-running listener on the preferred local port."""
+
+    preferred_url: str
+    existing_runtime: dict[str, object] | None = None
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the operator launcher parser."""
 
@@ -148,8 +161,15 @@ def launch_operator_interface(config: OperatorLauncherConfig) -> int:
     )
     app = create_app(_browser_presence_app_config(presence_tracker))
 
+    runtime_metadata = current_runtime_metadata()
     try:
-        server = _make_server_with_fallback(make_server, config.host, config.port, app)
+        server, port_conflict = _make_server_with_fallback(
+            make_server,
+            config.host,
+            config.port,
+            app,
+            runtime_metadata=runtime_metadata,
+        )
     except OSError as exc:
         LOGGER.error(
             "Operator interface failed to bind: host=%s port=%s error=%s",
@@ -184,6 +204,15 @@ def launch_operator_interface(config: OperatorLauncherConfig) -> int:
     if config.open_browser:
         _open_browser(browser_url)
 
+    if port_conflict is not None:
+        print(f"Preferred local URL {port_conflict.preferred_url} was already in use.")
+        if port_conflict.existing_runtime is not None:
+            print(
+                "Existing listener runtime: "
+                f"PID {port_conflict.existing_runtime.get('pid')} · "
+                f"Python {port_conflict.existing_runtime.get('interpreter_path')}"
+            )
+        print(f"Opened this run at {browser_url} instead.")
     print(f"Occam's Beard operator interface is running at {browser_url}")
     if config.shutdown_on_browser_close:
         print("The local server will stop after the last browser page is closed.")
@@ -231,22 +260,38 @@ def _build_browser_url(host: str, port: int) -> str:
     return f"http://{browser_host}:{port}"
 
 
-def _make_server_with_fallback(make_server, host: str, preferred_port: int, app):
+def _make_server_with_fallback(
+    make_server,
+    host: str,
+    preferred_port: int,
+    app,
+    *,
+    runtime_metadata: dict[str, object],
+):
     """Create a local server, retrying on an ephemeral port if the preferred one is busy."""
 
     try:
-        return make_server(host, preferred_port, app)
+        return make_server(host, preferred_port, app), None
     except OSError as exc:
         if not _is_address_in_use_error(exc):
             raise
 
+        preferred_url = _build_browser_url(host, preferred_port)
+        existing_runtime = _probe_runtime_metadata(preferred_url)
+        same_runtime = runtime_fingerprint(existing_runtime) == runtime_fingerprint(runtime_metadata)
         LOGGER.warning(
-            "Requested operator port is unavailable; selecting an ephemeral fallback port instead: "
-            "host=%s requested_port=%s",
+            (
+                "Requested operator port is already serving %s runtime; selecting an "
+                "ephemeral fallback port instead: host=%s requested_port=%s"
+            ),
+            "the current" if same_runtime else "a different",
             host,
             preferred_port,
         )
-        return make_server(host, 0, app)
+        return (
+            make_server(host, 0, app),
+            PortConflictDetails(preferred_url=preferred_url, existing_runtime=existing_runtime),
+        )
 
 
 def _is_address_in_use_error(exc: OSError) -> bool:
@@ -294,6 +339,17 @@ def _write_ready_file(path: str | None, url: str) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         handle.write(url)
         handle.write("\n")
+
+
+def _probe_runtime_metadata(url: str) -> dict[str, object] | None:
+    """Query a running local server for its runtime identity when available."""
+
+    try:
+        with urllib.request.urlopen(f"{url}/health/runtime", timeout=0.5) as response:
+            payload = json.load(response)
+    except (TimeoutError, urllib.error.URLError, json.JSONDecodeError, OSError):
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def _browser_presence_app_config(

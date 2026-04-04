@@ -41,6 +41,7 @@ Endpoint failures often sit between desktop support, systems administration, and
 - local issue profiles under [`src/occams_beard/profiles/`](src/occams_beard/profiles/)
 - guided self-service summaries in the web UI and report output
 - support-bundle export with redaction and optional raw command capture
+- runtime identity now appears in the local UI, and `/health/runtime` exposes the active interpreter and package paths for support/debugging
 - standalone support-bundle validation for directory and zip exports
 - invalid optional local profile files are skipped instead of breaking the profile catalog
 

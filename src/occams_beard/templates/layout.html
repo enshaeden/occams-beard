@@ -22,6 +22,9 @@
           Collect trustworthy local evidence, explain likely fault domains,
           and export support-ready bundles without leaving the device unless you choose to.
         </p>
+        <p class="field-help">
+          Runtime {{ runtime_metadata.server_origin }} · App version {{ runtime_metadata.app_version }} · PID {{ runtime_metadata.pid }} · Python {{ runtime_metadata.interpreter_path }}
+        </p>
       </div>
       <nav class="header-actions" aria-label="Primary">
         <a class="ghost-button" href="{{ url_for('index') }}">Start Over</a>
