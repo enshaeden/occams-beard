@@ -17,7 +17,6 @@
           <p class="eyebrow">Step 2</p>
           <h2>Review the plan before you run it.</h2>
         </div>
-        <span class="mode-chip">Employee-safe</span>
       </div>
 
       <p class="lede">{{ form_state.selected_profile.description }}</p>
@@ -52,15 +51,12 @@
     <details class="advanced-panel" data-self-serve-advanced>
       <summary>Support asked me to change this plan</summary>
       <div class="advanced-panel-body stack-lg">
-        <p class="field-help">
-          Only open this if support asked you to change the plan details or add deeper probes.
-        </p>
         {% if form_state.profile_id %}
           <input type="hidden" name="profile_id" value="{{ form_state.profile_id }}">
         {% endif %}
 
         <fieldset class="stack-sm form-fieldset">
-          <legend>Check areas</legend>
+          <legend>Select specific tests</legend>
           <div class="check-grid">
             {% for item in form_state.plan.collection_items %}
               <label class="check-tile">
@@ -91,7 +87,7 @@
         </div>
 
         <fieldset class="stack-sm form-fieldset">
-          <legend>Optional probes and export privacy</legend>
+          <legend>Optional probes</legend>
           <div class="toggle-row">
             <label class="toggle" for="enable_ping">
               <input id="enable_ping" type="checkbox" name="enable_ping" {% if form_state.enable_ping %}checked{% endif %}>
@@ -101,9 +97,11 @@
               <input id="enable_trace" type="checkbox" name="enable_trace" {% if form_state.enable_trace %}checked{% endif %}>
               <span>Enable traceroute</span>
             </label>
+          <legend>Create diagnostic export</legend>
+          <div class="toggle-row"></div>
             <label class="toggle" for="capture_raw_commands">
               <input id="capture_raw_commands" type="checkbox" name="capture_raw_commands" {% if form_state.capture_raw_commands %}checked{% endif %}>
-              <span>Capture raw command output for a support bundle</span>
+              <span>Capture raw output for a support bundle</span>
             </label>
           </div>
         </fieldset>
@@ -113,12 +111,8 @@
     <div class="cta-strip">
       <div class="stack-xs">
         <h3>Step 3</h3>
-        <p class="field-help">
-          Start the local check. You can decide later whether you want to share a support bundle.
-        </p>
+        <button type="submit" class="primary-button">Start Device Check</button>
       </div>
-      <button type="submit" class="primary-button">Start Device Check</button>
-    </div>
   </form>
 {% else %}
   <article class="card">

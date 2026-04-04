@@ -205,6 +205,9 @@ On macOS, you can also double-click
 [`Open Device Check.command`](<Open Device Check.command>) from the repo root.
 It starts the local interface without leaving a Terminal window on screen and
 stops the local server after the browser page is closed.
+The repo-root launcher now skips an existing `.venv` interpreter when that
+interpreter is older than the supported Python baseline and falls back to a
+compatible bootstrap Python instead of failing before browser launch.
 
 On Windows, use [`Open Device Check.cmd`](<Open Device Check.cmd>) from the
 repo root. The root `.command` and `.cmd` files delegate to the same shared

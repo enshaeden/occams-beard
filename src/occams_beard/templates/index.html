@@ -3,12 +3,8 @@
 {% block content %}
   <section class="entry-shell stack-md">
     <div class="stack-sm">
-      <p class="eyebrow">Choose Your Path</p>
-      <h2>Start with the level of help you need right now.</h2>
-      <p class="lede">
-        Use the employee-safe path for a local evidence check, or open the
-        support path when IT asked for a deeper guided run and a support-ready handoff.
-      </p>
+      <p class="eyebrow">Use the Self Service path for an unassisted troubleshooting experience, or open the
+        support path when asked for a deeper guided run and a support-ready handoff.</p>
     </div>
     <div class="door-grid">
       {% for option in mode_options %}
@@ -71,7 +67,7 @@
             <a class="ghost-button" href="{{ url_for('index') }}">Choose a Different Path</a>
           </div>
           <p class="muted">
-            Pick the closest symptom. Occam's Beard will load a bounded local troubleshooting plan for you.
+            Pick the closest symptom to the issue you are experiencing to load a pre-defined test plan.
           </p>
           <div class="choice-grid" role="radiogroup" aria-label="Symptoms">
             {% for symptom in symptom_options %}
@@ -84,9 +80,8 @@
                   data-symptom-choice="{{ symptom.id }}"
                   {% if form_state.symptom_id == symptom.id %}checked{% endif %}
                 >
-                <span class="choice-badge">Symptom</span>
-                <span class="choice-title">{{ symptom.label }}</span>
-                <span class="choice-body">{{ symptom.description }}</span>
+                <span class="choice-badge">{{ symptom.label }}</span>
+                <span class="choice-title">{{ symptom.description }}</span>
               </label>
             {% endfor %}
           </div>

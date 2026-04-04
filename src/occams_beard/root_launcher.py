@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
+MINIMUM_PYTHON_VERSION = (3, 11)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -71,18 +72,20 @@ def _resolve_project_root(project_root: str | None) -> Path:
 
 def _resolve_bootstrap_python(project_root: Path) -> Path:
     project_python = _project_python_candidate(project_root)
-    if project_python.exists():
+    if project_python.exists() and _python_version_supported(project_python):
         return project_python
 
-    if sys.executable:
+    if sys.executable and _python_version_supported(Path(sys.executable)):
         return Path(sys.executable)
 
-    raise RuntimeError("Unable to determine a Python interpreter for environment bootstrap.")
+    raise RuntimeError(
+        "Unable to determine a Python 3.11+ interpreter for environment bootstrap."
+    )
 
 
 def _resolve_project_python(project_root: Path) -> Path:
     project_python = _project_python_candidate(project_root)
-    if project_python.exists():
+    if project_python.exists() and _python_version_supported(project_python):
         return project_python
     return _resolve_bootstrap_python(project_root)
 
@@ -91,6 +94,23 @@ def _project_python_candidate(project_root: Path) -> Path:
     if os.name == "nt":
         return project_root / ".venv" / "Scripts" / "python.exe"
     return project_root / ".venv" / "bin" / "python3"
+
+
+def _python_version_supported(python_bin: Path) -> bool:
+    result = subprocess.run(
+        [
+            str(python_bin),
+            "-c",
+            (
+                "import sys; "
+                f"raise SystemExit(0 if sys.version_info >= {MINIMUM_PYTHON_VERSION} else 1)"
+            ),
+        ],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0
 
 
 def _launcher_dependencies_ready(project_root: Path, python_bin: Path) -> bool:

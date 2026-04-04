@@ -16,7 +16,9 @@ SHOW_TERMINAL=0
 FORWARD_ARGS=()
 
 resolve_bootstrap_python() {
-  if [[ -x "${BOOTSTRAP_PYTHON}" ]]; then
+  if [[ -x "${BOOTSTRAP_PYTHON}" ]] && \
+    "${BOOTSTRAP_PYTHON}" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' \
+      >/dev/null 2>&1; then
     echo "${BOOTSTRAP_PYTHON}"
   else
     echo "python3"

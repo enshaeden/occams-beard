@@ -30,6 +30,33 @@ class RootLauncherTests(unittest.TestCase):
 
         self.assertEqual(candidate, project_root / ".venv" / "bin" / "python3")
 
+    @patch("occams_beard.root_launcher._python_version_supported", side_effect=[False, False, True])
+    def test_resolve_project_python_falls_back_when_virtualenv_python_is_incompatible(
+        self,
+        mock_python_version_supported,
+    ) -> None:
+        project_root = Path("/repo")
+
+        with (
+            patch.object(Path, "exists", return_value=True),
+            patch("occams_beard.root_launcher.sys.executable", "/usr/bin/python3.14"),
+        ):
+            resolved = root_launcher._resolve_project_python(project_root)
+
+        self.assertEqual(resolved, Path("/usr/bin/python3.14"))
+        self.assertEqual(mock_python_version_supported.call_count, 3)
+
+    @patch("occams_beard.root_launcher.subprocess.run")
+    def test_python_version_supported_rejects_incompatible_interpreter(
+        self,
+        mock_subprocess_run,
+    ) -> None:
+        mock_subprocess_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
+
+        supported = root_launcher._python_version_supported(Path("/repo/.venv/bin/python3"))
+
+        self.assertFalse(supported)
+
     def test_prepend_pythonpath_avoids_duplicate_src_path(self) -> None:
         src_path = str(Path("/repo/src"))
         current = os.pathsep.join([src_path, str(Path("/repo/tests"))])

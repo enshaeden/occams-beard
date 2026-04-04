@@ -7,6 +7,7 @@
 - Optional ping and traceroute remain best-effort.
 - Raw command capture is opt-in and local only.
 - Repo-root operator launch now uses platform-specific root shims that delegate to one shared Python bootstrap module; macOS keeps `Open Device Check.command`, and Windows uses `Open Device Check.cmd`.
+- The repo-root launcher now rejects an existing project virtualenv interpreter when it is older than the supported Python baseline, so stale local `.venv` state does not block browser launch.
 
 ## Primary Sources
 

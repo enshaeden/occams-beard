@@ -24,6 +24,7 @@
 
 ### Changed
 
+- The repo-root launcher now rejects an existing `.venv` interpreter when it is older than the supported Python baseline, so stale local virtualenv state does not block the macOS `.command` launcher before browser open.
 - Windows host/resource collection now avoids privileged CIM for uptime, memory, and basic battery facts, suppresses the non-actionable `load-average-unsupported` warning on Windows, and falls back to `ipconfig /all` when PowerShell DNS enumeration is denied.
 - The launcher now detects an occupied preferred localhost port, reports the conflicting runtime when possible, falls back to a new port instead of silently reusing the old server, and the UI now exposes runtime metadata plus a `/health/runtime` endpoint.
 - The local web interface is now split into focused `web/` modules for route composition, form parsing, session orchestration, progress shaping, and result presentation so the shared runner remains the architectural center.

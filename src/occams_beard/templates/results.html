@@ -4,16 +4,12 @@
   <section class="answer-shell {% if view.mode == 'support' %}answer-shell-support{% endif %}">
     <article class="card answer-card stack-lg">
       <div class="result-status-line">
-        <span class="mode-chip">{{ view.mode_label }}</span>
         <span class="status-pill status-{{ view.status_tone }}">{{ view.status_label }}</span>
       </div>
 
       <div class="stack-sm">
         <h2>{{ view.headline }}</h2>
         <p class="lede">{{ view.top_takeaway }}</p>
-        <p class="field-help">
-          Run generated {{ view.run_reference.generated_at }} · App version {{ view.run_reference.version }} · Run ID {{ record.run_id }}
-        </p>
       </div>
 
       <article class="info-panel answer-next-step stack-sm">
@@ -63,7 +59,6 @@
   <section class="card decision-card stack-lg">
     <div class="section-heading">
       <div>
-        <p class="eyebrow">Decision Support</p>
         <h2>What to do with this run</h2>
       </div>
     </div>
