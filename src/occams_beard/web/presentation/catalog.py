@@ -12,19 +12,18 @@ MODE_OPTIONS = (
         "id": SELF_SERVE_MODE,
         "label": "Check My Device",
         "description": (
-            "Start with safe checks and plain-language results. You do not need "
-            "to know networking terms to use this path."
+            "Run a quick diagnostic check and gather more information to share with support."
         ),
-        "badge": "Employee-safe",
+        "badge": "Self Service",
     },
     {
         "id": SUPPORT_MODE,
         "label": "Work With Support",
         "description": (
-            "Use this when IT or support asked for deeper testing, a specific "
+            "Use this when IT support asks for deeper testing, a specific "
             "profile, or a support-ready bundle."
         ),
-        "badge": "Technician-directed",
+        "badge": "Advanced mode",
     },
 )
 

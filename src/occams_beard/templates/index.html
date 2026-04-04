@@ -21,7 +21,7 @@
             href="{{ url_for('index', mode=option.id) }}"
             data-mode-link="{{ option.id }}"
           >
-            {{ "Open This Path" if form_state.mode != option.id else "You're Here" }}
+            {{ "Customise tests" if form_state.mode != option.id else "You're Here" }}
           </a>
         </article>
       {% endfor %}
