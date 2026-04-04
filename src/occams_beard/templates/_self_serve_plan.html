@@ -102,9 +102,14 @@
 
         <fieldset class="stack-sm form-fieldset">
           <legend>Create diagnostic export</legend>
-          <div class="toggle-row"></div>
+          <div class="toggle-row">
             <label class="toggle" for="capture_raw_commands">
-              <input id="capture_raw_commands" type="checkbox" name="capture_raw_commands" {% if form_state.capture_raw_commands %}checked{% endif %}>
+              <input
+                id="capture_raw_commands"
+                type="checkbox"
+                name="capture_raw_commands"
+                {% if form_state.capture_raw_commands %}checked{% endif %}
+              >
               <span>Capture raw output for a support bundle</span>
             </label>
           </div>
