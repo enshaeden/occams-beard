@@ -1,0 +1,19 @@
+# Python runtime and cache artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Local virtual environments
+.venv/
+venv/
+
+# Packaging metadata
+*.egg-info/
+
+# macOS / Finder noise
+.DS_Store

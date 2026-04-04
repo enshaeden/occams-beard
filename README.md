@@ -19,20 +19,18 @@ The design choices are deliberate. Collection stays local and read-mostly.
 Findings are the source of truth and are evaluated only from collected evidence.
 The explanation layer stays subordinate to those findings. CLI, web, launcher,
 JSON output, and support-bundle export all share one runner and one result
-model. As a portfolio artifact, the repository is meant to show systems
-engineering judgment in diagnostics architecture, operational scope control,
-support handoff design, and privacy-aware local tooling.
+model. The implementation is meant to keep diagnostics architecture,
+operational scope control, support handoff design, and privacy-aware local
+tooling easy to inspect.
 
 ## Why this repo matters
 
-This repo is evidence of how the author approaches endpoint tooling as a
-systems and operations problem rather than as a UI exercise or a convenience
-script. It shows an emphasis on deterministic evidence evaluation, explicit
-architectural boundaries, reusable result contracts, privacy-aware artifact
-generation, and support workflows that survive escalation. It also shows
-restraint: the implementation stays local-first, avoids agent or fleet
-pretensions, and keeps explanation bounded to what the system can actually
-justify from collected facts.
+The repository approaches endpoint tooling as a systems and operations problem
+rather than as a UI exercise or a convenience script. It emphasizes
+deterministic evidence evaluation, explicit architectural boundaries, reusable
+result contracts, privacy-aware artifact generation, and support workflows that
+survive escalation. It also stays intentionally narrow: local-first, no agent
+behavior, and no explanation beyond what the collected facts can justify.
 
 ## Representative failure classes
 
@@ -232,6 +230,16 @@ before handoff by checking manifest presence, listed files, sizes, hashes,
 raw-capture consistency, and schema-version agreement between `manifest.json`
 and `result.json`.
 
+Committed bundle example:
+
+```text
+sample_output/support-bundle-safe/
+|-- manifest.json
+|-- redaction-report.txt
+|-- report.txt
+`-- result.json
+```
+
 See [`docs/support-workflow.md`](docs/support-workflow.md),
 [`docs/privacy-and-threat-model.md`](docs/privacy-and-threat-model.md), and
 [`docs/result-schema.md`](docs/result-schema.md).
@@ -250,6 +258,10 @@ What this repository demonstrates today is concrete:
   separate reasoning engine
 - cross-platform parsing and regression coverage for supported Linux, macOS,
   and Windows collection paths represented in the repository
+
+The committed [`sample_output/default-run/`](sample_output/default-run/) example
+also shows the system returning `healthy-baseline` when the collected evidence
+does not justify a stronger fault signature.
 
 What it does not claim is equally important:
 
