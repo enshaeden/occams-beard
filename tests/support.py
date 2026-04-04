@@ -38,6 +38,7 @@ from occams_beard.models import (
     TcpConnectivityCheck,
     TcpTarget,
     TraceResult,
+    VpnSignal,
     VpnState,
 )
 from occams_beard.profile_catalog import get_profile
@@ -652,6 +653,178 @@ def build_degraded_partial_result() -> EndpointDiagnosticResult:
         )
     ]
     return result
+
+
+def build_profile_vpn_issue_result() -> EndpointDiagnosticResult:
+    profile = get_profile("vpn-issue")
+    options = DiagnosticsRunOptions(
+        selected_checks=list(profile.recommended_checks),
+        targets=list(profile.tcp_targets),
+        dns_hosts=list(profile.dns_hosts),
+        profile=profile,
+    )
+    facts = CollectedFacts(
+        host=HostBasics(
+            hostname="remote-windows-laptop",
+            operating_system="Windows",
+            kernel="10.0.22631",
+            current_user="operator",
+            uptime_seconds=7200,
+        ),
+        resources=ResourceState(
+            cpu=CpuState(logical_cpus=8, utilization_percent_estimate=11.4),
+            memory=MemoryState(
+                total_bytes=16 * 1024**3,
+                available_bytes=9_000_000_000,
+                free_bytes=7_300_000_000,
+                pressure_level="normal",
+            ),
+            disks=[],
+            battery=BatteryState(present=True, charge_percent=78, status="charging"),
+        ),
+        network=NetworkState(
+            interfaces=[
+                NetworkInterface(
+                    name="Wi-Fi",
+                    is_up=True,
+                    mac_address="00:11:22:33:44:55",
+                    addresses=[
+                        InterfaceAddress(
+                            family="ipv4",
+                            address="192.168.10.42",
+                            netmask="24",
+                            is_loopback=False,
+                        )
+                    ],
+                    mtu=1500,
+                    type_hint="wireless",
+                ),
+                NetworkInterface(
+                    name="utun2",
+                    is_up=True,
+                    mac_address=None,
+                    addresses=[
+                        InterfaceAddress(
+                            family="ipv4",
+                            address="10.8.0.14",
+                            netmask="24",
+                            is_loopback=False,
+                        )
+                    ],
+                    mtu=1380,
+                    type_hint="tunnel",
+                ),
+            ],
+            local_addresses=["192.168.10.42", "10.8.0.14"],
+            active_interfaces=["Wi-Fi", "utun2"],
+            arp_neighbors=[],
+            route_summary=RouteSummary(
+                default_gateway="10.8.0.1",
+                default_interface="utun2",
+                has_default_route=True,
+                routes=[
+                    RouteEntry(
+                        destination="default",
+                        gateway="10.8.0.1",
+                        interface="utun2",
+                        metric=25,
+                    )
+                ],
+                default_route_state="present",
+                observations=[],
+            ),
+        ),
+        dns=DnsState(
+            resolvers=["10.8.0.2"],
+            checks=[
+                DnsResolutionCheck(
+                    hostname="github.com",
+                    success=True,
+                    resolved_addresses=["140.82.112.3"],
+                    duration_ms=11,
+                )
+            ],
+        ),
+        connectivity=ConnectivityState(
+            internet_reachable=True,
+            tcp_checks=[
+                TcpConnectivityCheck(
+                    target=profile.tcp_targets[0],
+                    success=True,
+                    latency_ms=24.3,
+                    ip_used="140.82.112.3",
+                    duration_ms=24,
+                ),
+                TcpConnectivityCheck(
+                    target=profile.tcp_targets[1],
+                    success=False,
+                    error="timeout",
+                    duration_ms=3000,
+                ),
+            ],
+            ping_checks=[],
+            trace_results=[],
+        ),
+        vpn=VpnState(
+            signals=[
+                VpnSignal(
+                    interface_name="utun2",
+                    signal_type="interface-name-and-address-heuristic",
+                    description="Tunnel-like interface name detected with a usable address.",
+                    active=True,
+                    confidence=0.82,
+                    address_count=1,
+                ),
+                VpnSignal(
+                    interface_name="utun2",
+                    signal_type="default-route-heuristic",
+                    description="Default route uses an interface that looks like a VPN or tunnel.",
+                    active=True,
+                    confidence=0.9,
+                    address_count=1,
+                ),
+            ]
+        ),
+        services=ServiceState(
+            checks=[
+                ServiceCheck(
+                    target=profile.tcp_targets[0],
+                    success=True,
+                    latency_ms=26.0,
+                    duration_ms=26,
+                ),
+                ServiceCheck(
+                    target=profile.tcp_targets[1],
+                    success=False,
+                    error="timeout",
+                    duration_ms=3000,
+                ),
+            ]
+        ),
+    )
+    return _finalize_result(
+        facts=facts,
+        options=options,
+        warnings=[],
+        generated_at="2026-04-01T00:12:00+00:00",
+        elapsed_ms=188,
+        platform=PlatformInfo(
+            system="Windows",
+            release="11",
+            version="demo-build",
+            machine="AMD64",
+            python_version="3.13.4",
+        ),
+        durations_ms={
+            "host": 4,
+            "network": 12,
+            "routing": 8,
+            "dns": 18,
+            "connectivity": 44,
+            "vpn": 2,
+            "services": 29,
+        },
+    )
 
 
 def _finalize_result(

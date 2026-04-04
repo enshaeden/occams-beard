@@ -39,6 +39,7 @@ def main() -> int:
         build_default_run_result,
         build_degraded_partial_result,
         build_profile_dns_issue_result,
+        build_profile_vpn_issue_result,
     )
 
     for name in LEGACY_ARTIFACTS:
@@ -49,6 +50,7 @@ def main() -> int:
     for directory_name, result in (
         ("default-run", build_default_run_result()),
         ("profile-dns-issue", build_profile_dns_issue_result()),
+        ("profile-vpn-issue", build_profile_vpn_issue_result()),
         ("degraded-partial", build_degraded_partial_result()),
     ):
         scenario_root = OUTPUT_ROOT / directory_name

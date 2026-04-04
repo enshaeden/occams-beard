@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from occams_beard.domain_registry import NETWORK_EGRESS_DOMAINS
 from occams_beard.defaults import DEFAULT_CHECKS
 from occams_beard.execution import (
     DOMAIN_LABELS,
@@ -36,7 +37,7 @@ def initial_progress_execution(options: DiagnosticsRunOptions) -> list[DomainExe
                         else "Optional and not selected for this run."
                     )
                 ),
-                creates_network_egress=domain in {"dns", "connectivity", "services"},
+                creates_network_egress=domain in NETWORK_EGRESS_DOMAINS,
             )
         )
     return progress_execution

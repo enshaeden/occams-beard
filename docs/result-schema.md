@@ -89,6 +89,7 @@ Current committed examples live under [`sample_output/`](../sample_output/):
 
 - [`sample_output/default-run/result.json`](../sample_output/default-run/result.json) and [`sample_output/default-run/report.txt`](../sample_output/default-run/report.txt): baseline full-suite example
 - [`sample_output/profile-dns-issue/result.json`](../sample_output/profile-dns-issue/result.json) and [`sample_output/profile-dns-issue/report.txt`](../sample_output/profile-dns-issue/report.txt): profile-based DNS scenario
+- [`sample_output/profile-vpn-issue/result.json`](../sample_output/profile-vpn-issue/result.json) and [`sample_output/profile-vpn-issue/report.txt`](../sample_output/profile-vpn-issue/report.txt): profile-based VPN and private-resource scenario
 - [`sample_output/degraded-partial/result.json`](../sample_output/degraded-partial/result.json) and [`sample_output/degraded-partial/report.txt`](../sample_output/degraded-partial/report.txt): degraded mixed-result scenario
 - [`sample_output/support-bundle-safe/manifest.json`](../sample_output/support-bundle-safe/manifest.json), [`sample_output/support-bundle-safe/result.json`](../sample_output/support-bundle-safe/result.json), [`sample_output/support-bundle-safe/report.txt`](../sample_output/support-bundle-safe/report.txt), and [`sample_output/support-bundle-safe/redaction-report.txt`](../sample_output/support-bundle-safe/redaction-report.txt): canonical safe-redaction support-bundle example
 

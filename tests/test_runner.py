@@ -65,7 +65,7 @@ class RunnerTests(unittest.TestCase):
 
         with (
             patch(
-                "occams_beard.runner.collect_host_basics",
+                "occams_beard.domain_registry.collect_host_basics",
                 return_value=(
                     HostBasics(
                         hostname="demo-host",
@@ -78,20 +78,20 @@ class RunnerTests(unittest.TestCase):
                 ),
             ),
             patch(
-                "occams_beard.runner.collect_dns_state",
+                "occams_beard.domain_registry.collect_dns_state",
                 return_value=(DnsState(), []),
             ),
             patch(
-                "occams_beard.runner.evaluate_selected_findings",
+                "occams_beard.result_builder.evaluate_selected_findings",
                 return_value=([finding], "dns"),
             ),
-            patch("occams_beard.runner.collect_resource_state") as mock_resources,
-            patch("occams_beard.runner.collect_storage_state") as mock_storage,
-            patch("occams_beard.runner.collect_network_state") as mock_network,
-            patch("occams_beard.runner.collect_route_summary") as mock_routes,
-            patch("occams_beard.runner.collect_connectivity_state") as mock_connectivity,
-            patch("occams_beard.runner.collect_service_state") as mock_services,
-            patch("occams_beard.runner.collect_vpn_state") as mock_vpn,
+            patch("occams_beard.domain_registry.collect_resource_state") as mock_resources,
+            patch("occams_beard.domain_registry.collect_storage_state") as mock_storage,
+            patch("occams_beard.domain_registry.collect_network_state") as mock_network,
+            patch("occams_beard.domain_registry.collect_route_summary") as mock_routes,
+            patch("occams_beard.domain_registry.collect_connectivity_state") as mock_connectivity,
+            patch("occams_beard.domain_registry.collect_service_state") as mock_services,
+            patch("occams_beard.domain_registry.collect_vpn_state") as mock_vpn,
         ):
             result = run_diagnostics(options)
 
@@ -143,7 +143,7 @@ class RunnerTests(unittest.TestCase):
 
         with (
             patch(
-                "occams_beard.runner.collect_host_basics",
+                "occams_beard.domain_registry.collect_host_basics",
                 return_value=(
                     HostBasics(
                         hostname="demo-host",
@@ -156,11 +156,11 @@ class RunnerTests(unittest.TestCase):
                 ),
             ),
             patch(
-                "occams_beard.runner.collect_dns_state",
+                "occams_beard.domain_registry.collect_dns_state",
                 side_effect=fake_collect_dns_state,
             ),
             patch(
-                "occams_beard.runner.evaluate_selected_findings",
+                "occams_beard.result_builder.evaluate_selected_findings",
                 return_value=([], "healthy"),
             ),
         ):
@@ -219,7 +219,7 @@ class RunnerTests(unittest.TestCase):
 
         with (
             patch(
-                "occams_beard.runner.collect_host_basics",
+                "occams_beard.domain_registry.collect_host_basics",
                 return_value=(
                     HostBasics(
                         hostname="demo-host",
@@ -232,11 +232,11 @@ class RunnerTests(unittest.TestCase):
                 ),
             ),
             patch(
-                "occams_beard.runner.collect_resource_state",
+                "occams_beard.domain_registry.collect_resource_state",
                 side_effect=fake_collect_resource_state,
             ),
             patch(
-                "occams_beard.runner.evaluate_selected_findings",
+                "occams_beard.result_builder.evaluate_selected_findings",
                 return_value=([], "healthy"),
             ),
         ):
@@ -275,7 +275,7 @@ class RunnerTests(unittest.TestCase):
 
         with (
             patch(
-                "occams_beard.runner.collect_host_basics",
+                "occams_beard.domain_registry.collect_host_basics",
                 return_value=(
                     HostBasics(
                         hostname="demo-host",
@@ -288,7 +288,7 @@ class RunnerTests(unittest.TestCase):
                 ),
             ),
             patch(
-                "occams_beard.runner.collect_dns_state",
+                "occams_beard.domain_registry.collect_dns_state",
                 return_value=(
                     DnsState(
                         resolvers=["1.1.1.1"],
@@ -330,7 +330,7 @@ class RunnerTests(unittest.TestCase):
 
         with (
             patch(
-                "occams_beard.runner.collect_host_basics",
+                "occams_beard.domain_registry.collect_host_basics",
                 return_value=(
                     HostBasics(
                         hostname="demo-host",
@@ -343,7 +343,7 @@ class RunnerTests(unittest.TestCase):
                 ),
             ),
             patch(
-                "occams_beard.runner.collect_connectivity_state",
+                "occams_beard.domain_registry.collect_connectivity_state",
                 return_value=(
                     ConnectivityState(
                         internet_reachable=True,

@@ -6,6 +6,11 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
+from occams_beard.domain_registry import (
+    NETWORK_EGRESS_DOMAINS,
+    iter_registered_domains,
+    planned_step_labels_by_domain,
+)
 from occams_beard.defaults import DEFAULT_CHECKS
 from occams_beard.models import (
     CollectedFacts,
@@ -17,36 +22,21 @@ from occams_beard.models import (
     PingResult,
     ServiceCheck,
     TcpConnectivityCheck,
-    TcpTarget,
     TraceResult,
 )
 
 if TYPE_CHECKING:
-    from occams_beard.runner import DiagnosticsRunOptions
+    from occams_beard.run_options import DiagnosticsRunOptions
 
 
-DOMAIN_LABELS = {
-    "host": "Host basics",
-    "resources": "Resource snapshot",
-    "storage": "Storage snapshot",
-    "network": "Interface inventory",
-    "routing": "Routing inventory",
-    "dns": "DNS checks",
-    "connectivity": "Generic connectivity",
-    "vpn": "VPN heuristics",
-    "services": "Configured services",
-}
+DOMAIN_LABELS = {definition.domain: definition.label for definition in iter_registered_domains()}
 
 
 def planned_execution_step_breakdown(options: DiagnosticsRunOptions) -> dict[str, int]:
     """Return planned probe-step counts for each domain."""
 
-    selected_domains = set(options.selected_checks) | {"host"}
     labels_by_domain = planned_execution_step_labels(options)
-    return {
-        domain: (len(labels_by_domain[domain]) if domain in selected_domains else 0)
-        for domain in DEFAULT_CHECKS
-    }
+    return {domain: len(labels_by_domain[domain]) for domain in DEFAULT_CHECKS}
 
 
 def planned_execution_step_count(
@@ -64,10 +54,8 @@ def planned_execution_step_count(
 def planned_execution_step_labels(options: DiagnosticsRunOptions) -> dict[str, list[str]]:
     """Return human-readable step labels for each planned domain."""
 
-    return {
-        domain: _planned_probe_labels_for_domain(domain, options)
-        for domain in DEFAULT_CHECKS
-    }
+    labels_by_domain = planned_step_labels_by_domain(options)
+    return {domain: labels_by_domain.get(domain, []) for domain in DEFAULT_CHECKS}
 
 
 def next_execution_step_label(
@@ -101,7 +89,7 @@ def build_execution_records(
     records: list[DomainExecution] = []
     selected = set(options.selected_checks)
     for domain in DEFAULT_CHECKS:
-        creates_network_egress = domain in {"dns", "connectivity", "services"}
+        creates_network_egress = domain in NETWORK_EGRESS_DOMAINS
         if completed_domains is not None and domain not in completed_domains:
             if domain == "host" or domain in selected:
                 records.append(
@@ -125,115 +113,18 @@ def build_execution_records(
                 )
             continue
 
-        if domain == "host":
-            records.append(
-                _host_execution(True, facts, warnings_by_domain[domain], durations_ms.get(domain))
+        records.append(
+            _build_execution_record(
+                domain,
+                selected=domain == "host" or domain in selected,
+                facts=facts,
+                warnings=warnings_by_domain[domain],
+                duration_ms=durations_ms.get(domain),
+                options=options,
+                selected_checks=selected,
             )
-        elif domain == "resources":
-            records.append(
-                _resources_execution(
-                    domain in selected, facts, warnings_by_domain[domain], durations_ms.get(domain)
-                )
-            )
-        elif domain == "storage":
-            records.append(
-                _storage_execution(
-                    domain in selected, facts, warnings_by_domain[domain], durations_ms.get(domain)
-                )
-            )
-        elif domain == "network":
-            records.append(
-                _network_execution(
-                    domain in selected, facts, warnings_by_domain[domain], durations_ms.get(domain)
-                )
-            )
-        elif domain == "routing":
-            records.append(
-                _routing_execution(
-                    domain in selected, facts, warnings_by_domain[domain], durations_ms.get(domain)
-                )
-            )
-        elif domain == "dns":
-            records.append(
-                _dns_execution(
-                    domain in selected, facts, warnings_by_domain[domain], durations_ms.get(domain)
-                )
-            )
-        elif domain == "connectivity":
-            records.append(
-                _connectivity_execution(
-                    domain in selected,
-                    facts,
-                    warnings_by_domain[domain],
-                    durations_ms.get(domain),
-                    options,
-                )
-            )
-        elif domain == "vpn":
-            records.append(
-                _vpn_execution(
-                    domain in selected,
-                    facts,
-                    warnings_by_domain[domain],
-                    durations_ms.get(domain),
-                    selected_checks=selected,
-                )
-            )
-        elif domain == "services":
-            records.append(
-                _services_execution(
-                    domain in selected, facts, warnings_by_domain[domain], durations_ms.get(domain)
-                )
-            )
+        )
     return records
-
-
-def _planned_probe_labels_for_domain(domain: str, options: DiagnosticsRunOptions) -> list[str]:
-    if domain == "host":
-        return ["Collecting endpoint identity and uptime"]
-    if domain == "resources":
-        return [
-            "Collecting CPU and load facts",
-            "Collecting memory and battery facts",
-        ]
-    if domain == "storage":
-        return [
-            "Inspecting mounted volumes",
-            "Checking storage device health",
-        ]
-    if domain == "network":
-        return [
-            "Collecting interface inventory",
-            "Collecting neighbor cache",
-        ]
-    if domain == "routing":
-        return ["Collecting routing inventory"]
-    if domain == "dns":
-        return [
-            "Reading resolver configuration",
-            *[f"Resolving {hostname}" for hostname in options.dns_hosts],
-        ]
-    if domain == "connectivity":
-        labels = [
-            f"Testing TCP reachability to {_target_label(target)}"
-            for target in options.targets
-        ]
-        if options.enable_ping:
-            labels.extend(f"Pinging {target.host}" for target in options.targets)
-        if options.enable_trace:
-            labels.extend(f"Tracing route to {target.host}" for target in options.targets)
-        return labels
-    if domain == "services":
-        return [f"Checking {_target_label(target)}" for target in options.targets]
-    if domain == "vpn":
-        return ["Checking VPN heuristics"]
-    return []
-
-
-def _target_label(target: TcpTarget) -> str:
-    if target.label:
-        return target.label
-    return f"{target.host}:{target.port}"
 
 
 def _host_execution(
@@ -265,6 +156,27 @@ def _host_execution(
         summary="Collected endpoint identity and uptime facts as a baseline domain.",
         warnings=warnings,
         probes=[probe],
+    )
+
+
+def _build_execution_record(
+    domain: str,
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    builder = _EXECUTION_BUILDERS[domain]
+    return builder(
+        selected=selected,
+        facts=facts,
+        warnings=warnings,
+        duration_ms=duration_ms,
+        options=options,
+        selected_checks=selected_checks,
     )
 
 
@@ -894,3 +806,139 @@ def _not_run_record(
         summary=summary or "This domain was not selected for the run.",
         creates_network_egress=creates_network_egress,
     )
+
+
+def _build_host_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del options, selected_checks
+    return _host_execution(selected, facts, warnings, duration_ms)
+
+
+def _build_resources_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del options, selected_checks
+    return _resources_execution(selected, facts, warnings, duration_ms)
+
+
+def _build_storage_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del options, selected_checks
+    return _storage_execution(selected, facts, warnings, duration_ms)
+
+
+def _build_network_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del options, selected_checks
+    return _network_execution(selected, facts, warnings, duration_ms)
+
+
+def _build_routing_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del options, selected_checks
+    return _routing_execution(selected, facts, warnings, duration_ms)
+
+
+def _build_dns_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del options, selected_checks
+    return _dns_execution(selected, facts, warnings, duration_ms)
+
+
+def _build_connectivity_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del selected_checks
+    return _connectivity_execution(selected, facts, warnings, duration_ms, options)
+
+
+def _build_vpn_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del options
+    return _vpn_execution(
+        selected,
+        facts,
+        warnings,
+        duration_ms,
+        selected_checks=selected_checks,
+    )
+
+
+def _build_services_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del options, selected_checks
+    return _services_execution(selected, facts, warnings, duration_ms)
+
+
+_EXECUTION_BUILDERS = {
+    "host": _build_host_record,
+    "resources": _build_resources_record,
+    "storage": _build_storage_record,
+    "network": _build_network_record,
+    "routing": _build_routing_record,
+    "dns": _build_dns_record,
+    "connectivity": _build_connectivity_record,
+    "vpn": _build_vpn_record,
+    "services": _build_services_record,
+}

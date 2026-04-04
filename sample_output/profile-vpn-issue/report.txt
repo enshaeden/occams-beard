@@ -1,0 +1,113 @@
+Occam's Beard Report
+================================
+
+Summary
+- Result schema version: 1.1.0
+- App version: 0.1.0
+- Host: remote-windows-laptop
+- Platform: Windows 11 (AMD64)
+- Internet reachable: yes
+- Default route present: yes
+- Probable fault domain: vpn
+- Fault-domain basis: VPN or tunnel appears active while private targets remain unreachable (0.90 confidence)
+- Profile: VPN Issue (VPN issue)
+
+Execution Status
+- Host basics: passed (local only)
+  Duration: 4 ms
+  Summary: Collected endpoint identity and uptime facts as a baseline domain.
+- Interface inventory: passed (local only)
+  Duration: 12 ms
+  Summary: Collected interface state, local addresses, and neighbor context.
+- Routing inventory: passed (local only)
+  Duration: 8 ms
+  Summary: Collected route table and default-route interpretation.
+- DNS checks: passed (network egress)
+  Duration: 18 ms
+  Summary: Collected resolver configuration and hostname resolution checks.
+- Generic connectivity: partial (network egress)
+  Duration: 44 ms
+  Summary: Collected generic DNS-independent and TCP path checks.
+  Probe TCP 10.0.0.10:443: failed (TCP connection failed: timeout.)
+  Probe Ping github.com: skipped (Ping was not enabled for this run.)
+- VPN heuristics: passed (local only)
+  Duration: 2 ms
+  Summary: Evaluated tunnel-interface and route heuristics.
+- Configured services: partial (network egress)
+  Duration: 29 ms
+  Summary: Collected TCP checks for intended service targets.
+  Probe Service private-service:443: failed (Service path failed: timeout.)
+
+Key Findings
+1. [MEDIUM] VPN or tunnel appears active while private targets remain unreachable
+   Derived finding: A VPN-like interface is present, but private resource checks still failed.
+   Plain language: A tunnel or VPN signal is present, but private targets are still unreachable.
+   Evidence summary: VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address). VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.90, 1 usable address).
+   Observed fact: VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address).
+   Observed fact: VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.90, 1 usable address).
+   Observed fact: Default route uses interface utun2.
+   Observed fact: 1 more supporting signal(s) not shown
+   Heuristic conclusion: The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.
+   Safe next actions: Reconnect the VPN client once if that is already part of the documented workflow.; Keep one public baseline target in the run to separate tunnel issues from wider internet loss.
+   Escalate when: Escalate if private targets still fail while VPN-like interfaces and routes remain present.
+   Uncertainty: VPN state is heuristic in this tool; interface and route signals do not prove the remote network path is healthy.
+   Fault domain: vpn (0.90 confidence, heuristic)
+
+What Likely Happened
+- Heuristic conclusion: The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.
+
+What You Can Try Safely
+- Reconnect the VPN client once if that is already part of the documented workflow.
+- Keep one public baseline target in the run to separate tunnel issues from wider internet loss.
+- Confirm the VPN client reports a connected state before rerunning.
+- If possible, retry the private target once after reconnecting the VPN client.
+
+Escalate When
+- Escalate if private targets still fail while VPN-like interfaces and routes remain present.
+- Escalate if a tunnel-like interface is present but private service checks still fail.
+- Escalate if the VPN path changes the default route unexpectedly or DNS behavior differs from the baseline network.
+
+What Remains Uncertain
+- VPN state is heuristic in this tool; interface and route signals do not prove the remote network path is healthy.
+- Generic connectivity was only partially collected or produced mixed results.
+- Configured services was only partially collected or produced mixed results.
+
+System Snapshot
+- Current user: operator
+- Uptime (seconds): 7200
+- CPU logical cores: 8
+- CPU utilization estimate: 11.4%
+- Memory pressure: normal
+- Memory available: 8.4 GiB / 16.0 GiB
+- Battery health: not collected
+
+Storage Snapshot
+- Monitored volumes: not collected
+- Storage device health: not collected
+
+Network Snapshot
+- Active interfaces: Wi-Fi, utun2
+- Local addresses: 192.168.10.42, 10.8.0.14
+- Interface MTUs: Wi-Fi=1500, utun2=1380
+- ARP neighbors: none collected
+- Default gateway: 10.8.0.1
+- Default interface: utun2
+- Default route state: present
+- Route entries collected: 1
+- Route observations: none
+
+Generic Reachability Checks
+- github.com:443 [public-baseline]: ok, 24.3 ms, via 140.82.112.3
+- 10.0.0.10:443 [private-service]: failed (timeout)
+
+DNS Resolution
+- Resolvers: 10.8.0.2
+- github.com: ok (140.82.112.3)
+
+Configured Service Checks
+- public-baseline -> github.com:443: ok, 26.0 ms
+- private-service -> 10.0.0.10:443: failed (timeout)
+
+Probable Fault Domain
+- vpn
+- Justification: The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.

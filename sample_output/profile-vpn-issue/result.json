@@ -1,0 +1,561 @@
+{
+  "schema_version": "1.1.0",
+  "metadata": {
+    "project_name": "occams-beard",
+    "version": "0.1.0",
+    "generated_at": "2026-04-01T00:12:00+00:00",
+    "elapsed_ms": 188,
+    "selected_checks": [
+      "network",
+      "routing",
+      "dns",
+      "connectivity",
+      "vpn",
+      "services"
+    ],
+    "profile_id": "vpn-issue",
+    "profile_name": "VPN Issue",
+    "issue_category": "VPN issue"
+  },
+  "platform": {
+    "system": "Windows",
+    "release": "11",
+    "version": "demo-build",
+    "machine": "AMD64",
+    "python_version": "3.13.4"
+  },
+  "facts": {
+    "host": {
+      "hostname": "remote-windows-laptop",
+      "operating_system": "Windows",
+      "kernel": "10.0.22631",
+      "current_user": "operator",
+      "uptime_seconds": 7200
+    },
+    "resources": {
+      "cpu": {
+        "logical_cpus": 8,
+        "load_average_1m": null,
+        "load_average_5m": null,
+        "load_average_15m": null,
+        "utilization_percent_estimate": 11.4
+      },
+      "memory": {
+        "total_bytes": 17179869184,
+        "available_bytes": 9000000000,
+        "free_bytes": 7300000000,
+        "pressure_level": "normal"
+      },
+      "disks": [],
+      "battery": {
+        "present": true,
+        "charge_percent": 78,
+        "status": "charging",
+        "cycle_count": null,
+        "condition": null,
+        "health_percent": null
+      },
+      "storage_devices": []
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "Wi-Fi",
+          "is_up": true,
+          "mac_address": "00:11:22:33:44:55",
+          "addresses": [
+            {
+              "family": "ipv4",
+              "address": "192.168.10.42",
+              "netmask": "24",
+              "is_loopback": false
+            }
+          ],
+          "mtu": 1500,
+          "type_hint": "wireless"
+        },
+        {
+          "name": "utun2",
+          "is_up": true,
+          "mac_address": null,
+          "addresses": [
+            {
+              "family": "ipv4",
+              "address": "10.8.0.14",
+              "netmask": "24",
+              "is_loopback": false
+            }
+          ],
+          "mtu": 1380,
+          "type_hint": "tunnel"
+        }
+      ],
+      "local_addresses": [
+        "192.168.10.42",
+        "10.8.0.14"
+      ],
+      "active_interfaces": [
+        "Wi-Fi",
+        "utun2"
+      ],
+      "arp_neighbors": [],
+      "route_summary": {
+        "default_gateway": "10.8.0.1",
+        "default_interface": "utun2",
+        "has_default_route": true,
+        "routes": [
+          {
+            "destination": "default",
+            "gateway": "10.8.0.1",
+            "interface": "utun2",
+            "metric": 25,
+            "note": null
+          }
+        ],
+        "default_route_state": "present",
+        "observations": []
+      }
+    },
+    "dns": {
+      "resolvers": [
+        "10.8.0.2"
+      ],
+      "checks": [
+        {
+          "hostname": "github.com",
+          "success": true,
+          "resolved_addresses": [
+            "140.82.112.3"
+          ],
+          "error": null,
+          "duration_ms": 11
+        }
+      ]
+    },
+    "connectivity": {
+      "internet_reachable": true,
+      "tcp_checks": [
+        {
+          "target": {
+            "host": "github.com",
+            "port": 443,
+            "label": "public-baseline"
+          },
+          "success": true,
+          "latency_ms": 24.3,
+          "error": null,
+          "ip_used": "140.82.112.3",
+          "duration_ms": 24
+        },
+        {
+          "target": {
+            "host": "10.0.0.10",
+            "port": 443,
+            "label": "private-service"
+          },
+          "success": false,
+          "latency_ms": null,
+          "error": "timeout",
+          "ip_used": null,
+          "duration_ms": 3000
+        }
+      ],
+      "ping_checks": [],
+      "trace_results": []
+    },
+    "vpn": {
+      "signals": [
+        {
+          "interface_name": "utun2",
+          "signal_type": "interface-name-and-address-heuristic",
+          "description": "Tunnel-like interface name detected with a usable address.",
+          "active": true,
+          "confidence": 0.82,
+          "address_count": 1
+        },
+        {
+          "interface_name": "utun2",
+          "signal_type": "default-route-heuristic",
+          "description": "Default route uses an interface that looks like a VPN or tunnel.",
+          "active": true,
+          "confidence": 0.9,
+          "address_count": 1
+        }
+      ]
+    },
+    "services": {
+      "checks": [
+        {
+          "target": {
+            "host": "github.com",
+            "port": 443,
+            "label": "public-baseline"
+          },
+          "success": true,
+          "latency_ms": 26.0,
+          "error": null,
+          "duration_ms": 26
+        },
+        {
+          "target": {
+            "host": "10.0.0.10",
+            "port": 443,
+            "label": "private-service"
+          },
+          "success": false,
+          "latency_ms": null,
+          "error": "timeout",
+          "duration_ms": 3000
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "identifier": "vpn-signal-private-resource-failure",
+      "severity": "medium",
+      "title": "VPN or tunnel appears active while private targets remain unreachable",
+      "summary": "A VPN-like interface is present, but private resource checks still failed.",
+      "evidence": [
+        "VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address).",
+        "VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.90, 1 usable address).",
+        "Default route uses interface utun2.",
+        "Private target 10.0.0.10:443 failed with timeout."
+      ],
+      "probable_cause": "The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.",
+      "fault_domain": "vpn",
+      "confidence": 0.9,
+      "heuristic": true,
+      "plain_language": "A tunnel or VPN signal is present, but private targets are still unreachable.",
+      "evidence_summary": "VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address). VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.90, 1 usable address).",
+      "safe_next_actions": [
+        "Reconnect the VPN client once if that is already part of the documented workflow.",
+        "Keep one public baseline target in the run to separate tunnel issues from wider internet loss."
+      ],
+      "escalation_triggers": [
+        "Escalate if private targets still fail while VPN-like interfaces and routes remain present."
+      ],
+      "uncertainty_notes": [
+        "VPN state is heuristic in this tool; interface and route signals do not prove the remote network path is healthy."
+      ]
+    }
+  ],
+  "probable_fault_domain": "vpn",
+  "warnings": [],
+  "execution": [
+    {
+      "domain": "host",
+      "label": "Host basics",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 4,
+      "summary": "Collected endpoint identity and uptime facts as a baseline domain.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "host-basics",
+          "label": "Collect host basics",
+          "status": "passed",
+          "duration_ms": 4,
+          "target": null,
+          "details": [
+            "Hostname: remote-windows-laptop.",
+            "Kernel: 10.0.22631."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "resources",
+      "label": "Resource snapshot",
+      "status": "not_run",
+      "selected": false,
+      "duration_ms": null,
+      "summary": "This domain was not selected for the run.",
+      "warnings": [],
+      "probes": [],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "storage",
+      "label": "Storage snapshot",
+      "status": "not_run",
+      "selected": false,
+      "duration_ms": null,
+      "summary": "This domain was not selected for the run.",
+      "warnings": [],
+      "probes": [],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "network",
+      "label": "Interface inventory",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 12,
+      "summary": "Collected interface state, local addresses, and neighbor context.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "interface-inventory",
+          "label": "Collect interface inventory",
+          "status": "passed",
+          "duration_ms": 12,
+          "target": null,
+          "details": [
+            "Interfaces collected: 2."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "arp-neighbor-cache",
+          "label": "Collect ARP or neighbor cache",
+          "status": "passed",
+          "duration_ms": 12,
+          "target": null,
+          "details": [
+            "Neighbor entries collected: 0."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "routing",
+      "label": "Routing inventory",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 8,
+      "summary": "Collected route table and default-route interpretation.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "route-inventory",
+          "label": "Collect routing summary",
+          "status": "passed",
+          "duration_ms": 8,
+          "target": null,
+          "details": [
+            "Default route present: yes.",
+            "Default route state: present."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "dns",
+      "label": "DNS checks",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 18,
+      "summary": "Collected resolver configuration and hostname resolution checks.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "resolver-inventory",
+          "label": "Determine configured resolvers",
+          "status": "passed",
+          "duration_ms": 18,
+          "target": null,
+          "details": [
+            "Resolvers: 10.8.0.2."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "dns:github.com",
+          "label": "Resolve github.com",
+          "status": "passed",
+          "duration_ms": 11,
+          "target": "github.com",
+          "details": [
+            "Resolved to 140.82.112.3."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    },
+    {
+      "domain": "connectivity",
+      "label": "Generic connectivity",
+      "status": "partial",
+      "selected": true,
+      "duration_ms": 44,
+      "summary": "Collected generic DNS-independent and TCP path checks.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "tcp:github.com:443",
+          "label": "TCP github.com:443",
+          "status": "passed",
+          "duration_ms": 24,
+          "target": "github.com:443",
+          "details": [
+            "Connected in 24.3 ms."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "tcp:10.0.0.10:443",
+          "label": "TCP 10.0.0.10:443",
+          "status": "failed",
+          "duration_ms": 3000,
+          "target": "10.0.0.10:443",
+          "details": [
+            "TCP connection failed: timeout."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "ping:github.com",
+          "label": "Ping github.com",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "github.com",
+          "details": [
+            "Ping was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "trace:github.com",
+          "label": "Trace github.com",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "github.com",
+          "details": [
+            "Traceroute was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "ping:10.0.0.10",
+          "label": "Ping 10.0.0.10",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "10.0.0.10",
+          "details": [
+            "Ping was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "trace:10.0.0.10",
+          "label": "Trace 10.0.0.10",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": "10.0.0.10",
+          "details": [
+            "Traceroute was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    },
+    {
+      "domain": "vpn",
+      "label": "VPN heuristics",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 2,
+      "summary": "Evaluated tunnel-interface and route heuristics.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "vpn-heuristics",
+          "label": "Evaluate VPN and tunnel signals",
+          "status": "passed",
+          "duration_ms": 2,
+          "target": null,
+          "details": [
+            "VPN signal matched interface utun2 with confidence 0.82.",
+            "VPN signal matched interface utun2 with confidence 0.90."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "services",
+      "label": "Configured services",
+      "status": "partial",
+      "selected": true,
+      "duration_ms": 29,
+      "summary": "Collected TCP checks for intended service targets.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "service:github.com:443",
+          "label": "Service public-baseline:443",
+          "status": "passed",
+          "duration_ms": 26,
+          "target": "github.com:443",
+          "details": [
+            "Connected in 26.0 ms."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        },
+        {
+          "probe_id": "service:10.0.0.10:443",
+          "label": "Service private-service:443",
+          "status": "failed",
+          "duration_ms": 3000,
+          "target": "10.0.0.10:443",
+          "details": [
+            "Service path failed: timeout."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
+        }
+      ],
+      "creates_network_egress": true
+    }
+  ],
+  "guided_experience": {
+    "issue_category": "VPN issue",
+    "profile_id": "vpn-issue",
+    "profile_name": "VPN Issue",
+    "what_we_know": [],
+    "likely_happened": [
+      "Heuristic conclusion: The tunnel may be established, but its routes, security policy, or remote network path may be incomplete."
+    ],
+    "safe_next_steps": [
+      "Reconnect the VPN client once if that is already part of the documented workflow.",
+      "Keep one public baseline target in the run to separate tunnel issues from wider internet loss.",
+      "Confirm the VPN client reports a connected state before rerunning.",
+      "If possible, retry the private target once after reconnecting the VPN client."
+    ],
+    "escalation_guidance": [
+      "Escalate if private targets still fail while VPN-like interfaces and routes remain present.",
+      "Escalate if a tunnel-like interface is present but private service checks still fail.",
+      "Escalate if the VPN path changes the default route unexpectedly or DNS behavior differs from the baseline network."
+    ],
+    "uncertainty_notes": [
+      "VPN state is heuristic in this tool; interface and route signals do not prove the remote network path is healthy.",
+      "Generic connectivity was only partially collected or produced mixed results.",
+      "Configured services was only partially collected or produced mixed results."
+    ]
+  }
+}

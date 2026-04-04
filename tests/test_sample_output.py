@@ -14,6 +14,7 @@ from support import (
     build_default_run_result,
     build_degraded_partial_result,
     build_profile_dns_issue_result,
+    build_profile_vpn_issue_result,
 )
 
 SAMPLE_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "sample_output"
@@ -38,6 +39,12 @@ class SampleOutputTests(unittest.TestCase):
         self._assert_report_and_json(
             sample_dir="degraded-partial",
             result=build_degraded_partial_result(),
+        )
+
+    def test_profile_vpn_issue_sample_matches_current_renderers(self) -> None:
+        self._assert_report_and_json(
+            sample_dir="profile-vpn-issue",
+            result=build_profile_vpn_issue_result(),
         )
 
     def test_support_bundle_sample_matches_current_bundle_contents(self) -> None:
