@@ -79,6 +79,31 @@ class LiveSmokeValidationTests(unittest.TestCase):
         with self.assertRaises(SmokeValidationError):
             validate_live_result(result, platform_name="windows")
 
+    def test_validate_live_result_accepts_windows_ipconfig_dns_fallback(self) -> None:
+        result = _build_live_smoke_result()
+        result.facts.dns.resolvers = ["10.0.0.2"]
+        result.raw_command_capture = [
+            RawCommandCapture(
+                command=["ipconfig", "/all"],
+                returncode=0,
+                stdout="DNS Servers . . . . . . . . . . . : 10.0.0.2\n",
+                stderr="",
+                duration_ms=4,
+            ),
+            RawCommandCapture(
+                command=["route", "print"],
+                returncode=0,
+                stdout="0.0.0.0          0.0.0.0       10.0.0.1    10.0.0.50     25\n",
+                stderr="",
+                duration_ms=5,
+            ),
+        ]
+
+        summary = validate_live_result(result, platform_name="windows")
+
+        self.assertEqual(summary["platform"], "windows")
+        self.assertEqual(summary["resolver_count"], 1)
+
     def test_validate_live_result_allows_explicit_macos_no_dns_configuration(self) -> None:
         result = _build_live_smoke_result()
         result.facts.dns.resolvers = []

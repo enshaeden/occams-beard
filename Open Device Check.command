@@ -4,10 +4,8 @@ set -euo pipefail
 
 SCRIPT_PATH=${0:A}
 PROJECT_ROOT=${SCRIPT_PATH:h}
-SYSTEM_PYTHON="python3"
-PROJECT_VENV="${PROJECT_ROOT}/.venv"
-PROJECT_PYTHON3="${PROJECT_VENV}/bin/python3"
-PROJECT_PYTHON="${PROJECT_VENV}/bin/python"
+BOOTSTRAP_PYTHON="${PROJECT_ROOT}/.venv/bin/python3"
+ROOT_LAUNCHER="${PROJECT_ROOT}/src/occams_beard/root_launcher.py"
 READY_FILE="${TMPDIR:-/tmp}/occams-beard-ready-${RANDOM}-${RANDOM}.txt"
 BACKGROUND_FLAG="--background-launch"
 SHOW_TERMINAL_FLAG="--show-terminal"
@@ -17,28 +15,12 @@ BACKGROUND_LAUNCH=0
 SHOW_TERMINAL=0
 FORWARD_ARGS=()
 
-resolve_python_bin() {
-  if [[ -x "${PROJECT_PYTHON3}" ]]; then
-    echo "${PROJECT_PYTHON3}"
-  elif [[ -x "${PROJECT_PYTHON}" ]]; then
-    echo "${PROJECT_PYTHON}"
+resolve_bootstrap_python() {
+  if [[ -x "${BOOTSTRAP_PYTHON}" ]]; then
+    echo "${BOOTSTRAP_PYTHON}"
   else
-    echo "${SYSTEM_PYTHON}"
+    echo "python3"
   fi
-}
-
-bootstrap_local_environment() {
-  echo "Preparing local operator environment in ${PROJECT_VENV} ..."
-  "${SYSTEM_PYTHON}" -m venv "${PROJECT_VENV}"
-  "${PROJECT_PYTHON3}" -m pip install --upgrade pip
-  "${PROJECT_PYTHON3}" -m pip install -e "${PROJECT_ROOT}"
-}
-
-launcher_import_ready() {
-  local python_bin="$1"
-  PYTHONPATH="${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${python_bin}" -c "from occams_beard.launcher import _load_web_dependencies; _load_web_dependencies()" \
-    >/dev/null 2>&1
 }
 
 hide_terminal_window() {
@@ -87,17 +69,12 @@ fi
 
 trap cleanup EXIT INT TERM
 
-PYTHON_BIN="$(resolve_python_bin)"
-
-if ! launcher_import_ready "${PYTHON_BIN}"; then
-  bootstrap_local_environment
-  PYTHON_BIN="$(resolve_python_bin)"
-fi
-
-export PYTHONPATH="${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
+PYTHON_BIN="$(resolve_bootstrap_python)"
 
 cd "${PROJECT_ROOT}"
-"${PYTHON_BIN}" -m occams_beard.launcher \
+"${PYTHON_BIN}" "${ROOT_LAUNCHER}" \
+  --project-root "${PROJECT_ROOT}" \
+  -- \
   --no-browser \
   --shutdown-on-browser-close \
   --ready-file "${READY_FILE}" \

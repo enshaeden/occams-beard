@@ -68,6 +68,14 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+Windows setup:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+```
+
 Run the default suite:
 
 ```bash
@@ -126,6 +134,13 @@ On macOS, you can also double-click
 [`Open Device Check.command`](<Open Device Check.command>)
 from the repo root. It starts the local interface without leaving a Terminal
 window on screen and stops the local server after the browser page is closed.
+
+On Windows, use
+[`Open Device Check.cmd`](<Open Device Check.cmd>)
+from the repo root. The root `.command` and `.cmd` files now delegate to the
+same shared Python bootstrap so the environment bootstrap and operator launch
+behavior stay aligned across platforms, while the macOS wrapper retains its
+Terminal-hiding behavior.
 
 ## Web flow
 
@@ -227,6 +242,6 @@ CI blocks on documentation structure, unit tests, `ruff`, `mypy`, and bounded li
 - no persistent history beyond local session state in the web UI
 - no multi-user or fleet-management model
 - raw command capture remains opt-in because it can contain sensitive local data
-- battery and storage-device health facts are opportunistic and stay read-only; some endpoints will expose little or no health detail without elevation
+- battery and storage-device health facts are opportunistic and stay read-only; Windows now uses unprivileged host APIs for uptime, memory, DNS fallback, and battery presence/charge, but some endpoints will still expose limited battery-health detail without elevation
 - optional local profile overrides can be skipped when malformed; built-in profiles remain strict
 - committed sample artifacts under [`sample_output/`](sample_output/) are deterministic review fixtures, not live captures from a production endpoint

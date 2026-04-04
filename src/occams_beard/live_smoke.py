@@ -226,10 +226,10 @@ def _capture_succeeded(capture: RawCommandCapture) -> bool:
 
 
 def _is_successful_windows_dns_capture(capture: RawCommandCapture) -> bool:
-    if not _matches_prefix(capture, ["powershell", "-NoProfile", "-Command"]):
-        return False
-    command_text = capture.command[-1] if capture.command else ""
-    return "Get-DnsClientServerAddress" in command_text and _capture_succeeded(capture)
+    if _matches_prefix(capture, ["powershell", "-NoProfile", "-Command"]):
+        command_text = capture.command[-1] if capture.command else ""
+        return "Get-DnsClientServerAddress" in command_text and _capture_succeeded(capture)
+    return _matches_prefix(capture, ["ipconfig", "/all"]) and _capture_succeeded(capture)
 
 
 def _is_known_scutil_no_dns_capture(capture: RawCommandCapture) -> bool:

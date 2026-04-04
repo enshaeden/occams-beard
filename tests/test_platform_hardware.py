@@ -97,6 +97,50 @@ class MacosHardwareHelperTests(unittest.TestCase):
 class WindowsHardwareHelperTests(unittest.TestCase):
     """Validate Windows hardware-health parsing."""
 
+    def test_read_uptime_seconds_uses_kernel_tick_counter(self) -> None:
+        with patch("occams_beard.platform.windows.ctypes.windll", create=True) as mock_windll:
+            mock_windll.kernel32.GetTickCount64.return_value = 12_345_000
+
+            uptime_seconds = windows.read_uptime_seconds()
+
+        self.assertEqual(uptime_seconds, 12_345)
+
+    def test_read_memory_snapshot_uses_global_memory_status(self) -> None:
+        with patch("occams_beard.platform.windows.ctypes.windll", create=True) as mock_windll:
+            def populate_memory_status(pointer) -> int:
+                status = pointer._obj
+                status.ullTotalPhys = 32 * 1024**3
+                status.ullAvailPhys = 20 * 1024**3
+                return 1
+
+            mock_windll.kernel32.GlobalMemoryStatusEx.side_effect = populate_memory_status
+
+            snapshot = windows.read_memory_snapshot()
+
+        self.assertEqual(
+            snapshot,
+            {
+                "total_bytes": 32 * 1024**3,
+                "available_bytes": 20 * 1024**3,
+                "free_bytes": 20 * 1024**3,
+            },
+        )
+
+    def test_read_battery_snapshot_uses_power_status_and_detects_no_battery(self) -> None:
+        with patch("occams_beard.platform.windows.ctypes.windll", create=True) as mock_windll:
+            def populate_power_status(pointer) -> int:
+                status = pointer._obj
+                status.ACLineStatus = 1
+                status.BatteryFlag = 128
+                status.BatteryLifePercent = 255
+                return 1
+
+            mock_windll.kernel32.GetSystemPowerStatus.side_effect = populate_power_status
+
+            snapshot = windows.read_battery_snapshot()
+
+        self.assertEqual(snapshot, {"present": False})
+
     @patch("occams_beard.platform.windows.run_command")
     def test_read_storage_device_health_parses_json_list(self, mock_run_command) -> None:
         mock_run_command.return_value = CommandResult(
@@ -132,6 +176,40 @@ class WindowsHardwareHelperTests(unittest.TestCase):
                 }
             ],
         )
+
+    @patch("occams_beard.platform.windows.run_command")
+    def test_read_resolvers_falls_back_to_ipconfig_when_powershell_is_denied(
+        self, mock_run_command
+    ) -> None:
+        mock_run_command.side_effect = [
+            CommandResult(
+                args=(
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "Get-DnsClientServerAddress | Select-Object -ExpandProperty ServerAddresses",
+                ),
+                returncode=1,
+                stdout="",
+                stderr="Access denied",
+                duration_ms=10,
+            ),
+            CommandResult(
+                args=("ipconfig", "/all"),
+                returncode=0,
+                stdout=(
+                    "Ethernet adapter Ethernet:\n\n"
+                    "   DNS Servers . . . . . . . . . . . : 10.0.0.2\n"
+                    "                                       1.1.1.1\n"
+                ),
+                stderr="",
+                duration_ms=12,
+            ),
+        ]
+
+        resolvers = windows.read_resolvers()
+
+        self.assertEqual(resolvers, ["10.0.0.2", "1.1.1.1"])
 
 
 if __name__ == "__main__":

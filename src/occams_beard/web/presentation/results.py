@@ -276,6 +276,10 @@ def build_results_view(
         "mode_badge": mode_option["badge"],
         "status_tone": rollup_tone,
         "status_label": rollup_label,
+        "run_reference": {
+            "generated_at": result.metadata.generated_at,
+            "version": result.metadata.version,
+        },
         "headline": _headline_for_result(
             mode=mode,
             tone=rollup_tone,

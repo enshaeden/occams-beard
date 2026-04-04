@@ -96,7 +96,7 @@ def collect_resource_state(
                     message="Load average is unavailable on this endpoint.",
                 )
             )
-    else:
+    elif current_platform() != "windows":
         warnings.append(
             DiagnosticWarning(
                 domain="resources",

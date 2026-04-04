@@ -5,6 +5,7 @@
 ### Added
 
 - Schema-versioned result output with execution-status records.
+- Shared Python bootstrap for the repo-root operator launcher plus a Windows `Open Device Check.cmd` shim, so the local operator UI can be launched from the repo root on both macOS and Windows.
 - Narrow hardware-health facts under the existing `resources` and `storage` domains, starting with read-only battery state and storage-device health where the OS exposes it without elevation.
 - Local profile/scenario support for common troubleshooting issue types.
 - Support-bundle export with manifest, redaction report, and optional raw command capture.
@@ -23,6 +24,7 @@
 
 ### Changed
 
+- Windows host/resource collection now avoids privileged CIM for uptime, memory, and basic battery facts, suppresses the non-actionable `load-average-unsupported` warning on Windows, and falls back to `ipconfig /all` when PowerShell DNS enumeration is denied.
 - The local web interface is now split into focused `web/` modules for route composition, form parsing, session orchestration, progress shaping, and result presentation so the shared runner remains the architectural center.
 - The deterministic explanation layer now lives under `explanations.py`, with `assistant.py` retained only as a compatibility facade.
 - Core documentation, UI copy, and architecture notes now define Occam's Beard explicitly as a local-first troubleshooting assistant with deterministic diagnostics and support-ready export, with stronger non-goals around fleet, management, and generalized assistant behavior.

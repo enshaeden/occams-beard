@@ -53,6 +53,8 @@ class WebPresenterTests(unittest.TestCase):
         self.assertEqual(view["technical_sections"][0]["passed_count"], 2)
         self.assertEqual(view["technical_sections"][0]["notable_items"], [])
         self.assertEqual(view["continue_with_support_url"], "/support")
+        self.assertEqual(view["run_reference"]["generated_at"], result.metadata.generated_at)
+        self.assertEqual(view["run_reference"]["version"], result.metadata.version)
         self.assertTrue(view["primary_next_step"])
         self.assertNotIn(view["top_takeaway"], view["what_we_know"])
 

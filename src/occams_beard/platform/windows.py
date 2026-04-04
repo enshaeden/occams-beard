@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import ctypes
 import json
-from datetime import UTC, datetime
+from ctypes import wintypes
 
 from occams_beard.utils.parsing import (
     ParsedInterface,
@@ -12,10 +13,40 @@ from occams_beard.utils.parsing import (
     empty_route_data,
     parse_arp_table,
     parse_ipconfig,
+    parse_windows_ipconfig_dns_servers,
     parse_powershell_dns_server_list,
     parse_route_print,
 )
 from occams_beard.utils.subprocess import CommandResult, run_command
+
+
+class MEMORYSTATUSEX(ctypes.Structure):
+    """Windows memory snapshot structure for `GlobalMemoryStatusEx`."""
+
+    _fields_ = [
+        ("dwLength", wintypes.DWORD),
+        ("dwMemoryLoad", wintypes.DWORD),
+        ("ullTotalPhys", ctypes.c_ulonglong),
+        ("ullAvailPhys", ctypes.c_ulonglong),
+        ("ullTotalPageFile", ctypes.c_ulonglong),
+        ("ullAvailPageFile", ctypes.c_ulonglong),
+        ("ullTotalVirtual", ctypes.c_ulonglong),
+        ("ullAvailVirtual", ctypes.c_ulonglong),
+        ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+    ]
+
+
+class SYSTEM_POWER_STATUS(ctypes.Structure):
+    """Windows power snapshot structure for `GetSystemPowerStatus`."""
+
+    _fields_ = [
+        ("ACLineStatus", wintypes.BYTE),
+        ("BatteryFlag", wintypes.BYTE),
+        ("BatteryLifePercent", wintypes.BYTE),
+        ("SystemStatusFlag", wintypes.BYTE),
+        ("BatteryLifeTime", wintypes.DWORD),
+        ("BatteryFullLifeTime", wintypes.DWORD),
+    ]
 
 
 def _powershell_json_value(command: str) -> object | None:
@@ -45,40 +76,28 @@ def _powershell_json(command: str) -> dict[str, object] | None:
 
 
 def read_uptime_seconds() -> int | None:
-    """Read system uptime using PowerShell CIM APIs."""
-
-    payload = _powershell_json(
-        "Get-CimInstance Win32_OperatingSystem | Select-Object LastBootUpTime"
-    )
-    if payload is None:
-        return None
-
-    boot_text = payload.get("LastBootUpTime")
-    if not isinstance(boot_text, str):
-        return None
+    """Read system uptime using the unprivileged kernel tick counter."""
 
     try:
-        boot_time = datetime.fromisoformat(boot_text.replace("Z", "+00:00"))
-    except ValueError:
+        return max(0, int(ctypes.windll.kernel32.GetTickCount64() // 1000))
+    except (AttributeError, OSError):
         return None
-
-    return max(0, int((datetime.now(UTC) - boot_time.astimezone(UTC)).total_seconds()))
 
 
 def read_memory_snapshot() -> dict[str, int | None]:
-    """Read memory totals via PowerShell CIM APIs."""
+    """Read memory totals via `GlobalMemoryStatusEx` without elevation."""
 
-    payload = _powershell_json(
-        "Get-CimInstance Win32_OperatingSystem | "
-        "Select-Object TotalVisibleMemorySize,FreePhysicalMemory"
-    )
-    if payload is None:
+    status = MEMORYSTATUSEX()
+    status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+    try:
+        succeeded = bool(ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)))
+    except (AttributeError, OSError):
+        succeeded = False
+    if not succeeded:
         return {"total_bytes": None, "available_bytes": None, "free_bytes": None}
 
-    total_kib = payload.get("TotalVisibleMemorySize")
-    free_kib = payload.get("FreePhysicalMemory")
-    total_bytes = int(total_kib) * 1024 if isinstance(total_kib, (int, float)) else None
-    free_bytes = int(free_kib) * 1024 if isinstance(free_kib, (int, float)) else None
+    total_bytes = int(status.ullTotalPhys)
+    free_bytes = int(status.ullAvailPhys)
     return {
         "total_bytes": total_bytes,
         "available_bytes": free_bytes,
@@ -87,29 +106,27 @@ def read_memory_snapshot() -> dict[str, int | None]:
 
 
 def read_battery_snapshot() -> dict[str, object] | None:
-    """Read battery state through Win32_Battery when available."""
+    """Read battery state through `GetSystemPowerStatus` when available."""
 
-    payload = _powershell_json_value(
-        "Get-CimInstance Win32_Battery | "
-        "Select-Object EstimatedChargeRemaining,BatteryStatus,Status"
-    )
-    records = _as_object_list(payload)
-    if payload is None:
+    status = SYSTEM_POWER_STATUS()
+    try:
+        succeeded = bool(ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)))
+    except (AttributeError, OSError):
+        succeeded = False
+    if not succeeded:
         return None
-    if not records:
+
+    if _battery_flag_has_no_battery(status.BatteryFlag):
         return {"present": False}
 
-    battery = records[0]
     snapshot: dict[str, object] = {"present": True}
-    charge_percent = _coerce_int(battery.get("EstimatedChargeRemaining"))
+    charge_percent = _normalize_battery_percent(status.BatteryLifePercent)
     if charge_percent is not None:
         snapshot["charge_percent"] = charge_percent
 
-    status = _coerce_string(battery.get("Status")) or _map_windows_battery_status(
-        _coerce_int(battery.get("BatteryStatus"))
-    )
-    if status is not None:
-        snapshot["status"] = status
+    battery_status = _map_windows_power_status(status)
+    if battery_status is not None:
+        snapshot["status"] = battery_status
     return snapshot
 
 
@@ -163,7 +180,7 @@ def read_routes() -> tuple[ParsedRouteData, CommandResult]:
 
 
 def read_resolvers() -> list[str]:
-    """Read DNS server information via PowerShell."""
+    """Read DNS server information with a PowerShell-first fallback."""
 
     result = run_command(
         [
@@ -174,10 +191,16 @@ def read_resolvers() -> list[str]:
         ],
         timeout=8.0,
     )
-    if not result.succeeded:
+    if result.succeeded:
+        resolvers = parse_powershell_dns_server_list(result.stdout)
+        if resolvers:
+            return resolvers
+
+    fallback = run_command(["ipconfig", "/all"], timeout=8.0)
+    if not fallback.succeeded:
         return []
 
-    return parse_powershell_dns_server_list(result.stdout)
+    return parse_windows_ipconfig_dns_servers(fallback.stdout)
 
 
 def read_arp_neighbors() -> tuple[list[ParsedNeighbor], CommandResult]:
@@ -223,4 +246,26 @@ def _map_windows_battery_status(status_code: int | None) -> str | None:
         return "Charging"
     if status_code == 11:
         return "Partially charged"
+    return None
+
+
+def _normalize_battery_percent(raw_percent: int) -> int | None:
+    if raw_percent == 255:
+        return None
+    return raw_percent
+
+
+def _battery_flag_has_no_battery(flag: int) -> bool:
+    return bool(flag & 128)
+
+
+def _map_windows_power_status(status: SYSTEM_POWER_STATUS) -> str | None:
+    if status.BatteryFlag & 8:
+        return "Charging"
+    if status.ACLineStatus == 1 and status.BatteryLifePercent == 100:
+        return "Fully charged"
+    if status.ACLineStatus == 1:
+        return "On AC power"
+    if status.ACLineStatus == 0:
+        return "Discharging"
     return None

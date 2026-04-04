@@ -11,6 +11,9 @@
       <div class="stack-sm">
         <h2>{{ view.headline }}</h2>
         <p class="lede">{{ view.top_takeaway }}</p>
+        <p class="field-help">
+          Run generated {{ view.run_reference.generated_at }} · App version {{ view.run_reference.version }} · Run ID {{ record.run_id }}
+        </p>
       </div>
 
       <article class="info-panel answer-next-step stack-sm">

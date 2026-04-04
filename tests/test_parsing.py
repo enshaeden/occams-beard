@@ -21,6 +21,7 @@ from occams_beard.utils.parsing import (
     parse_route_print,
     parse_scutil_dns,
     parse_traceroute_output,
+    parse_windows_ipconfig_dns_servers,
 )
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
@@ -392,6 +393,24 @@ Interface: 10.10.10.50 --- 0x7
         parsed = parse_powershell_dns_server_list(
             _fixture("windows-dns-server-addresses-variants.txt")
         )
+
+        self.assertEqual(parsed, ["10.0.0.2", "fe80::1", "1.1.1.1"])
+
+    def test_parse_windows_ipconfig_dns_servers_handles_continuation_lines(self) -> None:
+        output = """
+Ethernet adapter Ethernet:
+
+   Connection-specific DNS Suffix  . : corp.example
+   DNS Servers . . . . . . . . . . . : 10.0.0.2
+                                       fe80::1
+                                       1.1.1.1
+
+Wireless LAN adapter Wi-Fi:
+
+   Media State . . . . . . . . . . . : Media disconnected
+""".strip()
+
+        parsed = parse_windows_ipconfig_dns_servers(output)
 
         self.assertEqual(parsed, ["10.0.0.2", "fe80::1", "1.1.1.1"])
 

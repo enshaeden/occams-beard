@@ -7,6 +7,7 @@ src/occams_beard/bundle_validator.py
 src/occams_beard/cli.py
 src/occams_beard/defaults.py
 src/occams_beard/execution.py
+src/occams_beard/explanations.py
 src/occams_beard/findings.py
 src/occams_beard/launcher.py
 src/occams_beard/live_smoke.py
@@ -15,6 +16,7 @@ src/occams_beard/models.py
 src/occams_beard/privacy.py
 src/occams_beard/profile_catalog.py
 src/occams_beard/report.py
+src/occams_beard/root_launcher.py
 src/occams_beard/runner.py
 src/occams_beard/schema.py
 src/occams_beard/serializers.py
@@ -50,6 +52,8 @@ src/occams_beard/profiles/no-internet.toml
 src/occams_beard/profiles/vpn-issue.toml
 src/occams_beard/static/app.js
 src/occams_beard/static/style.css
+src/occams_beard/templates/_self_serve_plan.html
+src/occams_beard/templates/_support_bundle_form.html
 src/occams_beard/templates/index.html
 src/occams_beard/templates/layout.html
 src/occams_beard/templates/results.html
@@ -60,6 +64,16 @@ src/occams_beard/utils/resolution.py
 src/occams_beard/utils/subprocess.py
 src/occams_beard/utils/time.py
 src/occams_beard/utils/validation.py
+src/occams_beard/web/__init__.py
+src/occams_beard/web/filters.py
+src/occams_beard/web/forms.py
+src/occams_beard/web/progress.py
+src/occams_beard/web/routes.py
+src/occams_beard/web/sessions.py
+src/occams_beard/web/presentation/__init__.py
+src/occams_beard/web/presentation/catalog.py
+src/occams_beard/web/presentation/plans.py
+src/occams_beard/web/presentation/results.py
 tests/test_app.py
 tests/test_assistant.py
 tests/test_browser_ui.py
@@ -73,12 +87,15 @@ tests/test_live_smoke.py
 tests/test_network_collection.py
 tests/test_parsing.py
 tests/test_platform_hardware.py
+tests/test_platform_network.py
 tests/test_profiles.py
 tests/test_report_output.py
+tests/test_root_launcher.py
 tests/test_routing_collection.py
 tests/test_runner.py
 tests/test_sample_output.py
 tests/test_serializers.py
+tests/test_service_collection.py
 tests/test_storage_collection.py
 tests/test_support_bundle.py
 tests/test_system_collection.py

@@ -6,6 +6,7 @@
 - Missing commands degrade into warnings or `unsupported` execution status instead of silent skips.
 - Optional ping and traceroute remain best-effort.
 - Raw command capture is opt-in and local only.
+- Repo-root operator launch now uses platform-specific root shims that delegate to one shared Python bootstrap module; macOS keeps `Open Device Check.command`, and Windows uses `Open Device Check.cmd`.
 
 ## Primary Sources
 
@@ -34,13 +35,15 @@ macOS:
 
 Windows:
 
-- PowerShell CIM queries
-- `Get-CimInstance Win32_Battery`
+- `GetTickCount64`
+- `GlobalMemoryStatusEx`
+- `GetSystemPowerStatus`
+- PowerShell DNS server enumeration with `ipconfig /all` fallback
 - `Get-PhysicalDisk`
 - `ipconfig /all`
 - `route print`
 - `arp -a`
-- PowerShell DNS server enumeration
+- PowerShell CIM queries for optional storage health only
 
 ## Live Smoke Validation
 
@@ -52,10 +55,12 @@ Windows:
 ## Current Limits
 
 - command output still varies by platform and OS version
+- Windows cannot execute the macOS `.command` file type directly, so true cross-platform root launch requires a Windows-specific sibling shim even though launch orchestration is shared underneath
 - VPN detection remains heuristic
 - Linux battery health is limited to what sysfs exposes, and non-privileged Linux storage-device health is still effectively unavailable in the current model
 - macOS storage-device health depends on `diskutil` exposing usable device and SMART state on the current host
-- Windows battery collection currently captures battery presence, charge, and coarse state, but not design-capacity health
+- Windows battery collection currently captures battery presence, charge, and coarse state without elevation, but it still does not expose design-capacity health in the current model
+- Some enterprise Windows environments deny CIM access to standard users; host uptime, memory, resolver inventory, and basic battery state therefore avoid CIM and fall back to native APIs or unprivileged command output
 - traceroute parsing remains conservative
 - fixture coverage now includes representative split-tunnel, blackhole/default-route, resolver, VPN-adapter, malformed-route, legacy-netstat, and additional traceroute variants across Linux, macOS, and Windows, but it still does not cover every OS/version-localization combination
 - live smoke validation now checks real command output on GitHub-hosted Ubuntu, macOS, and Windows images, but it does not yet represent every enterprise image, self-hosted runner baseline, or non-English locale

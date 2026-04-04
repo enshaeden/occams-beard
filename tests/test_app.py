@@ -194,6 +194,8 @@ class AppTests(unittest.TestCase):
         self.assertIn("Continue With Support", results_text)
         self.assertIn("What we know", results_text)
         self.assertIn("Download Support Bundle", results_text)
+        self.assertIn("Run ID", results_text)
+        self.assertIn("App version", results_text)
         self.assertIn(
             "The next best step is to continue with support so they can review a deeper guided plan.",
             results_text,

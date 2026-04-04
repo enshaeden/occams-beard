@@ -696,6 +696,44 @@ def parse_powershell_dns_server_list(output: str) -> list[str]:
     return _dedupe_strings(resolvers)
 
 
+def parse_windows_ipconfig_dns_servers(output: str) -> list[str]:
+    """Parse `ipconfig /all` output into a resolver list."""
+
+    resolvers: list[str] = []
+    collecting_dns_servers = False
+
+    for raw_line in output.splitlines():
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if not stripped:
+            collecting_dns_servers = False
+            continue
+
+        if re.match(r"^[^\s].*:$", line):
+            collecting_dns_servers = False
+            continue
+
+        if collecting_dns_servers and raw_line[:1].isspace() and _looks_like_ip_address(stripped):
+            resolvers.append(_strip_windows_address_annotations(stripped))
+            continue
+
+        if ":" in stripped:
+            field, _, value = stripped.partition(":")
+            normalized_field = _normalize_windows_label(field)
+            collecting_dns_servers = normalized_field == "dnsservers"
+            if collecting_dns_servers and value.strip():
+                resolvers.append(_strip_windows_address_annotations(value.strip()))
+            continue
+
+        if collecting_dns_servers and raw_line[:1].isspace():
+            resolvers.append(_strip_windows_address_annotations(stripped))
+            continue
+
+        collecting_dns_servers = False
+
+    return _dedupe_strings(resolvers)
+
+
 def _extract_metric(line: str) -> int | None:
     metric_match = re.search(r"\bmetric\s+(\d+)", line)
     return int(metric_match.group(1)) if metric_match else None
@@ -809,3 +847,9 @@ def _extract_trace_host(remainder: str, address: str | None) -> str | None:
     ):
         return None
     return candidate.split()[0]
+
+
+def _looks_like_ip_address(value: str) -> bool:
+    if re.fullmatch(r"(?:\d{1,3}\.){3}\d{1,3}", value):
+        return True
+    return bool(re.fullmatch(r"[0-9A-Fa-f:]+(?:%\S+)?", value)) and ":" in value

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 from occams_beard.launcher import (
@@ -18,6 +17,8 @@ from occams_beard.launcher import (
     launch_operator_interface,
     main,
 )
+
+TEST_TEMP_ROOT = Path(__file__).resolve().parent / ".tmp"
 
 
 class LauncherTests(unittest.TestCase):
@@ -65,12 +66,15 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(_build_browser_url("0.0.0.0", 5000), "http://127.0.0.1:5000")
 
     def test_write_ready_file_persists_exact_url(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            ready_path = Path(temp_dir) / "ready.txt"
+        TEST_TEMP_ROOT.mkdir(exist_ok=True)
+        ready_path = TEST_TEMP_ROOT / "ready-file-test.txt"
+        if ready_path.exists():
+            ready_path.unlink()
+        self.addCleanup(lambda: ready_path.unlink(missing_ok=True))
 
-            _write_ready_file(str(ready_path), "http://127.0.0.1:5010")
+        _write_ready_file(str(ready_path), "http://127.0.0.1:5010")
 
-            self.assertEqual(ready_path.read_text(encoding="utf-8"), "http://127.0.0.1:5010\n")
+        self.assertEqual(ready_path.read_text(encoding="utf-8"), "http://127.0.0.1:5010\n")
 
     @patch("occams_beard.launcher.launch_operator_interface", return_value=0)
     def test_main_delegates_to_launch_operator_interface(
@@ -171,18 +175,19 @@ class LauncherTests(unittest.TestCase):
             MagicMock(return_value=server),
         )
 
-        with TemporaryDirectory() as temp_dir:
-            ready_path = Path(temp_dir) / "ready.txt"
-            with patch("occams_beard.launcher.threading.Thread") as mock_thread_class:
-                thread = MagicMock()
-                thread.is_alive.side_effect = [False]
-                mock_thread_class.return_value = thread
+        TEST_TEMP_ROOT.mkdir(exist_ok=True)
+        ready_path = TEST_TEMP_ROOT / "launch-ready-file-test.txt"
+        if ready_path.exists():
+            ready_path.unlink()
+        self.addCleanup(lambda: ready_path.unlink(missing_ok=True))
+        with patch("occams_beard.launcher.threading.Thread") as mock_thread_class:
+            thread = MagicMock()
+            thread.is_alive.side_effect = [False]
+            mock_thread_class.return_value = thread
 
-                result = launch_operator_interface(
-                    OperatorLauncherConfig(ready_file=str(ready_path))
-                )
+            result = launch_operator_interface(OperatorLauncherConfig(ready_file=str(ready_path)))
 
-            ready_text = ready_path.read_text(encoding="utf-8")
+        ready_text = ready_path.read_text(encoding="utf-8")
 
         self.assertEqual(result, 0)
         self.assertEqual(ready_text, "http://127.0.0.1:5012\n")
