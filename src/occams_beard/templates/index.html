@@ -17,7 +17,7 @@
             href="{{ url_for('index', mode=option.id) }}"
             data-mode-link="{{ option.id }}"
           >
-            {{ "Customise tests" if form_state.mode != option.id else "You're Here" }}
+            {{ "Customise tests" if form_state.mode != option.id else "Selected mode" }}
           </a>
         </article>
       {% endfor %}
@@ -62,12 +62,12 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Step 1</p>
-              <h2>Choose the symptom that feels closest.</h2>
+              <h2>Choose the symptom that best decribes your issue.</h2>
             </div>
             <a class="ghost-button" href="{{ url_for('index') }}">Choose a Different Path</a>
           </div>
           <p class="muted">
-            Pick the closest symptom to the issue you are experiencing to load a pre-defined test plan.
+            Selecting a symptom loads a recommended troubleshooting plan.
           </p>
           <div class="choice-grid" role="radiogroup" aria-label="Symptoms">
             {% for symptom in symptom_options %}
@@ -234,7 +234,7 @@
             {% endif %}
             <div class="stack-xs">
               <label class="field-label" for="profile">Support plan</label>
-              <p class="field-help">Choose the local plan your technician asked you to follow.</p>
+              <p class="field-help">Choose the troubleshooting plan your technician asked you to follow.</p>
               <select id="profile" name="profile">
                 {% for profile in profiles %}
                   <option value="{{ profile.profile_id }}" {% if form_state.profile_id == profile.profile_id %}selected{% endif %}>
