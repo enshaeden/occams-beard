@@ -32,6 +32,36 @@ CLI / Web / Launcher / Support Bundle Export
 - `web/` keeps route composition, form parsing, run-session orchestration, progress shaping, and result presentation above the shared result model.
 - `intake/` centralizes intent-driven translation from user-selected symptom language into deterministic profile defaults and support-path suggestions.
 
+
+## Intake Resolver Layer (Phase 1)
+
+The intake package now includes a standalone deterministic resolver in
+`src/occams_beard/intake/resolver.py`.
+
+Resolver contract output:
+
+- `primary_intent`: internal intent key or `None` when unresolved
+- `confidence_score`: bounded deterministic score from `0.0` to `1.0`
+- `alternative_intents`: ranked alternatives for ambiguity handling
+- `trace`: rule and candidate metadata for debugging and automated tests
+
+Current deterministic rule order:
+
+1. Exact symptom-id match from the canonical contract (`1.0` confidence).
+2. Exact phrase match from symptom labels/phrases and intent phrases.
+3. Token-overlap phrase matching for free-text input.
+4. Unknown fallback with unresolved intent and `0.0` confidence.
+
+Extension rules:
+
+- Keep all resolver behavior deterministic and explainable.
+- Add or adjust phrases in `intake/catalog.py` first; avoid duplicating mapping
+  logic in `web/forms.py` or presentation modules.
+- Prefer adding explicit phrase rules and tests over speculative NLP/statistical
+  scoring.
+- Preserve stable trace metadata keys so downstream clarification and mapping
+  phases can rely on resolver outputs.
+
 ## Execution Model
 
 The shared runner is now intentionally small. It coordinates four responsibilities
