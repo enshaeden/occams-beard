@@ -79,3 +79,19 @@ dependencies such as routing facts feeding VPN heuristics.
 - support artifacts remain local and explicit
 - registered domains are composable, but the registry is still local code, not a remote or dynamic plug-in system
 - no automatic remediation is introduced
+
+## Intake Contract Direction (Phase 0)
+
+A new canonical intake package now defines symptom-to-intent mapping independently from
+web presentation metadata: `src/occams_beard/intake/`.
+
+The intake contract is now the source of truth for:
+
+- constrained internal intent taxonomy (7 intents)
+- user-facing symptom entry keys and representative phrases
+- clarification questions used for intent refinement
+- refined answer pathways
+- downstream domain/check mappings and profile fallback presets
+
+This is intentionally additive in Phase 0. Runtime orchestration and web form wiring stay
+unchanged until later phases consume the intake contract directly.

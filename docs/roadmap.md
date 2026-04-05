@@ -58,3 +58,11 @@ The operating model remains:
 - dashboards
 - mandatory cloud services
 - automatic remediation
+
+## Intake Modernization (In Progress)
+
+- Introduce a canonical intent-driven intake contract in `src/occams_beard/intake/` as the
+  top-level intake control plane.
+- Preserve current runtime execution behavior while contract adoption proceeds in phases.
+- Transition from profile-first intake to intent-first intake, with profiles retained as
+  fallback execution presets for compatibility and operator workflows.
