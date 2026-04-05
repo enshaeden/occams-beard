@@ -26,6 +26,14 @@ This workflow exists to support only four product flows:
 3. produce support-ready handoff artifacts
 4. help a user or operator choose safe next steps
 
+## Intake Clarification Expectations
+
+Intake clarification is now modeled as a deterministic pre-execution step in the intake package (independent of Flask routes).
+
+- Support-facing handoff should expect up to two clarification answers per resolved intent before execution scope is finalized.
+- Clarification may resolve early to a pathway/domain focus, or fall back to a default pathway when answers remain uninformative.
+- This phase only defines the engine and context model; web route flow remains the existing one-step submit model until later wiring phases.
+
 ## Bundle Contents
 
 - `result.json`: schema-versioned machine-readable result.

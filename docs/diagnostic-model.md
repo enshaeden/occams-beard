@@ -62,6 +62,34 @@ Extension rules:
 - Preserve stable trace metadata keys so downstream clarification and mapping
   phases can rely on resolver outputs.
 
+## Clarification Engine Layer (Phase 2)
+
+A standalone clarification engine now lives in `src/occams_beard/intake/clarification.py` with typed refinement models in `src/occams_beard/intake/clarification_models.py`.
+
+Clarification contract output:
+
+- `questions`: minimal per-intent prompt set (capped at 1-2 prompts)
+- `context`: deterministic decision state with:
+  - active intent
+  - answered and remaining clarification keys
+  - candidate pathways
+  - selected pathway (when resolved)
+  - downstream domain hints and profile fallback
+  - machine-readable status and reason codes
+
+Refinement behavior:
+
+1. Build initial question set directly from the canonical intake contract.
+2. Validate answer options against the selected question contract.
+3. Deterministically score pathway candidates from answer/pathway token overlap.
+4. Resolve to a pathway when possible, or remain unresolved until fallback is required.
+
+Design constraints for this phase:
+
+- Clarification logic remains Flask-independent and route-agnostic.
+- `web/forms.py` can consume clarification context later without rewriting current one-step submit flow yet.
+- No branching questionnaire tree is introduced beyond the contract-owned 1-2 clarification prompts per intent.
+
 ## Execution Model
 
 The shared runner is now intentionally small. It coordinates four responsibilities
