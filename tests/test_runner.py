@@ -53,7 +53,9 @@ class RunnerTests(unittest.TestCase):
             [("1.1.1.1", 53), ("8.8.8.8", 53)],
         )
 
-    def test_build_run_options_preserves_intake_context_when_supplied(self) -> None:
+    def test_build_run_options_records_validation_trace_when_intake_context_is_supplied(
+        self,
+    ) -> None:
         intake_context = IntakeContext(
             selected_symptom_key="apps-sites-not-loading",
             selected_symptom_label="Apps or sites not loading",
@@ -65,7 +67,13 @@ class RunnerTests(unittest.TestCase):
         options = build_run_options(intake_context=intake_context)
 
         self.assertIsNotNone(options.intake_context)
-        self.assertEqual(options.intake_context, intake_context)
+        assert options.intake_context is not None
+        self.assertEqual(
+            options.intake_context.selected_symptom_key,
+            intake_context.selected_symptom_key,
+        )
+        self.assertIn("validation_adjustments", options.intake_context.trace_metadata)
+        self.assertIn("decision", options.intake_context.trace_metadata["validation_adjustments"])
 
     def test_run_diagnostics_returns_result_and_skips_unselected_collectors(self) -> None:
         options = DiagnosticsRunOptions(

@@ -41,6 +41,7 @@ class Metadata:
     profile_id: str | None = None
     profile_name: str | None = None
     issue_category: str | None = None
+    intake_debug: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)

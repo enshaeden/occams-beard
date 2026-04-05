@@ -26,6 +26,8 @@ class IntakeDomainMapperTests(unittest.TestCase):
             mapping.selected_checks,
             ("network", "routing", "vpn", "services"),
         )
+        self.assertEqual(mapping.selected_domains, ("network", "routing", "vpn", "services"))
+        self.assertEqual(mapping.rationale, "intent_primary_pathway_domains")
         self.assertEqual(mapping.suggested_profile_id, "vpn-issue")
         self.assertIsNone(mapping.fallback_mode)
 
@@ -46,6 +48,8 @@ class IntakeDomainMapperTests(unittest.TestCase):
         )
 
         self.assertEqual(mapping.selected_checks, ("dns", "routing", "connectivity"))
+        self.assertEqual(mapping.selected_domains, ("dns", "routing", "connectivity"))
+        self.assertEqual(mapping.rationale, "clarification_pathway_domains")
         self.assertEqual(mapping.suggested_profile_id, "dns-issue")
 
     def test_unknown_intent_falls_back_to_general_path(self) -> None:
@@ -56,6 +60,7 @@ class IntakeDomainMapperTests(unittest.TestCase):
         self.assertEqual(mapping.selected_checks, tuple(DEFAULT_CHECKS))
         self.assertEqual(mapping.suggested_profile_id, "custom-profile")
         self.assertEqual(mapping.fallback_mode, "general_triage")
+        self.assertEqual(mapping.rationale, "fallback_general_triage_no_intent")
 
     def test_unknown_refined_domains_fall_back_to_custom_profile_mode(self) -> None:
         resolution = resolve_intake_interpretation("internet-not-working")
@@ -81,6 +86,8 @@ class IntakeDomainMapperTests(unittest.TestCase):
         self.assertEqual(mapping.selected_checks, tuple(DEFAULT_CHECKS))
         self.assertEqual(mapping.suggested_profile_id, "custom-profile")
         self.assertEqual(mapping.fallback_mode, "custom_profile")
+        self.assertEqual(mapping.selected_domains, ("not-a-real-domain",))
+        self.assertEqual(mapping.rationale, "fallback_default_checks_unknown_domains")
 
 
 if __name__ == "__main__":

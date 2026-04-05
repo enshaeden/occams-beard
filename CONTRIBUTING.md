@@ -88,3 +88,12 @@ When this scope changes, update [README.md](README.md) and [CONTRIBUTING.md](CON
 - Add tests for new schema, bundle, profile, or UI behavior.
 - If a change affects support artifacts, update the matching canonical docs under `docs/` and the README documentation map.
 - Run `python scripts/check_docs.py` when adding, moving, or deleting markdown files.
+
+## Intake Architecture Guardrails
+
+- Keep self-serve intake logic centralized in `src/occams_beard/intake/` and `src/occams_beard/web/forms.py`.
+- Treat `src/occams_beard/web/presentation/catalog.py` as presentation-only. It must not contain symptom-to-intent, intent-to-domain, or validation policy logic.
+- Keep Flask route handlers in `src/occams_beard/web/routes.py` orchestration-only; do not add intake mapping or fallback policy branching there.
+- Add or adjust symptom wording in the intake contract (`src/occams_beard/intake/catalog.py`) and keep deterministic resolution rules in `src/occams_beard/intake/resolver.py`.
+- Add clarification behavior in `src/occams_beard/intake/clarification.py`, domain mapping behavior in `src/occams_beard/intake/domain_mapper.py`, and safety validation in `src/occams_beard/intake/validator.py`.
+- Add or update regression coverage in `tests/test_app.py`, `tests/test_intake_resolver.py`, `tests/test_intake_domain_mapper.py`, and `tests/test_intake_validator.py` whenever intake behavior changes.

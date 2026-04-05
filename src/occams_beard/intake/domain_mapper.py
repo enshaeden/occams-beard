@@ -64,6 +64,8 @@ class DomainMappingResult:
     selected_checks: tuple[str, ...]
     suggested_profile_id: str | None
     fallback_mode: str | None = None
+    selected_domains: tuple[str, ...] = ()
+    rationale: str = "unspecified"
 
 
 
@@ -81,9 +83,11 @@ def map_intake_to_scope(
             selected_checks=tuple(DEFAULT_CHECKS),
             suggested_profile_id="custom-profile",
             fallback_mode="general_triage",
+            selected_domains=(),
+            rationale="fallback_general_triage_no_intent",
         )
 
-    domains = _domains_from_context_or_intent(
+    domains, rationale = _domains_from_context_or_intent(
         intent_key=intent_key,
         contract=contract,
         context=context,
@@ -94,12 +98,16 @@ def map_intake_to_scope(
             selected_checks=tuple(DEFAULT_CHECKS),
             suggested_profile_id="custom-profile",
             fallback_mode="custom_profile",
+            selected_domains=domains,
+            rationale="fallback_default_checks_unknown_domains",
         )
 
     suggested_profile_id = _suggested_profile_for_context(intent_key, context)
     return DomainMappingResult(
         selected_checks=checks,
         suggested_profile_id=suggested_profile_id,
+        selected_domains=domains,
+        rationale=rationale,
     )
 
 
@@ -108,20 +116,27 @@ def _domains_from_context_or_intent(
     intent_key: str,
     contract: IntakeContract,
     context: DecisionContext | None,
-) -> tuple[str, ...]:
+) -> tuple[tuple[str, ...], str]:
     if context is not None and context.next_domains:
-        return context.next_domains
+        return context.next_domains, "clarification_pathway_domains"
 
     intent = next((item for item in contract.intents if item.key == intent_key), None)
     if intent and intent.pathway_keys:
         pathway = next(
-            (item for item in contract.refined_answer_pathways if item.key == intent.pathway_keys[0]),
+            (
+                item
+                for item in contract.refined_answer_pathways
+                if item.key == intent.pathway_keys[0]
+            ),
             None,
         )
         if pathway is not None:
-            return pathway.next_domains
+            return pathway.next_domains, "intent_primary_pathway_domains"
 
-    return _INTENT_DEFAULT_DOMAINS.get(intent_key, ())
+    default_domains = _INTENT_DEFAULT_DOMAINS.get(intent_key, ())
+    if default_domains:
+        return default_domains, "intent_default_domains"
+    return (), "intent_unknown_domains"
 
 
 
@@ -129,7 +144,8 @@ def _checks_for_domains(domains: tuple[str, ...]) -> tuple[str, ...]:
     checks: list[str] = []
     seen: set[str] = set()
     for domain in domains:
-        for check in _DOMAIN_TO_CHECKS.get(domain, ()):  # unknown domains are intentionally ignored.
+        # Unknown domains are intentionally ignored.
+        for check in _DOMAIN_TO_CHECKS.get(domain, ()):
             if check in seen:
                 continue
             seen.add(check)

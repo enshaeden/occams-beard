@@ -59,6 +59,17 @@ def assemble_endpoint_result(
             profile_id=options.profile.profile_id if options.profile else None,
             profile_name=options.profile.name if options.profile else None,
             issue_category=options.profile.issue_category if options.profile else None,
+            intake_debug=(
+                {
+                    "selected_symptom_key": options.intake_context.selected_symptom_key,
+                    "selected_symptom_label": options.intake_context.selected_symptom_label,
+                    "resolved_intent_key": options.intake_context.resolved_intent_key,
+                    "scope_rationale": options.intake_context.scope_rationale,
+                    **options.intake_context.trace_metadata,
+                }
+                if options.intake_context is not None
+                else None
+            ),
         ),
         platform=PlatformInfo(
             system=python_platform.system(),
