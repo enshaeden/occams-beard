@@ -20,7 +20,7 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">Step 2</p>
-          <h2>Answer one quick question, then review your plan.</h2>
+          <h2>Answer the clarification question and review the planned run.</h2>
         </div>
       </div>
 
@@ -40,49 +40,24 @@
               </label>
             {% endfor %}
           </div>
-          <p class="field-help">This keeps the run focused while staying easy to start.</p>
+          <p class="field-help">Your response narrows the check scope.</p>
         </fieldset>
       {% endif %}
 
-      {% if form_state.clarification and form_state.clarification.answered %}
-        <div class="info-panel stack-sm">
-          <h3>What you already told us</h3>
+      <div class="info-panel stack-sm">
+        <h3>Planned run</h3>
+        <p>The run collects diagnostics on this device and prepares results for review.</p>
+        <p>
+          Planned checks: <strong>{{ form_state.plan_preview.check_areas }}</strong>
+          because {{ form_state.plan_preview.because }}.
+        </p>
+        {% if form_state.clarification and form_state.clarification.answered %}
           <ul class="result-list">
             {% for answer in form_state.clarification.answered %}
               <li><strong>{{ answer.prompt }}</strong> {{ answer.answer_label }}.</li>
             {% endfor %}
           </ul>
-        </div>
-      {% endif %}
-
-      <div class="info-panel stack-sm">
-        <h3>Before we run</h3>
-        <p>
-          We are going to check <strong>{{ form_state.plan_preview.check_areas }}</strong>
-          because {{ form_state.plan_preview.because }}.
-        </p>
-      </div>
-
-      <p class="lede">{{ form_state.selected_profile.description }}</p>
-
-      <div class="info-grid">
-        <article class="info-panel stack-sm">
-          <h3>What we’ll check</h3>
-          <ul class="result-list">
-            {% for item in form_state.plan.collection_items %}
-              <li><strong>{{ item.label }}.</strong> {{ item.description }}</li>
-            {% endfor %}
-          </ul>
-        </article>
-
-        <article class="info-panel stack-sm">
-          <h3>What to expect</h3>
-          <ul class="result-list">
-            <li>Everything stays on this device unless you choose to export it later.</li>
-            <li>{{ form_state.plan.network_activity_summary }}</li>
-            <li>You do not need to change any technical settings to start.</li>
-          </ul>
-        </article>
+        {% endif %}
       </div>
 
       <div class="tag-row" aria-label="Current plan">
@@ -100,7 +75,7 @@
         {% endif %}
 
         <fieldset class="stack-sm form-fieldset">
-          <legend>Select specific tests</legend>
+          <legend>Select check areas</legend>
           <div class="check-grid">
             {% for item in form_state.plan.collection_items %}
               <label class="check-tile">
@@ -171,8 +146,7 @@
 {% else %}
   <article class="card">
     <div class="empty-state">
-      <h3>Choose a symptom to continue</h3>
-      <p>The tool will load a plain-language plan and keep the technical controls out of the way.</p>
+      <h3>Select an issue to load the check plan.</h3>
     </div>
   </article>
 {% endif %}

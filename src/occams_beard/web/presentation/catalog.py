@@ -17,7 +17,7 @@ MODE_OPTIONS = (
         "id": SELF_SERVE_MODE,
         "label": "Check My Device",
         "description": (
-            "Run a quick diagnostic check and gather more information to share with support."
+            "Run a diagnostic check and prepare results for support if needed."
         ),
         "badge": "Self Service",
     },
@@ -25,8 +25,8 @@ MODE_OPTIONS = (
         "id": SUPPORT_MODE,
         "label": "Work With Support",
         "description": (
-            "Use this when IT support asks for deeper testing, a specific "
-            "profile, or a support-ready bundle."
+            "Use this path when support requests deeper testing, a specific "
+            "profile, or a support bundle."
         ),
         "badge": "Advanced mode",
     },
@@ -36,42 +36,27 @@ SYMPTOM_OPTIONS = (
     {
         "id": "internet-not-working",
         "label": "Internet not working",
-        "description": (
-            "Websites and online apps are not connecting, or everything looks offline."
-        ),
-        "hint": "Start with a broad connectivity check.",
+        "description": "Websites and online apps do not connect, or the device appears offline.",
     },
     {
         "id": "apps-sites-not-loading",
         "label": "Apps or sites not loading",
-        "description": (
-            "Some apps, sites, or sign-in pages stall, fail, or only partly load."
-        ),
-        "hint": "Great for partial failures and login loops.",
+        "description": "Some apps, sites, or sign-in pages stall, fail, or load partially.",
     },
     {
         "id": "vpn-or-company-resource-issue",
         "label": "VPN or company resource issue",
-        "description": (
-            "A VPN, internal app, file share, or company-only service is not working."
-        ),
-        "hint": "Focus on company access and private resources.",
+        "description": "A VPN, internal app, file share, or company-only service is unavailable.",
     },
     {
         "id": "device-feels-slow",
         "label": "Device feels slow",
-        "description": (
-            "The device feels unusually slow, overloaded, or unstable while you work."
-        ),
-        "hint": "Prioritizes local device health checks.",
+        "description": "The device is slow, overloaded, or unstable during normal work.",
     },
     {
         "id": "something-else",
         "label": "Something else / unsure",
-        "description": (
-            "You need a general local check before deciding what kind of help you need."
-        ),
-        "hint": "Safe fallback when you are not sure yet.",
+        "description": "Run the default diagnostic set when the issue category is not clear.",
     },
 )
 
