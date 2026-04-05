@@ -23,12 +23,8 @@
   <fieldset class="stack-xs form-fieldset">
     <legend id="redaction-level-label" class="field-label">Choose a redaction level</legend>
     <p class="field-help">{{ view.bundle_redaction_note }}</p>
-    <div
-      class="redaction-grid"
-      role="radiogroup"
-      aria-labelledby="redaction-level-label"
-    >
-      <div class="redaction-card">
+    <div class="redaction-grid" role="radiogroup" aria-labelledby="redaction-level-label">
+      <label class="redaction-option" for="redaction-level-safe">
         <input
           id="redaction-level-safe"
           class="redaction-input"
@@ -37,15 +33,13 @@
           value="safe"
           checked
         >
-        <label class="redaction-option" for="redaction-level-safe">
-          <span class="redaction-indicator" aria-hidden="true"></span>
-          <span class="redaction-copy">
-            <span class="redaction-title">Safe</span>
-            <span class="redaction-description">Recommended for most support handoffs.</span>
-          </span>
-        </label>
-      </div>
-      <div class="redaction-card">
+        <span class="selectable-option-control redaction-indicator" aria-hidden="true"></span>
+        <span class="selectable-option-content redaction-copy">
+          <span class="redaction-title">Safe</span>
+          <span class="redaction-description">Recommended for most support handoffs.</span>
+        </span>
+      </label>
+      <label class="redaction-option" for="redaction-level-strict">
         <input
           id="redaction-level-strict"
           class="redaction-input"
@@ -53,17 +47,15 @@
           name="redaction_level"
           value="strict"
         >
-        <label class="redaction-option" for="redaction-level-strict">
-          <span class="redaction-indicator" aria-hidden="true"></span>
-          <span class="redaction-copy">
-            <span class="redaction-title">Strict</span>
-            <span class="redaction-description">
-              Hide more values when support only needs broad evidence.
-            </span>
+        <span class="selectable-option-control redaction-indicator" aria-hidden="true"></span>
+        <span class="selectable-option-content redaction-copy">
+          <span class="redaction-title">Strict</span>
+          <span class="redaction-description">
+            Hide more values when support only needs broad evidence.
           </span>
-        </label>
-      </div>
-      <div class="redaction-card">
+        </span>
+      </label>
+      <label class="redaction-option" for="redaction-level-none">
         <input
           id="redaction-level-none"
           class="redaction-input"
@@ -71,26 +63,28 @@
           name="redaction_level"
           value="none"
         >
-        <label class="redaction-option" for="redaction-level-none">
-          <span class="redaction-indicator" aria-hidden="true"></span>
-          <span class="redaction-copy">
-            <span class="redaction-title">None</span>
-            <span class="redaction-description">Keep the collected values unredacted.</span>
-          </span>
-        </label>
-      </div>
+        <span class="selectable-option-control redaction-indicator" aria-hidden="true"></span>
+        <span class="selectable-option-content redaction-copy">
+          <span class="redaction-title">None</span>
+          <span class="redaction-description">Keep the collected values unredacted.</span>
+        </span>
+      </label>
     </div>
   </fieldset>
 
-  <label class="toggle" for="include_raw">
+  <label class="selectable-option selectable-option-checkbox toggle" for="include_raw">
     <input
+      class="selectable-option-input"
       id="include_raw"
       type="checkbox"
       name="include_raw"
       value="1"
       {% if not result.raw_command_capture %}disabled{% endif %}
     >
-    <span>Include raw command capture if this run collected it</span>
+    <span class="selectable-option-control check-control" aria-hidden="true"></span>
+    <span class="selectable-option-content">
+      <span class="choice-title">Include raw command capture if this run collected it</span>
+    </span>
   </label>
 
   <p class="field-help">The bundle downloads locally. You can review it before you share it.</p>
