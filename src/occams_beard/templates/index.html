@@ -68,16 +68,17 @@
           <p class="muted">Selecting an issue loads the recommended check plan.</p>
           <div class="choice-grid" role="radiogroup" aria-label="Symptoms">
             {% for symptom in symptom_options %}
-              <label class="choice-card {% if form_state.symptom_id == symptom.id %}choice-card-active{% endif %}">
+              <label class="selectable-option selectable-option-radio choice-card {% if form_state.symptom_id == symptom.id %}choice-card-active{% endif %}">
                 <input
-                  class="choice-input"
+                  class="selectable-option-input choice-input"
                   type="radio"
                   name="symptom"
                   value="{{ symptom.id }}"
                   data-symptom-choice="{{ symptom.id }}"
                   {% if form_state.symptom_id == symptom.id %}checked{% endif %}
                 >
-                <span class="choice-content stack-xs">
+                <span class="selectable-option-control choice-control" aria-hidden="true"></span>
+                <span class="selectable-option-content choice-content">
                   <span class="choice-title">{{ symptom.label }}</span>
                   {% if symptom.description %}
                     <span class="choice-body">{{ symptom.description }}</span>
@@ -267,14 +268,18 @@
               <legend>Check areas</legend>
               <div class="check-grid">
                 {% for item in form_state.plan.collection_items %}
-                  <label class="check-tile">
+                  <label class="selectable-option selectable-option-checkbox check-tile">
                     <input
+                      class="selectable-option-input"
                       type="checkbox"
                       name="checks"
                       value="{{ item.id }}"
                       {% if item.id in form_state.selected_checks %}checked{% endif %}
                     >
-                    <span>{{ item.label }}</span>
+                    <span class="selectable-option-control check-control" aria-hidden="true"></span>
+                    <span class="selectable-option-content">
+                      <span class="choice-title">{{ item.label }}</span>
+                    </span>
                   </label>
                 {% endfor %}
               </div>
@@ -297,21 +302,33 @@
             <fieldset class="stack-sm form-fieldset">
               <legend>Deeper probes and capture</legend>
               <div class="toggle-row">
-                <label class="toggle" for="enable_ping">
-                  <input id="enable_ping" type="checkbox" name="enable_ping" {% if form_state.enable_ping %}checked{% endif %}>
-                  <span>Enable ping</span>
+                <label class="selectable-option selectable-option-checkbox toggle" for="enable_ping">
+                  <input class="selectable-option-input" id="enable_ping" type="checkbox" name="enable_ping" {% if form_state.enable_ping %}checked{% endif %}>
+                  <span class="selectable-option-control check-control" aria-hidden="true"></span>
+                  <span class="selectable-option-content">
+                    <span class="choice-title">Enable ping</span>
+                  </span>
                 </label>
-                <label class="toggle" for="enable_trace">
-                  <input id="enable_trace" type="checkbox" name="enable_trace" {% if form_state.enable_trace %}checked{% endif %}>
-                  <span>Enable traceroute</span>
+                <label class="selectable-option selectable-option-checkbox toggle" for="enable_trace">
+                  <input class="selectable-option-input" id="enable_trace" type="checkbox" name="enable_trace" {% if form_state.enable_trace %}checked{% endif %}>
+                  <span class="selectable-option-control check-control" aria-hidden="true"></span>
+                  <span class="selectable-option-content">
+                    <span class="choice-title">Enable traceroute</span>
+                  </span>
                 </label>
-                <label class="toggle" for="enable_time_skew_check">
-                  <input id="enable_time_skew_check" type="checkbox" name="enable_time_skew_check" {% if form_state.enable_time_skew_check %}checked{% endif %}>
-                  <span>Enable bounded clock skew check</span>
+                <label class="selectable-option selectable-option-checkbox toggle" for="enable_time_skew_check">
+                  <input class="selectable-option-input" id="enable_time_skew_check" type="checkbox" name="enable_time_skew_check" {% if form_state.enable_time_skew_check %}checked{% endif %}>
+                  <span class="selectable-option-control check-control" aria-hidden="true"></span>
+                  <span class="selectable-option-content">
+                    <span class="choice-title">Enable bounded clock skew check</span>
+                  </span>
                 </label>
-                <label class="toggle" for="capture_raw_commands">
-                  <input id="capture_raw_commands" type="checkbox" name="capture_raw_commands" {% if form_state.capture_raw_commands %}checked{% endif %}>
-                  <span>Capture raw command output for the support bundle</span>
+                <label class="selectable-option selectable-option-checkbox toggle" for="capture_raw_commands">
+                  <input class="selectable-option-input" id="capture_raw_commands" type="checkbox" name="capture_raw_commands" {% if form_state.capture_raw_commands %}checked{% endif %}>
+                  <span class="selectable-option-control check-control" aria-hidden="true"></span>
+                  <span class="selectable-option-content">
+                    <span class="choice-title">Capture raw command output for the support bundle</span>
+                  </span>
                 </label>
               </div>
             </fieldset>

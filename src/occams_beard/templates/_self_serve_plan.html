@@ -29,14 +29,18 @@
           <legend>{{ form_state.clarification.question.prompt }}</legend>
           <div class="check-grid">
             {% for option in form_state.clarification.question.options %}
-              <label class="check-tile">
+              <label class="selectable-option selectable-option-radio check-tile">
                 <input
+                  class="selectable-option-input"
                   type="radio"
                   name="clar_{{ form_state.clarification.question.key }}"
                   value="{{ option.value }}"
                   required
                 >
-                <span>{{ option.label }}</span>
+                <span class="selectable-option-control choice-control" aria-hidden="true"></span>
+                <span class="selectable-option-content">
+                  <span class="choice-title">{{ option.label }}</span>
+                </span>
               </label>
             {% endfor %}
           </div>
@@ -78,14 +82,18 @@
           <legend>Select check areas</legend>
           <div class="check-grid">
             {% for item in form_state.plan.collection_items %}
-              <label class="check-tile">
+              <label class="selectable-option selectable-option-checkbox check-tile">
                 <input
+                  class="selectable-option-input"
                   type="checkbox"
                   name="checks"
                   value="{{ item.id }}"
                   {% if item.id in form_state.selected_checks %}checked{% endif %}
                 >
-                <span>{{ item.label }}</span>
+                <span class="selectable-option-control check-control" aria-hidden="true"></span>
+                <span class="selectable-option-content">
+                  <span class="choice-title">{{ item.label }}</span>
+                </span>
               </label>
             {% endfor %}
           </div>
@@ -108,13 +116,19 @@
         <fieldset class="stack-sm form-fieldset">
           <legend>Optional probes</legend>
           <div class="toggle-row">
-            <label class="toggle" for="enable_ping">
-              <input id="enable_ping" type="checkbox" name="enable_ping" {% if form_state.enable_ping %}checked{% endif %}>
-              <span>Enable ping</span>
+            <label class="selectable-option selectable-option-checkbox toggle" for="enable_ping">
+              <input class="selectable-option-input" id="enable_ping" type="checkbox" name="enable_ping" {% if form_state.enable_ping %}checked{% endif %}>
+              <span class="selectable-option-control check-control" aria-hidden="true"></span>
+              <span class="selectable-option-content">
+                <span class="choice-title">Enable ping</span>
+              </span>
             </label>
-            <label class="toggle" for="enable_trace">
-              <input id="enable_trace" type="checkbox" name="enable_trace" {% if form_state.enable_trace %}checked{% endif %}>
-              <span>Enable traceroute</span>
+            <label class="selectable-option selectable-option-checkbox toggle" for="enable_trace">
+              <input class="selectable-option-input" id="enable_trace" type="checkbox" name="enable_trace" {% if form_state.enable_trace %}checked{% endif %}>
+              <span class="selectable-option-control check-control" aria-hidden="true"></span>
+              <span class="selectable-option-content">
+                <span class="choice-title">Enable traceroute</span>
+              </span>
             </label>
           </div>
         </fieldset>
@@ -122,14 +136,18 @@
         <fieldset class="stack-sm form-fieldset">
           <legend>Create diagnostic export</legend>
           <div class="toggle-row">
-            <label class="toggle" for="capture_raw_commands">
+            <label class="selectable-option selectable-option-checkbox toggle" for="capture_raw_commands">
               <input
+                class="selectable-option-input"
                 id="capture_raw_commands"
                 type="checkbox"
                 name="capture_raw_commands"
                 {% if form_state.capture_raw_commands %}checked{% endif %}
               >
-              <span>Capture raw output for a support bundle</span>
+              <span class="selectable-option-control check-control" aria-hidden="true"></span>
+              <span class="selectable-option-content">
+                <span class="choice-title">Capture raw output for a support bundle</span>
+              </span>
             </label>
           </div>
         </fieldset>
