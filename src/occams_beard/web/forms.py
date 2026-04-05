@@ -8,14 +8,15 @@ from typing import Any, cast
 from flask import request, url_for
 
 from occams_beard.defaults import DEFAULT_DNS_HOSTS, DEFAULT_TCP_TARGETS
-from occams_beard.models import (
-    DiagnosticProfile,
-    EndpointDiagnosticResult,
-    RedactionLevel,
-    TcpTarget,
-)
+from occams_beard.models import DiagnosticProfile, EndpointDiagnosticResult, RedactionLevel, TcpTarget
 from occams_beard.profile_catalog import ProfileCatalogIssue, get_profile, get_profile_catalog
-from occams_beard.intake import resolve_self_serve_profile_id, suggest_support_profile_id
+from occams_beard.intake import (
+    DecisionContext,
+    get_intake_contract,
+    map_intake_to_scope,
+    resolve_intake_interpretation,
+    suggest_support_profile_id,
+)
 from occams_beard.web.presentation.catalog import (
     SELF_SERVE_MODE,
     SUPPORT_MODE,
@@ -51,8 +52,22 @@ def query_form_state() -> dict[str, object]:
 
     if mode == SELF_SERVE_MODE:
         symptom = get_symptom_option(request.args.get("symptom"))
-        profile = self_serve_profile(symptom["id"] if symptom else None)
+        scope = (
+            self_serve_scope(
+                symptom["id"],
+                refined_domains=request.args.get("refined_domains"),
+                profile_fallback_id=request.args.get("profile_fallback_id"),
+            )
+            if symptom is not None
+            else None
+        )
+        profile = (
+            get_profile(scope.suggested_profile_id)
+            if scope is not None and scope.suggested_profile_id
+            else None
+        )
     else:
+        scope = None
         symptom = None
         profile = get_profile(
             request.args.get("profile") or default_support_profile_id(source_record)
@@ -62,7 +77,11 @@ def query_form_state() -> dict[str, object]:
     selected_checks = (
         [item for item in checks_csv.split(",") if item]
         if checks_csv
-        else list(profile.recommended_checks if profile is not None else [])
+        else (
+            list(scope.selected_checks)
+            if scope is not None
+            else list(profile.recommended_checks if profile is not None else [])
+        )
     )
     targets_text = request.args.get("targets")
     dns_hosts_text = request.args.get("dns_hosts")
@@ -114,8 +133,14 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         symptom = get_symptom_option(request.form.get("symptom_id"))
         if symptom is None:
             raise ValueError("Choose the option that best matches the problem first.")
-        profile = self_serve_profile(symptom["id"])
+        scope = self_serve_scope(
+            symptom["id"],
+            refined_domains=request.form.get("refined_domains"),
+            profile_fallback_id=request.form.get("profile_fallback_id"),
+        )
+        profile = get_profile(scope.suggested_profile_id) if scope.suggested_profile_id else None
     else:
+        scope = None
         symptom = None
         profile = get_profile(request.form.get("profile_id") or "custom-profile")
 
@@ -130,7 +155,11 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         if dns_hosts_text
         else default_dns_lines(profile)
     )
-    effective_checks = selected_checks or list(profile.recommended_checks if profile else [])
+    effective_checks = selected_checks or (
+        list(scope.selected_checks)
+        if scope is not None
+        else list(profile.recommended_checks if profile else [])
+    )
 
     return build_form_state(
         mode=mode,
@@ -183,16 +212,32 @@ def request_error_form_state(error_message: str) -> dict[str, object]:
             symptom = get_symptom_option(request.form.get("symptom_id"))
         except ValueError:
             symptom = None
-        profile = self_serve_profile(symptom["id"] if symptom else None)
+        scope = (
+            self_serve_scope(
+                symptom["id"],
+                refined_domains=request.form.get("refined_domains"),
+                profile_fallback_id=request.form.get("profile_fallback_id"),
+            )
+            if symptom is not None
+            else None
+        )
+        profile = (
+            get_profile(scope.suggested_profile_id)
+            if scope is not None and scope.suggested_profile_id
+            else None
+        )
     else:
+        scope = None
         profile_id = request.form.get("profile_id") or "custom-profile"
         try:
             profile = get_profile(profile_id)
         except ValueError:
             profile = None
 
-    selected_checks = request.form.getlist("checks") or list(
-        profile.recommended_checks if profile is not None else []
+    selected_checks = request.form.getlist("checks") or (
+        list(scope.selected_checks)
+        if scope is not None
+        else list(profile.recommended_checks if profile is not None else [])
     )
     targets_text = request.form.get("targets") or "\n".join(default_target_lines(profile))
     dns_hosts_text = request.form.get("dns_hosts") or "\n".join(default_dns_lines(profile))
@@ -328,11 +373,51 @@ def optional_record(run_id: str | None) -> RunSession | None:
     return record
 
 
-def self_serve_profile(symptom_id: str | None) -> DiagnosticProfile | None:
-    """Return the backing profile for the chosen self-serve symptom."""
+def self_serve_scope(
+    symptom_id: str | None,
+    *,
+    refined_domains: str | None = None,
+    profile_fallback_id: str | None = None,
+):
+    """Resolve intent-driven self-serve check scope from symptom and optional refinements."""
 
-    profile_id = resolve_self_serve_profile_id(symptom_id)
-    return get_profile(profile_id) if profile_id else None
+    resolution = resolve_intake_interpretation(symptom_id)
+    context = clarification_context_from_refinement(
+        intent_key=resolution.primary_intent,
+        refined_domains=refined_domains,
+        profile_fallback_id=profile_fallback_id,
+    )
+    return map_intake_to_scope(
+        resolution=resolution,
+        contract=get_intake_contract(),
+        context=context,
+    )
+
+
+def clarification_context_from_refinement(
+    *,
+    intent_key: str | None,
+    refined_domains: str | None,
+    profile_fallback_id: str | None,
+) -> DecisionContext | None:
+    """Build an optional refined decision context from posted refinement inputs."""
+
+    domains = tuple(item.strip() for item in (refined_domains or "").split(",") if item.strip())
+    if not domains and not profile_fallback_id:
+        return None
+
+    return DecisionContext(
+        intent_key=intent_key,
+        status="ready",
+        asked_questions=(),
+        answered=(),
+        remaining_question_keys=(),
+        pathway_candidates=(),
+        selected_pathway_key=None,
+        next_domains=domains,
+        profile_fallback_id=profile_fallback_id,
+        reason="refined_context_supplied",
+    )
 
 
 def default_support_profile_id(source_record: RunSession | None) -> str:

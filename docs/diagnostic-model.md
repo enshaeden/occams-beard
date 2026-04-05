@@ -30,7 +30,7 @@ CLI / Web / Launcher / Support Bundle Export
 - `explanations.py` adds deterministic plain-language guidance on top of findings.
 - `serializers.py`, `report.py`, and `support_bundle.py` render the same result object for different consumers.
 - `web/` keeps route composition, form parsing, run-session orchestration, progress shaping, and result presentation above the shared result model.
-- `intake/` centralizes intent-driven translation from user-selected symptom language into deterministic profile defaults and support-path suggestions.
+- `intake/` centralizes intent-driven translation from user-selected symptom language into deterministic execution scope, clarification pathways, and support-path suggestions.
 
 
 ## Intake Resolver Layer (Phase 1)
@@ -89,6 +89,30 @@ Design constraints for this phase:
 - Clarification logic remains Flask-independent and route-agnostic.
 - `web/forms.py` can consume clarification context later without rewriting current one-step submit flow yet.
 - No branching questionnaire tree is introduced beyond the contract-owned 1-2 clarification prompts per intent.
+
+## Domain Mapper Layer (Phase 3)
+
+Self-serve intake scope now runs through `src/occams_beard/intake/domain_mapper.py`.
+
+Mapper contract output:
+
+- `selected_checks`: the execution checks to run for the self-serve path
+- `suggested_profile_id`: optional profile used only as a secondary artifact (defaults, bridge context, guidance labels)
+- `fallback_mode`: optional marker when intent resolution or refined domains cannot be mapped directly
+
+Current mapping behavior:
+
+1. Resolve intake intent from symptom/free-text via `intake/resolver.py`.
+2. Prefer clarification-refined domains (`DecisionContext.next_domains`) when available.
+3. Otherwise use intent baseline domains from the intake contract/pathways.
+4. Convert domains to checks deterministically.
+5. Fall back to general/custom scope when mapping is unresolved.
+
+Design constraints for this phase:
+
+- Self-serve execution scope is intent/domain driven first, with profiles retained as secondary hints.
+- Support mode remains profile-driven.
+- `build_run_options(...)` stays unchanged, consuming checks/targets/dns passed by web form state.
 
 ## Execution Model
 

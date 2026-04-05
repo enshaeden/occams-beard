@@ -202,6 +202,27 @@ class AppTests(unittest.TestCase):
         self.assertIn("vpn", self.captured_options.selected_checks)
         self.assertIn("services", self.captured_options.selected_checks)
 
+    def test_self_serve_submission_uses_intake_scope_over_profile_defaults(self) -> None:
+        response = self.client.post(
+            "/run",
+            data={
+                "mode": "self-serve",
+                "symptom_id": "apps-sites-not-loading",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run_id = response.headers["Location"].rsplit("/", 1)[-1]
+        self.wait_for_run_completion(run_id)
+        self.assertIsNotNone(self.captured_options)
+        assert self.captured_options is not None
+        self.assertIsNotNone(self.captured_options.profile)
+        assert self.captured_options.profile is not None
+        self.assertEqual(self.captured_options.profile.profile_id, "dns-issue")
+        self.assertIn("dns", self.captured_options.selected_checks)
+        self.assertIn("routing", self.captured_options.selected_checks)
+        self.assertNotIn("time", self.captured_options.selected_checks)
+
         results_response = self.client.get(f"/results/{run_id}")
         results_text = results_response.get_data(as_text=True)
         self.assertEqual(results_response.status_code, 200)
