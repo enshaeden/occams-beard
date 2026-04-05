@@ -14,12 +14,32 @@ from occams_beard.utils.subprocess import run_command
 
 LOGGER = logging.getLogger(__name__)
 
+_CRITICAL_FREE_RATIO = 0.05
+_LOW_FREE_RATIO = 0.10
+_CRITICAL_FREE_BYTES = 2 * 1024**3
+_LOW_FREE_BYTES = 10 * 1024**3
+
 _MACOS_IGNORED_MOUNT_POINTS = frozenset(
     {
         "/dev",
     }
 )
 _MACOS_IGNORED_MOUNT_PREFIXES = ("/Library/Developer/CoreSimulator/Volumes/",)
+_LINUX_IGNORED_MOUNT_POINTS = frozenset(
+    {
+        "/dev",
+        "/dev/shm",
+        "/proc",
+        "/run",
+        "/sys",
+    }
+)
+_LINUX_IGNORED_MOUNT_PREFIXES = (
+    "/proc/",
+    "/run/",
+    "/snap/",
+    "/sys/",
+)
 
 
 def collect_storage_state(
@@ -29,7 +49,8 @@ def collect_storage_state(
     """Collect relevant volume usage and non-privileged device health information."""
 
     warnings: list[DiagnosticWarning] = []
-    mount_points = _discover_mount_points()
+    platform_name = current_platform()
+    mount_points = _discover_mount_points(platform_name=platform_name)
     disks: list[DiskVolume] = []
 
     for path in mount_points:
@@ -46,6 +67,8 @@ def collect_storage_state(
             continue
 
         percent_used = round((usage.used / usage.total) * 100, 1) if usage.total else 0.0
+        free_percent = round((usage.free / usage.total) * 100, 1) if usage.total else None
+        role_hint = _volume_role_hint(path=path, platform_name=platform_name)
         disks.append(
             DiskVolume(
                 path=path,
@@ -53,6 +76,12 @@ def collect_storage_state(
                 used_bytes=usage.used,
                 free_bytes=usage.free,
                 percent_used=percent_used,
+                free_percent=free_percent,
+                pressure_level=_classify_disk_pressure(
+                    total_bytes=usage.total,
+                    free_bytes=usage.free,
+                ),
+                role_hint=role_hint,
             )
         )
 
@@ -80,7 +109,7 @@ def collect_storage_state(
         for item in (device_health or [])
         if item.get("device_id") is not None
     ]
-    if device_health is None and current_platform() in {"macos", "windows"}:
+    if device_health is None and platform_name in {"macos", "windows"}:
         warnings.append(
             DiagnosticWarning(
                 domain="storage",
@@ -90,11 +119,10 @@ def collect_storage_state(
         )
     if progress_callback is not None:
         progress_callback(2)
-    return disks, storage_devices, warnings
+    return sorted(disks, key=_disk_sort_key), storage_devices, warnings
 
 
-def _discover_mount_points() -> list[str]:
-    platform_name = current_platform()
+def _discover_mount_points(*, platform_name: str) -> list[str]:
     if platform_name == "windows":
         return _windows_roots()
 
@@ -112,10 +140,24 @@ def _discover_mount_points() -> list[str]:
 def _filter_mount_points(mount_points: list[str], platform_name: str) -> list[str]:
     """Filter pseudo-filesystems that should not drive operator findings."""
 
+    filtered_mount_points: list[str] = []
+    if platform_name == "linux":
+        for path in mount_points:
+            if path in _LINUX_IGNORED_MOUNT_POINTS or path.startswith(
+                _LINUX_IGNORED_MOUNT_PREFIXES
+            ):
+                LOGGER.debug(
+                    "Skipping Linux pseudo filesystem from storage findings: path=%s",
+                    path,
+                )
+                continue
+            filtered_mount_points.append(path)
+        return filtered_mount_points
+
     if platform_name != "macos":
         return mount_points
 
-    filtered_mount_points: list[str] = []
+    filtered_mount_points = []
     for path in mount_points:
         if path in _MACOS_IGNORED_MOUNT_POINTS or path.startswith(_MACOS_IGNORED_MOUNT_PREFIXES):
             LOGGER.debug("Skipping macOS pseudo filesystem from storage findings: path=%s", path)
@@ -149,3 +191,37 @@ def _coerce_string(value: object) -> str | None:
         stripped = value.strip()
         return stripped or None
     return None
+
+
+def _classify_disk_pressure(*, total_bytes: int, free_bytes: int) -> str:
+    if total_bytes <= 0:
+        return "unknown"
+
+    free_ratio = free_bytes / total_bytes
+    if free_ratio <= _CRITICAL_FREE_RATIO or free_bytes <= _CRITICAL_FREE_BYTES:
+        return "critical"
+    if free_ratio <= _LOW_FREE_RATIO or free_bytes <= _LOW_FREE_BYTES:
+        return "low"
+    return "normal"
+
+
+def _volume_role_hint(*, path: str, platform_name: str) -> str:
+    if platform_name == "windows":
+        return "system" if path.upper() == "C:\\" else "other"
+
+    normalized = path.rstrip("/") or "/"
+    if normalized in {"/", "/System/Volumes/Data", "/var", "/tmp", "/usr", "/opt"}:
+        return "system"
+    if normalized in {"/home", "/Users"}:
+        return "user_data"
+    return "other"
+
+
+def _disk_sort_key(disk: DiskVolume) -> tuple[int, int, float]:
+    pressure_rank = {"critical": 0, "low": 1, "normal": 2, None: 3, "unknown": 3}
+    role_rank = {"system": 0, "user_data": 1, "other": 2, None: 3}
+    return (
+        pressure_rank.get(disk.pressure_level, 3),
+        role_rank.get(disk.role_hint, 3),
+        disk.free_percent if disk.free_percent is not None else 100.0,
+    )

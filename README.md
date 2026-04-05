@@ -48,6 +48,12 @@ access-path failure classes, including:
 - local resource or hardware degradation, including host pressure, storage
   exhaustion, battery health warnings, and storage-device health states exposed
   by the operating system
+- "device feels slow" cases where the current host snapshot shows CPU
+  saturation, memory pressure, swap or commit pressure, or bounded heavy-load
+  process categories that make a network-only explanation less credible
+- application instability or local write failures where critically low free
+  space or degraded storage-device health make a connectivity-only explanation
+  less credible
 
 These are representative classes, not a claim of exhaustive diagnosis.
 
@@ -84,6 +90,13 @@ The core layers are intentionally separated:
 
 The runtime remains standard-library-first apart from Flask, which is the only
 runtime dependency and exists to serve the local web interface.
+
+For slow-device scenarios, the `resources` domain now stays intentionally
+operator-shaped rather than turning into a general metrics dashboard. It keeps
+the existing local-only model, collects only a current snapshot, and can add a
+bounded process-load summary by coarse category when the platform exposes it.
+It does not keep history, run background sampling, or persist a process
+inventory.
 
 ## Operational boundaries
 

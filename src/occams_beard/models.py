@@ -74,6 +74,8 @@ class CpuState:
     load_average_5m: float | None = None
     load_average_15m: float | None = None
     utilization_percent_estimate: float | None = None
+    load_ratio_1m: float | None = None
+    saturation_level: str | None = None
 
 
 @dataclass(slots=True)
@@ -84,6 +86,13 @@ class MemoryState:
     available_bytes: int | None
     free_bytes: int | None
     pressure_level: str | None = None
+    available_percent: float | None = None
+    swap_total_bytes: int | None = None
+    swap_free_bytes: int | None = None
+    swap_used_bytes: int | None = None
+    committed_bytes: int | None = None
+    commit_limit_bytes: int | None = None
+    commit_pressure_level: str | None = None
 
 
 @dataclass(slots=True)
@@ -95,6 +104,9 @@ class DiskVolume:
     used_bytes: int
     free_bytes: int
     percent_used: float
+    free_percent: float | None = None
+    pressure_level: str | None = None
+    role_hint: str | None = None
 
 
 @dataclass(slots=True)
@@ -122,6 +134,28 @@ class StorageDeviceHealth:
 
 
 @dataclass(slots=True)
+class ProcessCategoryLoad:
+    """A bounded, privacy-preserving summary of heavy process categories."""
+
+    category: str
+    process_count: int
+    combined_cpu_percent_estimate: float | None = None
+    peak_cpu_percent_estimate: float | None = None
+    combined_memory_bytes: int | None = None
+    peak_memory_bytes: int | None = None
+
+
+@dataclass(slots=True)
+class ProcessSnapshot:
+    """Bounded process-load hints derived from a single local snapshot."""
+
+    sampled_process_count: int
+    high_cpu_process_count: int = 0
+    high_memory_process_count: int = 0
+    top_categories: list[ProcessCategoryLoad] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class ResourceState:
     """Normalized view of host resource state."""
 
@@ -130,6 +164,7 @@ class ResourceState:
     disks: list[DiskVolume] = field(default_factory=list)
     battery: BatteryState | None = None
     storage_devices: list[StorageDeviceHealth] = field(default_factory=list)
+    process_snapshot: ProcessSnapshot | None = None
 
 
 @dataclass(slots=True)
@@ -471,7 +506,7 @@ class EndpointDiagnosticResult:
     metadata: Metadata
     platform: PlatformInfo
     facts: CollectedFacts
-    schema_version: str = "1.1.0"
+    schema_version: str = "1.3.0"
     findings: list[Finding] = field(default_factory=list)
     probable_fault_domain: FaultDomain = "unknown"
     warnings: list[DiagnosticWarning] = field(default_factory=list)

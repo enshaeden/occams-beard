@@ -30,6 +30,8 @@ def evaluate_findings(facts: CollectedFacts) -> tuple[list[Finding], str]:
 def evaluate_selected_findings(
     facts: CollectedFacts,
     selected_checks: list[str],
+    *,
+    issue_category: str | None = None,
 ) -> tuple[list[Finding], str]:
     """Evaluate only the rules supported by the completed diagnostic domains."""
 
@@ -41,7 +43,13 @@ def evaluate_selected_findings(
     if {"dns", "connectivity"} <= enabled:
         findings.extend(_evaluate_dns_path(facts))
     if {"resources", "storage"} & enabled:
-        findings.extend(_evaluate_resource_pressure(facts))
+        findings.extend(
+            _evaluate_resource_pressure(
+                facts,
+                enabled_checks=enabled,
+                issue_category=issue_category,
+            )
+        )
         findings.extend(_evaluate_hardware_health(facts))
     if "connectivity" in enabled:
         findings.extend(_evaluate_trace_results(facts))
@@ -351,72 +359,143 @@ def _evaluate_dns_path(facts: CollectedFacts) -> list[Finding]:
     return findings
 
 
-def _evaluate_resource_pressure(facts: CollectedFacts) -> list[Finding]:
+def _evaluate_resource_pressure(
+    facts: CollectedFacts,
+    *,
+    enabled_checks: set[str] | None = None,
+    issue_category: str | None = None,
+) -> list[Finding]:
     resources = facts.resources
     findings: list[Finding] = []
     memory = resources.memory
-    disks = resources.disks
-    cpu_hot = (
-        resources.cpu.utilization_percent_estimate is not None
-        and resources.cpu.utilization_percent_estimate >= 90
+    enabled_checks = enabled_checks or set()
+    cpu_pressure = _cpu_pressure_state(resources.cpu)
+    memory_pressure = _memory_pressure_state(memory)
+    process_snapshot = resources.process_snapshot
+    local_pressure_present = cpu_pressure["present"] or memory_pressure["present"]
+    combined_pressure = cpu_pressure["present"] and memory_pressure["present"]
+    strong_local_pressure = bool(cpu_pressure["strong"] or memory_pressure["strong"])
+    weakens_network_explanation = _network_explanation_not_supported(
+        facts,
+        enabled_checks=enabled_checks,
     )
-    low_memory = False
+    storage_pressure_findings = _storage_space_findings(
+        facts,
+        enabled_checks=enabled_checks,
+    )
+    findings.extend(storage_pressure_findings)
 
-    if memory.total_bytes and memory.available_bytes is not None:
-        available_ratio = memory.available_bytes / memory.total_bytes
-        low_memory = available_ratio <= 0.10
-        if low_memory:
-            findings.append(
-                Finding(
-                    identifier="high-memory-pressure",
-                    severity="medium",
-                    title="High memory pressure detected",
-                    summary="Available memory is critically low relative to total system memory.",
-                    evidence=[
-                        f"Available memory ratio is {available_ratio:.1%}.",
-                        f"Memory pressure classification is {memory.pressure_level or 'unknown'}.",
-                    ]
-                    + (
-                        [
-                            (
-                                "CPU utilization estimate is "
-                                f"{resources.cpu.utilization_percent_estimate:.1f}%."
-                            )
-                        ]
-                        if cpu_hot
-                        else []
-                    ),
-                    probable_cause=(
-                        "Local host resource contention is likely affecting "
-                        "application or interactive performance."
-                    ),
-                    fault_domain="local_host",
-                    confidence=0.82 if cpu_hot else 0.72,
-                )
+    if strong_local_pressure and issue_category == "device slow":
+        findings.append(
+            Finding(
+                identifier="device-slow-local-host-pressure",
+                severity="high"
+                if cpu_pressure["strong"] and memory_pressure["strong"]
+                else "medium",
+                title="Local resource pressure is likely contributing to the device feeling slow",
+                summary=(
+                    "The current host snapshot shows resource pressure that lines up with the "
+                    "reported slowness."
+                ),
+                evidence=_host_pressure_evidence(
+                    facts,
+                    include_network_context=weakens_network_explanation,
+                ),
+                probable_cause=(
+                    "The endpoint appears overloaded in the current snapshot, so local host "
+                    "pressure is a more credible explanation for the reported slowness than a "
+                    "generic network-only problem."
+                ),
+                fault_domain="local_host",
+                confidence=0.93 if combined_pressure else 0.87,
             )
+        )
 
-    if low_memory and cpu_hot and _has_degraded_connectivity(facts):
+    if memory_pressure["strong"]:
+        findings.append(
+            Finding(
+                identifier="high-memory-pressure",
+                severity="high" if memory_pressure["severity"] == "high" else "medium",
+                title="Severe local memory pressure is likely affecting responsiveness",
+                summary=(
+                    "Available memory is low enough that the operating system may be spending "
+                    "time reclaiming memory or leaning on swap."
+                ),
+                evidence=_memory_pressure_evidence(memory, process_snapshot),
+                probable_cause=(
+                    "Local memory pressure is likely contributing to sluggish applications, "
+                    "slow task switching, or delayed input response."
+                ),
+                fault_domain="local_host",
+                confidence=0.9 if memory.commit_pressure_level == "high" else 0.84,
+            )
+        )
+
+    if cpu_pressure["strong"]:
+        findings.append(
+            Finding(
+                identifier="sustained-cpu-saturation",
+                severity="high" if combined_pressure else "medium",
+                title="Sustained CPU saturation is likely affecting responsiveness",
+                summary=(
+                    "Runnable CPU work is staying at or above the available logical-core "
+                    "capacity in the current snapshot."
+                ),
+                evidence=_cpu_pressure_evidence(resources.cpu, process_snapshot),
+                probable_cause=(
+                    "The host currently has more CPU demand than available execution capacity, "
+                    "which is likely to slow interactive work."
+                ),
+                fault_domain="local_host",
+                confidence=0.9 if combined_pressure else 0.83,
+            )
+        )
+
+    if (
+        local_pressure_present
+        and not strong_local_pressure
+        and (
+            combined_pressure
+            or _snapshot_shows_multiple_pressure_vectors(process_snapshot)
+        )
+    ):
+        findings.append(
+            Finding(
+                identifier="local-resource-pressure-no-dominant-source",
+                severity="medium",
+                title=(
+                    "Local resource pressure is present, but no single dominant source stands "
+                    "out"
+                ),
+                summary=(
+                    "The device shows moderate host-pressure signals, but this snapshot does not "
+                    "cleanly isolate one bottleneck."
+                ),
+                evidence=_host_pressure_evidence(
+                    facts,
+                    include_network_context=weakens_network_explanation,
+                ),
+                probable_cause=(
+                    "The endpoint may be overloaded right now, but the current one-shot snapshot "
+                    "is not strong enough to attribute the pressure to CPU alone or memory alone."
+                ),
+                fault_domain="local_host",
+                confidence=0.7,
+            )
+        )
+
+    if strong_local_pressure and _has_degraded_connectivity(facts):
         findings.append(
             Finding(
                 identifier="host-pressure-with-connectivity-degradation",
                 severity="medium",
                 title="Resource pressure may be contributing to degraded connectivity",
                 summary=(
-                    "The endpoint is under severe CPU and memory pressure while "
-                    "connectivity checks are also degraded."
+                    "The endpoint is under local resource pressure while connectivity checks are "
+                    "also degraded."
                 ),
-                evidence=[
-                    (
-                        "CPU utilization estimate is "
-                        f"{resources.cpu.utilization_percent_estimate:.1f}%."
-                    ),
-                    (
-                        "Available memory is "
-                        f"{_format_ratio(memory.available_bytes, memory.total_bytes)} "
-                        "of total."
-                    ),
-                    _connectivity_pressure_evidence(facts),
-                ],
+                evidence=_host_pressure_evidence(facts)
+                + [_connectivity_pressure_evidence(facts)],
                 probable_cause=(
                     "Host saturation may be contributing to socket timeouts, "
                     "slow name resolution, or delayed operator workflows, "
@@ -428,27 +507,79 @@ def _evaluate_resource_pressure(facts: CollectedFacts) -> list[Finding]:
             )
         )
 
-    for disk in disks:
-        free_ratio = disk.free_bytes / disk.total_bytes if disk.total_bytes else 1.0
-        if free_ratio <= 0.10:
-            findings.append(
-                Finding(
-                    identifier=f"low-disk-space-{disk.path}",
-                    severity="medium",
-                    title=f"Low disk free space on {disk.path}",
-                    summary="A monitored filesystem is at or above the low-space threshold.",
-                    evidence=[
-                        f"Filesystem {disk.path} is {disk.percent_used:.1f}% utilized.",
-                        f"Free space ratio is {free_ratio:.1%}.",
-                    ],
-                    probable_cause=(
-                        "Local storage exhaustion is likely to impact host "
-                        "stability, logging, or application writes."
-                    ),
-                    fault_domain="local_host",
-                    confidence=0.9,
-                )
+    if issue_category == "device slow" and not local_pressure_present:
+        findings.append(
+            Finding(
+                identifier="no-significant-host-pressure",
+                severity="info",
+                title="No significant host-pressure signal was detected",
+                summary=(
+                    "This run did not capture strong CPU, memory, swap, or bounded process-load "
+                    "evidence that would explain the device feeling slow."
+                ),
+                evidence=_no_host_pressure_evidence(resources),
+                probable_cause=(
+                    "The current snapshot does not support a local resource-pressure explanation "
+                    "on its own."
+                ),
+                fault_domain="healthy",
+                confidence=0.76,
             )
+        )
+
+    if issue_category == "device slow" and weakens_network_explanation:
+        findings.append(
+            Finding(
+                identifier="network-explanation-not-supported",
+                severity="info",
+                title="Selected network checks do not currently explain the reported slowness",
+                summary=(
+                    "The network checks collected in this run do not show a matching network "
+                    "failure signature."
+                ),
+                evidence=_network_health_evidence(facts, enabled_checks=enabled_checks),
+                probable_cause=(
+                    "Current evidence does not support a network-based explanation for the "
+                    "reported slowness."
+                ),
+                fault_domain="healthy",
+                confidence=0.8,
+            )
+        )
+
+    if (
+        issue_category == "low disk space"
+        and not _storage_issue_present(resources)
+    ):
+        findings.append(
+            Finding(
+                identifier="no-significant-storage-pressure",
+                severity="info",
+                title=(
+                    "Current storage evidence does not support a strong local "
+                    "storage explanation"
+                ),
+                summary=(
+                    "This run did not capture critically low free space or a device-health state "
+                    "that would strongly explain the reported issue."
+                ),
+                evidence=_no_storage_pressure_evidence(resources)
+                + (
+                    _network_health_evidence(facts, enabled_checks=enabled_checks)
+                    if _network_explanation_not_supported(
+                        facts,
+                        enabled_checks=enabled_checks,
+                    )
+                    else []
+                ),
+                probable_cause=(
+                    "The current snapshot does not support local storage exhaustion or exposed "
+                    "storage-device degradation as the dominant explanation."
+                ),
+                fault_domain="healthy",
+                confidence=0.78,
+            )
+        )
 
     return findings
 
@@ -508,14 +639,14 @@ def _evaluate_hardware_health(facts: CollectedFacts) -> list[Finding]:
             Finding(
                 identifier="storage-device-health-failure",
                 severity="high",
-                title="Storage device health reports a failure state",
+                title="Storage-device health reports a failing state",
                 summary=(
                     "At least one storage device reported an explicit failing or unhealthy state."
                 ),
                 evidence=_storage_device_evidence(failed_devices),
                 probable_cause=(
-                    "The local storage subsystem is reporting a device-level fault that may affect "
-                    "boot, read, or write stability."
+                    "The local storage subsystem is reporting a device-level fault that may "
+                    "affect local reads, writes, boot behavior, or application stability."
                 ),
                 fault_domain="local_host",
                 confidence=0.93,
@@ -526,7 +657,7 @@ def _evaluate_hardware_health(facts: CollectedFacts) -> list[Finding]:
             Finding(
                 identifier="storage-device-health-warning",
                 severity="medium",
-                title="Storage device health reports a warning state",
+                title="Storage-device health reports a degraded state",
                 summary=(
                     "At least one storage device reported a warning state even though it is not "
                     "yet marked failed."
@@ -534,13 +665,121 @@ def _evaluate_hardware_health(facts: CollectedFacts) -> list[Finding]:
                 evidence=_storage_device_evidence(warning_devices),
                 probable_cause=(
                     "The local storage subsystem is signaling degraded device health that may "
-                    "become operationally significant."
+                    "become operationally significant even without a total device failure."
                 ),
                 fault_domain="local_host",
                 confidence=0.82,
             )
         )
 
+    return findings
+
+
+def _storage_space_findings(
+    facts: CollectedFacts,
+    *,
+    enabled_checks: set[str],
+) -> list[Finding]:
+    findings: list[Finding] = []
+    weakens_network_explanation = _network_explanation_not_supported(
+        facts,
+        enabled_checks=enabled_checks,
+    )
+    for disk in facts.resources.disks:
+        pressure_level = _disk_pressure_level(disk)
+        if pressure_level not in {"critical", "low"}:
+            continue
+
+        operational_impact = _storage_operational_impact(disk)
+        evidence = _disk_pressure_evidence(disk)
+        if operational_impact is not None:
+            evidence.append(operational_impact)
+        if weakens_network_explanation:
+            evidence.extend(_network_health_evidence(facts, enabled_checks=enabled_checks))
+
+        if pressure_level == "critical":
+            findings.append(
+                Finding(
+                    identifier="critical-disk-space-exhaustion",
+                    severity="high",
+                    title=f"Critical disk-space exhaustion on {disk.path}",
+                    summary=(
+                        "Available disk space is critically low and may affect application "
+                        "stability."
+                    ),
+                    evidence=evidence,
+                    probable_cause=(
+                        "Local filesystem space exhaustion is likely to affect writes, temp "
+                        "files, logging, updates, or sign-in caches on this device."
+                    ),
+                    fault_domain="local_host",
+                    confidence=0.95 if _is_operational_volume(disk) else 0.88,
+                    plain_language=(
+                        "Available disk space is critically low and may affect application "
+                        "stability."
+                    ),
+                    safe_next_actions=[
+                        (
+                            "Remove or archive only known non-essential local files if that is "
+                            "already part of the documented operator process."
+                        ),
+                        (
+                            "Capture a support bundle before cleanup if the "
+                            "storage pressure is current."
+                        ),
+                    ],
+                    escalation_triggers=[
+                        (
+                            "Escalate if critical free-space pressure remains "
+                            "on an operational volume."
+                        ),
+                    ],
+                    uncertainty_notes=[
+                        (
+                            "This is a current capacity snapshot only; it does not prove how long "
+                            "the filesystem has been this full."
+                        )
+                    ],
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    identifier="low-disk-space-operational-risk",
+                    severity="medium",
+                    title=f"Low available disk space may affect local operations on {disk.path}",
+                    summary=(
+                        "Available disk space is low enough that local writes, logs, or updates "
+                        "may start failing."
+                    ),
+                    evidence=evidence,
+                    probable_cause=(
+                        "Local storage pressure may be contributing to application failures, "
+                        "unstable updates, delayed writes, or missing local logs."
+                    ),
+                    fault_domain="local_host",
+                    confidence=0.9 if _is_operational_volume(disk) else 0.8,
+                    plain_language=(
+                        "Low available disk space may impact local writes, logs, or updates."
+                    ),
+                    safe_next_actions=[
+                        (
+                            "Review obvious non-essential local files first before deleting any "
+                            "managed or application data."
+                        ),
+                        "Capture a support bundle while the low-space condition is still present.",
+                    ],
+                    escalation_triggers=[
+                        "Escalate if low free space persists on a system or user-data volume.",
+                    ],
+                    uncertainty_notes=[
+                        (
+                            "This finding identifies storage pressure, not which application will "
+                            "fail first or which file set caused the pressure."
+                        )
+                    ],
+                )
+            )
     return findings
 
 
@@ -621,6 +860,63 @@ def _storage_device_status(device: StorageDeviceHealth) -> str | None:
     return None
 
 
+def _storage_issue_present(resources) -> bool:
+    if any(_disk_pressure_level(disk) in {"critical", "low"} for disk in resources.disks):
+        return True
+    return any(
+        _storage_device_status(device) in {"failure", "warning"}
+        for device in resources.storage_devices
+    )
+
+
+def _disk_pressure_level(disk) -> str:
+    if disk.pressure_level in {"critical", "low", "normal"}:
+        return str(disk.pressure_level)
+    if disk.total_bytes <= 0:
+        return "unknown"
+    free_ratio = disk.free_bytes / disk.total_bytes
+    if free_ratio <= 0.05 or disk.free_bytes <= 2 * 1024**3:
+        return "critical"
+    if free_ratio <= 0.10 or disk.free_bytes <= 10 * 1024**3:
+        return "low"
+    return "normal"
+
+
+def _disk_pressure_evidence(disk) -> list[str]:
+    free_percent = (
+        f"{disk.free_percent:.1f}%"
+        if disk.free_percent is not None
+        else _format_ratio(disk.free_bytes, disk.total_bytes)
+    )
+    return [
+        f"Filesystem {disk.path} is {disk.percent_used:.1f}% utilized.",
+        f"Free space is {_format_bytes(disk.free_bytes)} ({free_percent} free).",
+        f"Storage pressure classification for this volume is {_disk_pressure_level(disk)}.",
+    ]
+
+
+def _storage_operational_impact(disk) -> str | None:
+    role_hint = disk.role_hint or "other"
+    if role_hint == "system":
+        return (
+            "This appears to be a system-facing volume, so low space can affect temp files, "
+            "logs, updates, caches, or sign-in state."
+        )
+    if role_hint == "user_data":
+        return (
+            "This appears to be a user-data volume, so low space can affect profile data, "
+            "downloads, caches, and application writes."
+        )
+    return (
+        "Low space on this monitored volume may still affect local writes for applications that "
+        "store data there."
+    )
+
+
+def _is_operational_volume(disk) -> bool:
+    return disk.role_hint in {"system", "user_data"}
+
+
 def _storage_device_evidence(devices: list[StorageDeviceHealth]) -> list[str]:
     evidence: list[str] = []
     for device in devices:
@@ -643,6 +939,38 @@ def _storage_device_evidence(devices: list[StorageDeviceHealth]) -> list[str]:
             f"{'; '.join(status_bits) or 'an explicit health issue'}."
         )
     return evidence
+
+
+def _no_storage_pressure_evidence(resources) -> list[str]:
+    if not resources.disks and not resources.storage_devices:
+        return ["No disk-capacity or storage-device health facts were collected in this run."]
+
+    evidence: list[str] = []
+    if resources.disks:
+        healthiest = [
+            (
+                f"{disk.path} ({disk.free_percent:.1f}% free, "
+                f"{_disk_pressure_level(disk)} pressure)"
+            )
+            for disk in resources.disks[:3]
+            if disk.free_percent is not None
+        ]
+        if healthiest:
+            evidence.append(f"Monitored volumes: {', '.join(healthiest)}.")
+    healthy_devices = [
+        device
+        for device in resources.storage_devices
+        if _storage_device_status(device) == "healthy"
+    ]
+    if healthy_devices:
+        evidence.append(
+            "Storage-device health reported healthy state for "
+            + ", ".join(device.device_id for device in healthy_devices[:3])
+            + "."
+        )
+    elif not resources.storage_devices:
+        evidence.append("Storage-device health was not exposed on this endpoint.")
+    return evidence or ["No strong local storage-risk signal was detected."]
 
 
 def _evaluate_service_path(facts: CollectedFacts) -> list[Finding]:
@@ -821,6 +1149,259 @@ def _connectivity_pressure_evidence(facts: CollectedFacts) -> str:
     return "Internet reachability checks did not succeed."
 
 
+def _cpu_pressure_state(cpu) -> dict[str, bool | str]:
+    logical_cpus = cpu.logical_cpus or 0
+    ratio_5m = (
+        (cpu.load_average_5m / logical_cpus)
+        if cpu.load_average_5m is not None and logical_cpus > 0
+        else None
+    )
+    strong = bool(
+        cpu.load_ratio_1m is not None
+        and cpu.load_ratio_1m >= 1.25
+        and ratio_5m is not None
+        and ratio_5m >= 1.0
+    )
+    present = strong or cpu.saturation_level == "elevated"
+    return {
+        "present": present,
+        "strong": strong,
+        "ratio_5m_known": ratio_5m is not None,
+    }
+
+
+def _memory_pressure_state(memory) -> dict[str, bool | str]:
+    available_percent = memory.available_percent or 0.0
+    swap_pressure = _has_swap_pressure(memory)
+    commit_pressure = memory.commit_pressure_level in {"high", "elevated"}
+    strong = bool(
+        memory.pressure_level == "high"
+        and (
+            available_percent <= 8.0
+            or swap_pressure
+            or memory.commit_pressure_level == "high"
+        )
+    )
+    present = strong or memory.pressure_level == "elevated" or commit_pressure or swap_pressure
+    severity = (
+        "high"
+        if available_percent <= 5.0 or memory.commit_pressure_level == "high"
+        else "medium"
+    )
+    return {
+        "present": present,
+        "strong": strong,
+        "severity": severity,
+    }
+
+
+def _has_swap_pressure(memory) -> bool:
+    if memory.swap_used_bytes is None:
+        return False
+    if memory.swap_total_bytes:
+        return (
+            memory.swap_total_bytes > 0
+            and (memory.swap_used_bytes / memory.swap_total_bytes) >= 0.25
+        )
+    return memory.swap_used_bytes >= 512 * 1024**2
+
+
+def _snapshot_shows_multiple_pressure_vectors(snapshot) -> bool:
+    if snapshot is None:
+        return False
+    vectors = 0
+    if snapshot.high_cpu_process_count >= 2:
+        vectors += 1
+    if snapshot.high_memory_process_count >= 2:
+        vectors += 1
+    if len(snapshot.top_categories) >= 2:
+        vectors += 1
+    return vectors >= 2
+
+
+def _host_pressure_evidence(
+    facts: CollectedFacts,
+    *,
+    include_network_context: bool = False,
+) -> list[str]:
+    evidence: list[str] = []
+    evidence.extend(
+        _cpu_pressure_evidence(
+            facts.resources.cpu,
+            facts.resources.process_snapshot,
+        )
+    )
+    evidence.extend(
+        _memory_pressure_evidence(
+            facts.resources.memory,
+            facts.resources.process_snapshot,
+        )
+    )
+    snapshot = facts.resources.process_snapshot
+    if snapshot is not None and snapshot.sampled_process_count:
+        evidence.append(
+            "Bounded process snapshot sampled "
+            f"{snapshot.sampled_process_count} processes and retained "
+            f"{len(snapshot.top_categories)} notable category summaries."
+        )
+    if include_network_context:
+        evidence.extend(
+            _network_health_evidence(
+                facts,
+                enabled_checks={"routing", "dns", "connectivity"},
+            )
+        )
+    return _dedupe_preserve_order(evidence)
+
+
+def _cpu_pressure_evidence(cpu, snapshot) -> list[str]:
+    evidence: list[str] = []
+    if cpu.logical_cpus is not None:
+        evidence.append(f"Logical CPU count is {cpu.logical_cpus}.")
+    if cpu.load_average_1m is not None:
+        evidence.append(
+            "1-minute load average is "
+            f"{cpu.load_average_1m:.2f}"
+            + (
+                f" ({cpu.load_ratio_1m:.2f}x logical-core capacity)."
+                if cpu.load_ratio_1m is not None
+                else "."
+            )
+        )
+    if cpu.load_average_5m is not None:
+        evidence.append(f"5-minute load average is {cpu.load_average_5m:.2f}.")
+    if cpu.saturation_level is not None:
+        evidence.append(f"CPU saturation classification is {cpu.saturation_level}.")
+    if snapshot is not None and snapshot.high_cpu_process_count:
+        evidence.append(
+            "Bounded process snapshot found "
+            f"{snapshot.high_cpu_process_count} unusually active processes."
+        )
+    for category in (snapshot.top_categories[:2] if snapshot is not None else []):
+        if category.combined_cpu_percent_estimate is None:
+            continue
+        evidence.append(
+            f"Process category {_format_process_category(category.category)} accounts for about "
+            f"{category.combined_cpu_percent_estimate:.1f}% sampled CPU."
+        )
+    return evidence
+
+
+def _memory_pressure_evidence(memory, snapshot) -> list[str]:
+    evidence: list[str] = []
+    if memory.available_percent is not None:
+        evidence.append(f"Available memory is {memory.available_percent:.1f}% of total RAM.")
+    if memory.pressure_level is not None:
+        evidence.append(f"Memory pressure classification is {memory.pressure_level}.")
+    if memory.swap_used_bytes is not None or memory.swap_total_bytes is not None:
+        evidence.append(
+            "Swap usage is "
+            f"{_format_bytes(memory.swap_used_bytes)} / {_format_bytes(memory.swap_total_bytes)}."
+        )
+    if memory.committed_bytes is not None and memory.commit_limit_bytes is not None:
+        evidence.append(
+            "Committed memory is "
+            f"{_format_bytes(memory.committed_bytes)} / {_format_bytes(memory.commit_limit_bytes)}."
+        )
+    if memory.commit_pressure_level is not None:
+        evidence.append(f"Commit pressure classification is {memory.commit_pressure_level}.")
+    if snapshot is not None and snapshot.high_memory_process_count:
+        evidence.append(
+            "Bounded process snapshot found "
+            f"{snapshot.high_memory_process_count} unusually large resident-memory consumers."
+        )
+    for category in (snapshot.top_categories[:2] if snapshot is not None else []):
+        if category.combined_memory_bytes is None:
+            continue
+        evidence.append(
+            f"Process category {_format_process_category(category.category)} holds about "
+            f"{_format_bytes(category.combined_memory_bytes)} of sampled resident memory."
+        )
+    return evidence
+
+
+def _no_host_pressure_evidence(resources) -> list[str]:
+    evidence = []
+    evidence.append(
+        f"CPU saturation classification is {resources.cpu.saturation_level or 'unknown'}."
+    )
+    evidence.append(
+        f"Memory pressure classification is {resources.memory.pressure_level or 'unknown'}."
+    )
+    if resources.memory.commit_pressure_level is not None:
+        evidence.append(
+            f"Commit pressure classification is {resources.memory.commit_pressure_level}."
+        )
+    snapshot = resources.process_snapshot
+    if snapshot is None:
+        evidence.append("Bounded process-load hints were unavailable in this snapshot.")
+    else:
+        evidence.append(
+            f"Bounded process snapshot found {snapshot.high_cpu_process_count} high-CPU and "
+            f"{snapshot.high_memory_process_count} high-memory processes."
+        )
+    return evidence
+
+
+def _network_explanation_not_supported(
+    facts: CollectedFacts,
+    *,
+    enabled_checks: set[str],
+) -> bool:
+    if "connectivity" not in enabled_checks:
+        return False
+
+    public_tcp_checks = [
+        check
+        for check in facts.connectivity.tcp_checks
+        if not is_private_or_loopback_host(check.target.host)
+    ]
+    if not public_tcp_checks or any(not check.success for check in public_tcp_checks):
+        return False
+    if "dns" in enabled_checks and facts.dns.checks and any(
+        not check.success for check in facts.dns.checks
+    ):
+        return False
+    if "routing" in enabled_checks and not facts.network.route_summary.has_default_route:
+        return False
+    return facts.connectivity.internet_reachable
+
+
+def _network_health_evidence(
+    facts: CollectedFacts,
+    *,
+    enabled_checks: set[str],
+) -> list[str]:
+    evidence: list[str] = []
+    if "routing" in enabled_checks and facts.network.route_summary.has_default_route:
+        default_route_target = (
+            facts.network.route_summary.default_gateway
+            or facts.network.route_summary.default_interface
+            or "a configured interface"
+        )
+        evidence.append(
+            f"Routing summary still shows a default route via {default_route_target}."
+        )
+    if "dns" in enabled_checks:
+        successful_dns = [check for check in facts.dns.checks if check.success]
+        if successful_dns:
+            evidence.append(f"DNS checks succeeded: {_format_dns_hosts(successful_dns)}.")
+    if "connectivity" in enabled_checks:
+        public_tcp_checks = [
+            check
+            for check in facts.connectivity.tcp_checks
+            if not is_private_or_loopback_host(check.target.host)
+        ]
+        successful_public_tcp = [check for check in public_tcp_checks if check.success]
+        if successful_public_tcp:
+            evidence.append(
+                f"External TCP checks succeeded: {_format_tcp_targets(successful_public_tcp)}."
+            )
+        if facts.connectivity.internet_reachable:
+            evidence.append("Generic internet reachability checks succeeded.")
+    return evidence
+
+
 def _route_inconsistency_evidence(facts: CollectedFacts) -> list[str]:
     route_summary = facts.network.route_summary
     if not route_summary.has_default_route:
@@ -912,3 +1493,27 @@ def _format_service_targets(checks: Iterable[ServiceCheck]) -> str:
         status = "ok" if check.success else (check.error or "failed")
         items.append(f"{label} ({status})")
     return ", ".join(items[:3]) + (" and more" if len(items) > 3 else "")
+
+
+def _format_process_category(value: str) -> str:
+    return {
+        "browser": "browser",
+        "collaboration": "collaboration apps",
+        "container_runtime": "container runtime",
+        "database": "database",
+        "ide": "IDE or editor",
+        "other": "other processes",
+        "vm": "VM",
+    }.get(value, value.replace("_", " "))
+
+
+def _format_bytes(value: int | None) -> str:
+    if value is None:
+        return "unknown"
+    suffixes = ["B", "KiB", "MiB", "GiB", "TiB"]
+    size = float(value)
+    for suffix in suffixes:
+        if size < 1024 or suffix == suffixes[-1]:
+            return f"{size:.1f} {suffix}"
+        size /= 1024
+    return f"{value} B"

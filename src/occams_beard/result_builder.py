@@ -6,8 +6,8 @@ import platform as python_platform
 from typing import TYPE_CHECKING, cast
 
 from occams_beard import __version__
-from occams_beard.explanations import build_guided_experience, enrich_findings
 from occams_beard.execution import build_execution_records
+from occams_beard.explanations import build_guided_experience, enrich_findings
 from occams_beard.findings import evaluate_selected_findings
 from occams_beard.models import (
     EndpointDiagnosticResult,
@@ -34,7 +34,11 @@ def assemble_endpoint_result(
     """Build the stable endpoint result contract from the completed run context."""
 
     facts = context.current_facts()
-    findings, probable_fault_domain = evaluate_selected_findings(facts, options.selected_checks)
+    findings, probable_fault_domain = evaluate_selected_findings(
+        facts,
+        options.selected_checks,
+        issue_category=options.profile.issue_category if options.profile else None,
+    )
     findings = enrich_findings(findings)
     execution = build_execution_records(facts, options, context.warnings, context.durations_ms)
     guided_experience = build_guided_experience(findings, execution, options.profile)

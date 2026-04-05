@@ -30,7 +30,7 @@ The operating model remains:
 - optional local profile overrides that are skipped cleanly when malformed while built-ins stay strict
 - standalone support-bundle validation for directory and zip exports
 - CI gates for documentation structure, unit tests, `ruff` including `E501`, `mypy`, and bounded live smoke validation on GitHub-hosted Ubuntu, macOS, and Windows runners
-- canonical committed sample artifacts that match schema `1.1.0` and current support-bundle output
+- canonical committed sample artifacts that match schema `1.3.0` and current support-bundle output
 - broader parser coverage for Linux, macOS, and Windows split-tunnel, resolver, VPN, malformed-route, legacy-netstat, localized route-print, and traceroute/routing variants
 - documented accessibility hardening in the existing server-rendered UI, plus optional browser-level coverage for key flows
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import ctypes
 import json
 from ctypes import wintypes
+from typing import Any
 
 from occams_beard.utils.parsing import (
     ParsedInterface,
@@ -13,9 +14,9 @@ from occams_beard.utils.parsing import (
     empty_route_data,
     parse_arp_table,
     parse_ipconfig,
-    parse_windows_ipconfig_dns_servers,
     parse_powershell_dns_server_list,
     parse_route_print,
+    parse_windows_ipconfig_dns_servers,
 )
 from occams_beard.utils.subprocess import CommandResult, run_command
 
@@ -58,6 +59,7 @@ def _powershell_json_value(command: str) -> object | None:
             f"{command} | ConvertTo-Json -Compress",
         ],
         timeout=8.0,
+        capture_output_for_bundle="Get-Process" not in command,
     )
     if not result.succeeded:
         return None
@@ -75,11 +77,21 @@ def _powershell_json(command: str) -> dict[str, object] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _kernel32() -> Any | None:
+    windll = getattr(ctypes, "windll", None)
+    if windll is None:
+        return None
+    return windll.kernel32
+
+
 def read_uptime_seconds() -> int | None:
     """Read system uptime using the unprivileged kernel tick counter."""
 
     try:
-        return max(0, int(ctypes.windll.kernel32.GetTickCount64() // 1000))
+        kernel32 = _kernel32()
+        if kernel32 is None:
+            return None
+        return max(0, int(kernel32.GetTickCount64() // 1000))
     except (AttributeError, OSError):
         return None
 
@@ -90,11 +102,21 @@ def read_memory_snapshot() -> dict[str, int | None]:
     status = MEMORYSTATUSEX()
     status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
     try:
-        succeeded = bool(ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)))
+        kernel32 = _kernel32()
+        succeeded = bool(kernel32 and kernel32.GlobalMemoryStatusEx(ctypes.byref(status)))
     except (AttributeError, OSError):
         succeeded = False
     if not succeeded:
-        return {"total_bytes": None, "available_bytes": None, "free_bytes": None}
+        return {
+            "total_bytes": None,
+            "available_bytes": None,
+            "free_bytes": None,
+            "swap_total_bytes": None,
+            "swap_free_bytes": None,
+            "swap_used_bytes": None,
+            "committed_bytes": None,
+            "commit_limit_bytes": None,
+        }
 
     total_bytes = int(status.ullTotalPhys)
     free_bytes = int(status.ullAvailPhys)
@@ -102,6 +124,11 @@ def read_memory_snapshot() -> dict[str, int | None]:
         "total_bytes": total_bytes,
         "available_bytes": free_bytes,
         "free_bytes": free_bytes,
+        "swap_total_bytes": None,
+        "swap_free_bytes": None,
+        "swap_used_bytes": None,
+        "committed_bytes": None,
+        "commit_limit_bytes": None,
     }
 
 
@@ -110,7 +137,8 @@ def read_battery_snapshot() -> dict[str, object] | None:
 
     status = SYSTEM_POWER_STATUS()
     try:
-        succeeded = bool(ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)))
+        kernel32 = _kernel32()
+        succeeded = bool(kernel32 and kernel32.GetSystemPowerStatus(ctypes.byref(status)))
     except (AttributeError, OSError):
         succeeded = False
     if not succeeded:
@@ -159,6 +187,34 @@ def read_storage_device_health() -> list[dict[str, object]] | None:
             }
         )
     return devices
+
+
+def read_process_snapshot() -> list[dict[str, object]] | None:
+    """Collect a bounded process snapshot without persisting raw process inventory."""
+
+    payload = _powershell_json_value("Get-Process | Select-Object ProcessName,CPU,WorkingSet64")
+    records = _as_object_list(payload)
+    if payload is None:
+        return None
+
+    processes: list[dict[str, object]] = []
+    for record in records:
+        name = _coerce_string(record.get("ProcessName"))
+        if name is None:
+            continue
+        cpu_value = record.get("CPU")
+        cpu_percent_estimate = float(cpu_value) if isinstance(cpu_value, (int, float)) else None
+        memory_bytes = _coerce_int(record.get("WorkingSet64"))
+        processes.append(
+            {
+                "name": name,
+                "cpu_percent_estimate": round(cpu_percent_estimate, 1)
+                if cpu_percent_estimate is not None
+                else None,
+                "memory_bytes": memory_bytes,
+            }
+        )
+    return processes
 
 
 def read_interfaces() -> tuple[list[ParsedInterface], CommandResult]:

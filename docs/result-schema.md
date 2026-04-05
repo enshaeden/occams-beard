@@ -2,7 +2,7 @@
 
 ## Schema Version
 
-Current result schema: `1.1.0`
+Current result schema: `1.3.0`
 
 This schema version is separate from the application version. The application can change without changing the result schema, and the result schema can change even if the operator-facing UI stays similar.
 
@@ -21,17 +21,27 @@ This schema version is separate from the application version. The application ca
 - `guided_experience`
 
 Raw command capture is intentionally excluded from `result.json`. If enabled, it lives only in the support bundle as `raw-commands.json`.
+The bounded process-snapshot commands used for host-pressure hints are also excluded from raw-command capture so support bundles do not accidentally turn the feature into a process inventory export.
 
 `guided_experience` is a deterministic explanation surface derived from findings and execution state. It is not an independent reasoning engine and should not contradict or bypass `findings`.
 
-## Additive `1.1.0` Fields
+## Additive `1.3.0` Fields
 
-Schema `1.1.0` adds two optional fields under `facts.resources`:
+Schema `1.3.0` adds optional host-pressure and storage-pressure fields:
 
-- `battery`: read-only battery state when the endpoint exposes it
-- `storage_devices`: read-only storage-device health records when the endpoint exposes them
+- Under `facts.resources`:
+  - `battery`: read-only battery state when the endpoint exposes it
+  - `storage_devices`: read-only storage-device health records when the endpoint exposes them
+  - `cpu.load_ratio_1m` and `cpu.saturation_level`: logical-core saturation hints derived from the current load snapshot
+  - `memory.available_percent`, optional swap fields, and optional commit-pressure fields: snapshot-only local memory pressure evidence when the platform exposes it
+  - `process_snapshot`: bounded process-load category summaries derived from one local snapshot, not a persistent process inventory
+- Under `facts.resources.disks[*]`:
+  - `free_percent`: operator-friendly free-space percentage for the current filesystem snapshot
+  - `pressure_level`: deterministic storage-pressure classification for that volume: `critical`, `low`, `normal`, or `unknown`
+  - `role_hint`: coarse operational role for the monitored volume, used only to explain likely impact areas such as system writes or user-data writes
 
 These fields are additive. Existing consumers that ignore unknown fields can continue to parse the rest of the result.
+The new resource fields remain read-only and snapshot-only. They do not represent background sampling, destructive testing, vendor-specific SMART parsing sprawl, or long-term baselines.
 
 ## Execution Status Model
 
@@ -69,7 +79,9 @@ Supported status values:
 
 - Pre-schema-versioned JSON artifacts are historical and should be treated as unversioned review fixtures.
 - Schema `1.0.0` is the first explicit compatibility point.
-- Schema `1.1.0` is the current compatibility point.
+- Schema `1.1.0` remains a prior compatibility point.
+- Schema `1.2.0` remains a prior compatibility point.
+- Schema `1.3.0` is the current compatibility point.
 - Additive fields should not require a major schema bump.
 - Renaming or removing fields should require a major schema bump.
 

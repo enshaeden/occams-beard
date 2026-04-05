@@ -212,6 +212,66 @@ FINDING_GUIDANCE: dict[str, dict[str, object]] = {
             ("The tool identifies host pressure, not which application or process is responsible."),
         ],
     },
+    "sustained-cpu-saturation": {
+        "plain_language": (
+            "CPU demand is staying high enough that the device itself is likely overloaded."
+        ),
+        "safe_next_actions": [
+            (
+                "Pause or close non-essential heavy local workloads before rerunning if that is "
+                "safe for the user session."
+            ),
+            "Capture a support bundle while the saturation is still present.",
+        ],
+        "escalation_triggers": [
+            "Escalate if CPU saturation remains high after obvious local workload reduction.",
+        ],
+        "uncertainty_notes": [
+            (
+                "This identifies sustained CPU pressure on the host, not which exact process is "
+                "responsible."
+            ),
+        ],
+    },
+    "device-slow-local-host-pressure": {
+        "plain_language": (
+            "Local resource pressure is likely contributing to the device feeling slow."
+        ),
+        "safe_next_actions": [
+            (
+                "Reduce obvious local workload where that is safe, then rerun while the slow "
+                "symptom is still present."
+            ),
+            "Capture a support bundle promptly so the snapshot remains current.",
+        ],
+        "escalation_triggers": [
+            "Escalate if the device still feels slow and the same host-pressure pattern repeats.",
+        ],
+        "uncertainty_notes": [
+            (
+                "This is still a one-time snapshot; it does not prove how long the host pressure "
+                "has been present."
+            ),
+        ],
+    },
+    "local-resource-pressure-no-dominant-source": {
+        "plain_language": (
+            "The device may be overloaded right now, but this snapshot does not isolate a single "
+            "main bottleneck."
+        ),
+        "safe_next_actions": [
+            "Rerun while the slow period is active so the next snapshot can confirm the pattern.",
+        ],
+        "escalation_triggers": [
+            "Escalate if repeated runs keep showing moderate host pressure without a clear owner.",
+        ],
+        "uncertainty_notes": [
+            (
+                "This finding confirms local pressure signals exist, but not whether CPU, memory, "
+                "or workload mix is the dominant driver."
+            ),
+        ],
+    },
     "host-pressure-with-connectivity-degradation": {
         "plain_language": (
             "The endpoint is heavily loaded and that load may be contributing "
@@ -233,6 +293,44 @@ FINDING_GUIDANCE: dict[str, dict[str, object]] = {
             (
                 "This is a heuristic link between host load and network "
                 "behavior, not proof that the host caused the path failure."
+            ),
+        ],
+    },
+    "no-significant-host-pressure": {
+        "plain_language": (
+            "This run did not capture a strong local CPU or memory pressure signal."
+        ),
+        "safe_next_actions": [
+            "Rerun while the slow behavior is actively happening so the snapshot reflects it.",
+        ],
+        "escalation_triggers": [
+            "Escalate if the device is still slow but repeated runs stay inconclusive.",
+        ],
+        "uncertainty_notes": [
+            (
+                "The tool captures a current snapshot only; it can miss short spikes or earlier "
+                "pressure that already cleared."
+            ),
+        ],
+    },
+    "network-explanation-not-supported": {
+        "plain_language": (
+            "The selected network checks do not currently support a network-based explanation for "
+            "the reported slowness."
+        ),
+        "safe_next_actions": [
+            "Keep at least one public DNS and TCP baseline in future slow-device runs.",
+        ],
+        "escalation_triggers": [
+            (
+                "Escalate if the device stays slow but both host-pressure and network evidence "
+                "remain weak."
+            ),
+        ],
+        "uncertainty_notes": [
+            (
+                "This only means the selected network checks looked healthy in this run; it does "
+                "not prove the network was healthy at every earlier moment."
             ),
         ],
     },
@@ -288,6 +386,65 @@ FINDING_GUIDANCE: dict[str, dict[str, object]] = {
             (
                 "This shows an explicit health warning from the endpoint, but not whether the "
                 "device will fail imminently."
+            ),
+        ],
+    },
+    "critical-disk-space-exhaustion": {
+        "plain_language": (
+            "Available disk space is critically low and may affect application stability."
+        ),
+        "safe_next_actions": [
+            (
+                "Free only known non-essential local space first, following the documented "
+                "operator process."
+            ),
+            "Capture a support bundle before cleanup if the condition is still present.",
+        ],
+        "escalation_triggers": [
+            "Escalate if critical free-space pressure remains on a monitored operational volume.",
+        ],
+        "uncertainty_notes": [
+            (
+                "This is a current capacity snapshot; it does not prove how long the filesystem "
+                "has been near exhaustion."
+            ),
+        ],
+    },
+    "low-disk-space-operational-risk": {
+        "plain_language": (
+            "Low available disk space may impact local writes, logs, or updates."
+        ),
+        "safe_next_actions": [
+            "Review obvious non-essential local files before deleting managed or application data.",
+            "Capture a support bundle while the low-space state is still present.",
+        ],
+        "escalation_triggers": [
+            "Escalate if low free space persists on a monitored operational volume.",
+        ],
+        "uncertainty_notes": [
+            (
+                "This finding identifies storage pressure, not which specific application will "
+                "fail first."
+            ),
+        ],
+    },
+    "no-significant-storage-pressure": {
+        "plain_language": (
+            "Current storage evidence does not support a strong local storage explanation."
+        ),
+        "safe_next_actions": [
+            "Rerun while the issue is active if storage pressure is still suspected.",
+        ],
+        "escalation_triggers": [
+            (
+                "Escalate if the issue persists but storage evidence remains weak across "
+                "repeated runs."
+            ),
+        ],
+        "uncertainty_notes": [
+            (
+                "This only reflects the current snapshot and the storage-health data the platform "
+                "exposed."
             ),
         ],
     },

@@ -6,12 +6,12 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
+from occams_beard.defaults import DEFAULT_CHECKS
 from occams_beard.domain_registry import (
     NETWORK_EGRESS_DOMAINS,
     iter_registered_domains,
     planned_step_labels_by_domain,
 )
-from occams_beard.defaults import DEFAULT_CHECKS
 from occams_beard.models import (
     CollectedFacts,
     DiagnosticWarning,
@@ -191,9 +191,14 @@ def _resources_execution(
     cpu = facts.resources.cpu
     memory = facts.resources.memory
     resource_warnings = [
-        warning for warning in warnings if warning.code != "battery-unavailable"
+        warning
+        for warning in warnings
+        if warning.code not in {"battery-unavailable", "process-snapshot-unavailable"}
     ]
     battery_warnings = [warning for warning in warnings if warning.code == "battery-unavailable"]
+    process_warnings = [
+        warning for warning in warnings if warning.code == "process-snapshot-unavailable"
+    ]
 
     resource_status: ExecutionStatus = "passed"
     if resource_warnings and cpu.logical_cpus is None and memory.total_bytes is None:
@@ -206,12 +211,18 @@ def _resources_execution(
     probes = [
         ExecutionProbe(
             probe_id="resource-snapshot",
-            label="Collect CPU and memory facts",
+            label="Collect CPU, memory, and swap facts",
             status=resource_status,
             duration_ms=duration_ms,
             details=[
                 f"Logical CPUs: {cpu.logical_cpus if cpu.logical_cpus is not None else 'unknown'}.",
+                f"CPU saturation: {cpu.saturation_level or 'unknown'}.",
                 f"Memory pressure: {memory.pressure_level or 'unknown'}.",
+                (
+                    f"Commit pressure: {memory.commit_pressure_level}."
+                    if memory.commit_pressure_level is not None
+                    else "Commit pressure was not reported."
+                ),
             ],
             warnings=resource_warnings,
         ),
@@ -219,6 +230,11 @@ def _resources_execution(
             facts,
             duration_ms=duration_ms,
             warnings=battery_warnings,
+        ),
+        _process_snapshot_probe(
+            facts,
+            duration_ms=duration_ms,
+            warnings=process_warnings,
         ),
     ]
     status = _aggregate_probe_statuses(probe.status for probe in probes)
@@ -228,7 +244,10 @@ def _resources_execution(
         status=status,
         selected=True,
         duration_ms=duration_ms,
-        summary="Collected local CPU, memory, and battery state when available.",
+        summary=(
+            "Collected local CPU, memory, swap or commit, and bounded process-load hints "
+            "when available."
+        ),
         warnings=warnings,
         probes=probes,
     )
@@ -257,7 +276,13 @@ def _storage_execution(
             label="Collect disk usage",
             status=disk_status,
             duration_ms=duration_ms,
-            details=[f"Volumes collected: {len(facts.resources.disks)}."],
+            details=[
+                f"Volumes collected: {len(facts.resources.disks)}.",
+                (
+                    "Pressure summary: "
+                    f"{_storage_pressure_summary(facts.resources.disks)}."
+                ),
+            ],
             warnings=disk_warnings,
         ),
         _storage_device_probe(
@@ -273,7 +298,10 @@ def _storage_execution(
         status=status,
         selected=True,
         duration_ms=duration_ms,
-        summary="Collected filesystem capacity and storage-device health when available.",
+        summary=(
+            "Collected filesystem capacity and storage-device health, with explicit low-space "
+            "pressure classification when available."
+        ),
         warnings=warnings,
         probes=probes,
     )
@@ -709,6 +737,49 @@ def _battery_probe(
     )
 
 
+def _process_snapshot_probe(
+    facts: CollectedFacts,
+    *,
+    duration_ms: int | None,
+    warnings: list[DiagnosticWarning],
+) -> ExecutionProbe:
+    snapshot = facts.resources.process_snapshot
+    if warnings:
+        status: ExecutionStatus = "partial"
+        details = ["Bounded process-load hints could not be collected on this endpoint."]
+    elif snapshot is None:
+        status = "skipped"
+        details = ["Bounded process-load hints were not collected in this run."]
+    else:
+        status = "passed"
+        category_summary = ", ".join(
+            
+                f"{item.category} ({item.process_count})"
+                for item in snapshot.top_categories[:3]
+            
+        )
+        details = [
+            f"Processes sampled: {snapshot.sampled_process_count}.",
+            (
+                f"High-CPU processes: {snapshot.high_cpu_process_count}; "
+                f"high-memory processes: {snapshot.high_memory_process_count}."
+            ),
+            (
+                f"Top load categories: {category_summary}."
+                if category_summary
+                else "No notable process categories were retained in the bounded summary."
+            ),
+        ]
+    return ExecutionProbe(
+        probe_id="bounded-process-snapshot",
+        label="Collect bounded process-load hints",
+        status=status,
+        duration_ms=duration_ms,
+        details=details,
+        warnings=warnings,
+    )
+
+
 def _storage_device_probe(
     facts: CollectedFacts,
     *,
@@ -750,6 +821,17 @@ def _storage_device_probe(
         details=details,
         warnings=warnings,
     )
+
+
+def _storage_pressure_summary(disks) -> str:
+    if not disks:
+        return "no volumes collected"
+    counts = {"critical": 0, "low": 0, "normal": 0}
+    for disk in disks:
+        level = getattr(disk, "pressure_level", None)
+        if level in counts:
+            counts[level] += 1
+    return ", ".join(f"{count} {level}" for level, count in counts.items() if count) or "unknown"
 
 
 def _status_from_collection(

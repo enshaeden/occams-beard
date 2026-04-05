@@ -10,6 +10,7 @@ from occams_beard.models import (
     ConnectivityState,
     CpuState,
     DiagnosticWarning,
+    DiskVolume,
     DnsResolutionCheck,
     DnsState,
     EndpointDiagnosticResult,
@@ -21,6 +22,8 @@ from occams_beard.models import (
     NetworkInterface,
     NetworkState,
     PlatformInfo,
+    ProcessCategoryLoad,
+    ProcessSnapshot,
     ResourceState,
     RouteSummary,
     ServiceCheck,
@@ -321,14 +324,35 @@ class ReportOutputTests(unittest.TestCase):
                     uptime_seconds=600,
                 ),
                 resources=ResourceState(
-                    cpu=CpuState(logical_cpus=8, utilization_percent_estimate=11.0),
+                    cpu=CpuState(
+                        logical_cpus=8,
+                        utilization_percent_estimate=11.0,
+                        load_ratio_1m=0.11,
+                        saturation_level="normal",
+                    ),
                     memory=MemoryState(
                         total_bytes=16 * 1024**3,
                         available_bytes=8 * 1024**3,
                         free_bytes=7 * 1024**3,
                         pressure_level="normal",
+                        available_percent=50.0,
+                        swap_total_bytes=4 * 1024**3,
+                        swap_free_bytes=3 * 1024**3,
+                        swap_used_bytes=1024**3,
+                        commit_pressure_level="normal",
                     ),
-                    disks=[],
+                    disks=[
+                        DiskVolume(
+                            path="/",
+                            total_bytes=500 * 1024**3,
+                            used_bytes=490 * 1024**3,
+                            free_bytes=10 * 1024**3,
+                            percent_used=98.0,
+                            free_percent=2.0,
+                            pressure_level="critical",
+                            role_hint="system",
+                        )
+                    ],
                     battery=BatteryState(
                         present=True,
                         charge_percent=91,
@@ -346,6 +370,19 @@ class ReportOutputTests(unittest.TestCase):
                             operational_status=None,
                         )
                     ],
+                    process_snapshot=ProcessSnapshot(
+                        sampled_process_count=42,
+                        high_cpu_process_count=1,
+                        high_memory_process_count=1,
+                        top_categories=[
+                            ProcessCategoryLoad(
+                                category="browser",
+                                process_count=2,
+                                combined_cpu_percent_estimate=44.0,
+                                combined_memory_bytes=2 * 1024**3,
+                            )
+                        ],
+                    ),
                 ),
                 network=NetworkState(route_summary=RouteSummary(None, None, False, [])),
                 dns=DnsState(),
@@ -359,7 +396,14 @@ class ReportOutputTests(unittest.TestCase):
         text = render_report(result)
 
         self.assertIn("Battery health: 91%, Charging, condition Normal, health 98.0%", text)
+        self.assertIn("CPU saturation: normal", text)
+        self.assertIn(
+            "Swap or commit pressure: swap 1.0 GiB / 4.0 GiB, commit pressure normal",
+            text,
+        )
+        self.assertIn("Bounded process hints: browser (2, 44.0% CPU, 2.0 GiB)", text)
         self.assertIn("Storage Snapshot", text)
+        self.assertIn("Monitored volumes: / (98.0% used, 2.0% free, critical pressure)", text)
         self.assertIn("Storage device health: disk0=Verified", text)
 
 

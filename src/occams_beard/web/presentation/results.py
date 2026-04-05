@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
 import re
+from collections import OrderedDict
+from collections.abc import Sequence
 
 from occams_beard.models import (
     DnsResolutionCheck,
@@ -20,9 +21,6 @@ from occams_beard.web.presentation.catalog import (
     get_mode_option,
 )
 from occams_beard.web.presentation.plans import probe_summary
-
-if False:  # pragma: no cover
-    from occams_beard.runner import DiagnosticsRunOptions
 
 STATUS_LABELS = {
     "passed": "Passed",
@@ -159,12 +157,14 @@ def build_results_view(
         [
             "Everything in this run stayed on this device unless you choose to download an export.",
             (
-                "This run created network traffic for the selected DNS, reachability, or service checks."
+                "This run created network traffic for the selected DNS, "
+                "reachability, or service checks."
                 if any(record.creates_network_egress for record in selected_execution)
                 else "This run stayed local-only and did not create intentional network traffic."
             ),
             (
-                "Raw command capture is available for this run and stays excluded unless you turn it on in the support bundle."
+                "Raw command capture is available for this run and stays "
+                "excluded unless you turn it on in the support bundle."
                 if result.raw_command_capture
                 else "Raw command capture was not collected for this run."
             ),
@@ -309,9 +309,13 @@ def build_results_view(
         "warning_notes": warnings,
         "privacy_notes": privacy_notes,
         "bundle_intro": (
-            "Use this as the main handoff to support. It contains the local result, a readable report, redaction details, and file checksums."
+            "Use this as the main handoff to support. It contains the local "
+            "result, a readable report, redaction details, and file checksums."
             if mode == SUPPORT_MODE
-            else "If you still need help, use the support bundle instead of screenshots so support receives the full local result."
+            else (
+                "If you still need help, use the support bundle instead of "
+                "screenshots so support receives the full local result."
+            )
         ),
         "bundle_contents": bundle_contents,
         "bundle_raw_capture_label": (
@@ -320,9 +324,13 @@ def build_results_view(
             else "Raw command capture not collected"
         ),
         "bundle_raw_capture_note": (
-            "This run collected raw command output. It stays excluded unless you turn it on below."
+            "This run collected raw command output. It stays excluded unless "
+            "you turn it on below."
             if result.raw_command_capture
-            else "This run did not collect raw command output, so the bundle will include only the standard files."
+            else (
+                "This run did not collect raw command output, so the bundle "
+                "will include only the standard files."
+            )
         ),
         "bundle_redaction_note": "Safe redaction is selected by default for most support handoffs.",
         "support_actions_intro": (
@@ -358,7 +366,10 @@ def _headline_for_result(
         return (
             "We found some useful signals, but this run did not isolate a single cause."
             if mode == SELF_SERVE_MODE
-            else "Your device completed most checks successfully, but one or more deeper checks stayed incomplete."
+            else (
+                "Your device completed most checks successfully, but one or "
+                "more deeper checks stayed incomplete."
+            )
         )
     if top_finding is not None:
         return top_finding.title
@@ -549,7 +560,7 @@ def _build_uncertainty_notes(
     mode: str,
     tone: str,
     top_finding: Finding | None,
-    degraded_execution: list[object],
+    degraded_execution: Sequence[object],
     warnings: list[str],
     source_notes: list[str],
     continue_with_support: bool,
@@ -559,24 +570,31 @@ def _build_uncertainty_notes(
         lead_notes.append(
             "We found some useful signals, but this run did not isolate a single cause."
             if mode == SELF_SERVE_MODE
-            else "Your device completed most checks successfully, but one or more deeper checks stayed incomplete."
+            else (
+                "Your device completed most checks successfully, but one or "
+                "more deeper checks stayed incomplete."
+            )
         )
     elif tone == "attention" and degraded_execution:
         lead_notes.append(
-            "This run found something that needs attention, but one or more supporting checks still finished with gaps."
+            "This run found something that needs attention, but one or more "
+            "supporting checks still finished with gaps."
         )
     elif tone == "clear":
         lead_notes.append(
-            "This run stayed bounded to the selected checks, so it does not prove every layer is healthy."
+            "This run stayed bounded to the selected checks, so it does not "
+            "prove every layer is healthy."
         )
 
     if warnings and tone in {"partial", "attention"}:
         lead_notes.append(
-            "One or more checks reported limitations, so the remaining uncertainty is best reviewed with support."
+            "One or more checks reported limitations, so the remaining "
+            "uncertainty is best reviewed with support."
         )
     elif top_finding is None and degraded_execution:
         lead_notes.append(
-            "The collected evidence stayed incomplete enough that support review is the safest next step."
+            "The collected evidence stayed incomplete enough that support "
+            "review is the safest next step."
         )
 
     if continue_with_support and tone in {"partial", "attention"}:
@@ -599,12 +617,19 @@ def _primary_next_step(
 ) -> str:
     if mode == SUPPORT_MODE:
         return (
-            "Download the support bundle and decide whether to include the raw command capture before you send it to support."
+            "Download the support bundle and decide whether to include the raw "
+            "command capture before you send it to support."
             if raw_capture_available
-            else "Download the support bundle and send it to support so they can review the full local evidence."
+            else (
+                "Download the support bundle and send it to support so they "
+                "can review the full local evidence."
+            )
         )
     if tone in {"partial", "attention"} and continue_with_support:
-        return "The next best step is to continue with support so they can review a deeper guided plan."
+        return (
+            "The next best step is to continue with support so they can review "
+            "a deeper guided plan."
+        )
     if next_steps:
         return next_steps[0]
     if escalation_guidance:

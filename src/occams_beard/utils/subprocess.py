@@ -57,7 +57,12 @@ def capture_command_output() -> Iterator[list[RawCommandCapture]]:
         _COMMAND_CAPTURE_SINK.reset(token)
 
 
-def run_command(args: list[str], timeout: float = 5.0) -> CommandResult:
+def run_command(
+    args: list[str],
+    timeout: float = 5.0,
+    *,
+    capture_output_for_bundle: bool = True,
+) -> CommandResult:
     """Run a command without raising, capturing stdout and stderr."""
 
     start = time.perf_counter()
@@ -74,7 +79,7 @@ def run_command(args: list[str], timeout: float = 5.0) -> CommandResult:
             duration_ms=duration_ms,
             error=f"command-not-found:{args[0]}",
         )
-        _record_capture(result)
+        _record_capture(result, enabled=capture_output_for_bundle)
         return result
 
     LOGGER.debug("Running command: %s", args)
@@ -97,7 +102,7 @@ def run_command(args: list[str], timeout: float = 5.0) -> CommandResult:
             timed_out=True,
             error="timeout",
         )
-        _record_capture(result)
+        _record_capture(result, enabled=capture_output_for_bundle)
         return result
     except OSError as exc:
         duration_ms = int((time.perf_counter() - start) * 1000)
@@ -109,7 +114,7 @@ def run_command(args: list[str], timeout: float = 5.0) -> CommandResult:
             duration_ms=duration_ms,
             error=str(exc),
         )
-        _record_capture(result)
+        _record_capture(result, enabled=capture_output_for_bundle)
         return result
 
     duration_ms = int((time.perf_counter() - start) * 1000)
@@ -120,7 +125,7 @@ def run_command(args: list[str], timeout: float = 5.0) -> CommandResult:
         stderr=completed.stderr,
         duration_ms=duration_ms,
     )
-    _record_capture(result)
+    _record_capture(result, enabled=capture_output_for_bundle)
     return result
 
 
@@ -132,7 +137,9 @@ def _coerce_process_output(output: str | bytes | None) -> str:
     return output
 
 
-def _record_capture(result: CommandResult) -> None:
+def _record_capture(result: CommandResult, *, enabled: bool) -> None:
+    if not enabled:
+        return
     captured = _COMMAND_CAPTURE_SINK.get()
     if captured is None:
         return

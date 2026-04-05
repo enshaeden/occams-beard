@@ -33,6 +33,9 @@ The added guidance fields do not replace the deterministic finding. They are ren
 The findings engine still reasons about:
 
 - local host pressure
+- symptom-correlated local host pressure for slow-device runs
+- deterministic storage-pressure states from monitored filesystems
+- explicit distinction between filesystem space exhaustion and storage-device health degradation
 - local network state
 - DNS failures and partial failures
 - generic connectivity failures
@@ -42,3 +45,18 @@ The findings engine still reasons about:
 
 It still does not become an application-layer diagnosis engine or an auto-remediation system.
 It still does not infer hardware failure from cycle counts, generic low charge, or opaque vendor tooling that is not exposed through the current non-privileged collection path.
+
+## Local Host Pressure Notes
+
+- CPU pressure now prefers logical-core saturation evidence over generic utilization alone.
+- Memory pressure can incorporate optional swap or commit pressure when the platform exposes it.
+- Slow-device findings can explicitly state when current network checks do not support a network-based explanation.
+- Bounded process hints are summaries only. They are coarse categories from one snapshot, not a process inventory or a sustained trend.
+
+## Storage Notes
+
+- Storage findings stay deterministic and snapshot-based. They only use current filesystem capacity plus the non-privileged storage-health signals already exposed by the platform collectors.
+- Low-space findings are split between warning and critical severity so the report can distinguish operational risk from likely application-stability impact.
+- Storage-device health findings remain bounded to explicit healthy, warning, degraded, failing, or unhealthy states surfaced by the operating system. They do not infer device failure from generic slowness alone.
+- When selected network checks look healthy, storage findings can explicitly note that the current evidence makes a network-only explanation less likely.
+- Absence findings such as `no-significant-storage-pressure` stay narrow. They mean the current snapshot did not expose strong local storage pressure, not that historical or intermittent storage issues are impossible.

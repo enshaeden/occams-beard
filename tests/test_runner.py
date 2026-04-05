@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from occams_beard.defaults import DEFAULT_CHECKS
+from occams_beard.execution import planned_execution_step_count
 from occams_beard.models import (
     ConnectivityState,
     CpuState,
@@ -18,7 +19,6 @@ from occams_beard.models import (
     TcpConnectivityCheck,
     TcpTarget,
 )
-from occams_beard.execution import planned_execution_step_count
 from occams_beard.runner import DiagnosticsRunOptions, build_run_options, run_diagnostics
 
 
@@ -99,7 +99,7 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result.probable_fault_domain, "dns")
         self.assertEqual(result.findings[0].identifier, "dns-degraded")
         self.assertEqual(result.facts.host.hostname, "demo-host")
-        self.assertEqual(result.schema_version, "1.1.0")
+        self.assertEqual(result.schema_version, "1.3.0")
         self.assertTrue(result.execution)
         self.assertIsNotNone(result.guided_experience)
         mock_resources.assert_not_called()
@@ -210,9 +210,11 @@ class RunnerTests(unittest.TestCase):
             if progress_callback is not None:
                 progress_callback(1)
                 progress_callback(2)
+                progress_callback(3)
             return (
                 CpuState(logical_cpus=8),
                 MemoryState(total_bytes=1000, available_bytes=500, free_bytes=400),
+                None,
                 None,
                 [],
             )
@@ -243,14 +245,17 @@ class RunnerTests(unittest.TestCase):
             run_diagnostics(options, progress_callback=capture_progress)
 
         self.assertEqual(progress_updates[0][0], "resources")
-        self.assertEqual(progress_updates[0][1:3], (1, 3))
+        self.assertEqual(progress_updates[0][1:3], (1, 4))
         self.assertEqual(progress_updates[1][0], "resources")
-        self.assertEqual(progress_updates[1][1:3], (2, 3))
+        self.assertEqual(progress_updates[1][1:3], (2, 4))
         self.assertEqual(progress_updates[1][3]["resources"], 1)
         self.assertEqual(progress_updates[2][0], "resources")
-        self.assertEqual(progress_updates[2][1:3], (3, 3))
+        self.assertEqual(progress_updates[2][1:3], (3, 4))
         self.assertEqual(progress_updates[2][3]["resources"], 2)
-        self.assertEqual(progress_updates[3][0], None)
+        self.assertEqual(progress_updates[3][0], "resources")
+        self.assertEqual(progress_updates[3][1:3], (4, 4))
+        self.assertEqual(progress_updates[3][3]["resources"], 3)
+        self.assertEqual(progress_updates[4][0], None)
 
     def test_planned_execution_step_count_grows_with_targets_and_enabled_probes(self) -> None:
         options = DiagnosticsRunOptions(

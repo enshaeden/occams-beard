@@ -101,13 +101,18 @@ def _execute_host(options: DiagnosticsRunOptions, context: DiagnosticsRunContext
 def _execute_resources(options: DiagnosticsRunOptions, context: DiagnosticsRunContext) -> None:
     del options
     started_at = time.perf_counter()
-    cpu, memory, battery, warnings = collect_resource_state(
+    cpu, memory, battery, process_snapshot, warnings = collect_resource_state(
         progress_callback=lambda completed_steps: context.record_domain_progress(
             "resources",
             completed_steps,
         )
     )
-    context.set_resources(cpu=cpu, memory=memory, battery=battery)
+    context.set_resources(
+        cpu=cpu,
+        memory=memory,
+        battery=battery,
+        process_snapshot=process_snapshot,
+    )
     context.complete_domain("resources", started_at=started_at, warnings=warnings)
 
 
@@ -204,6 +209,7 @@ def _resource_step_labels(options: DiagnosticsRunOptions) -> list[str]:
     return [
         "Collecting CPU and load facts",
         "Collecting memory and battery facts",
+        "Collecting bounded process-load hints",
     ]
 
 

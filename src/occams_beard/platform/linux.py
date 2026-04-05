@@ -34,7 +34,16 @@ def read_memory_snapshot() -> dict[str, int | None]:
 
     path = Path("/proc/meminfo")
     if not path.exists():
-        return {"total_bytes": None, "available_bytes": None, "free_bytes": None}
+        return {
+            "total_bytes": None,
+            "available_bytes": None,
+            "free_bytes": None,
+            "swap_total_bytes": None,
+            "swap_free_bytes": None,
+            "swap_used_bytes": None,
+            "committed_bytes": None,
+            "commit_limit_bytes": None,
+        }
 
     values: dict[str, int] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -45,10 +54,21 @@ def read_memory_snapshot() -> dict[str, int | None]:
         if number.isdigit():
             values[key] = int(number) * 1024
 
+    swap_total = values.get("SwapTotal")
+    swap_free = values.get("SwapFree")
+    swap_used = None
+    if swap_total is not None and swap_free is not None:
+        swap_used = max(swap_total - swap_free, 0)
+
     return {
         "total_bytes": values.get("MemTotal"),
         "available_bytes": values.get("MemAvailable", values.get("MemFree")),
         "free_bytes": values.get("MemFree"),
+        "swap_total_bytes": swap_total,
+        "swap_free_bytes": swap_free,
+        "swap_used_bytes": swap_used,
+        "committed_bytes": values.get("Committed_AS"),
+        "commit_limit_bytes": values.get("CommitLimit"),
     }
 
 
@@ -97,6 +117,41 @@ def read_storage_device_health() -> list[dict[str, object]]:
     """Return non-privileged storage-device health data when available."""
 
     return []
+
+
+def read_process_snapshot() -> list[dict[str, object]] | None:
+    """Collect a bounded process snapshot from `ps` without persisting raw output."""
+
+    result = run_command(
+        ["ps", "-A", "-o", "comm=,pcpu=,rss="],
+        timeout=6.0,
+        capture_output_for_bundle=False,
+    )
+    if not result.succeeded:
+        return None
+
+    processes: list[dict[str, object]] = []
+    for raw_line in result.stdout.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = line.split(None, 2)
+        if len(parts) != 3:
+            continue
+        command, cpu_text, rss_text = parts
+        try:
+            cpu_percent = float(cpu_text)
+            rss_kib = int(rss_text)
+        except ValueError:
+            continue
+        processes.append(
+            {
+                "name": command,
+                "cpu_percent_estimate": round(cpu_percent, 1),
+                "memory_bytes": rss_kib * 1024,
+            }
+        )
+    return processes
 
 
 def read_interfaces() -> tuple[list[ParsedInterface], CommandResult]:

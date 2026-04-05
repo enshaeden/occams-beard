@@ -13,6 +13,53 @@ from occams_beard.utils.subprocess import CommandResult
 class StorageCollectionTests(unittest.TestCase):
     """Validate storage mount filtering and warning behavior."""
 
+    @patch("occams_beard.collectors.storage.current_platform", return_value="linux")
+    @patch("occams_beard.collectors.storage.linux.read_storage_device_health", return_value=[])
+    @patch("occams_beard.collectors.storage.shutil.disk_usage")
+    @patch("occams_beard.collectors.storage.run_command")
+    def test_collect_storage_state_filters_linux_pseudo_filesystems(
+        self,
+        mock_run_command,
+        mock_disk_usage,
+        _mock_storage_health,
+        _mock_platform,
+    ) -> None:
+        mock_run_command.return_value = CommandResult(
+            args=("df", "-kP"),
+            returncode=0,
+            stdout=(
+                "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
+                "/dev/root 100 92 8 92% /\n"
+                "tmpfs 100 10 90 10% /run\n"
+                "tmpfs 100 5 95 5% /dev/shm\n"
+                "/dev/nvme0n1p2 100 40 60 40% /home\n"
+            ),
+            stderr="",
+            duration_ms=4,
+        )
+        usage_map = {
+            "/": shutil._ntuple_diskusage(
+                100 * 1024**3,
+                92 * 1024**3,
+                8 * 1024**3,
+            ),
+            "/home": shutil._ntuple_diskusage(
+                200 * 1024**3,
+                80 * 1024**3,
+                120 * 1024**3,
+            ),
+        }
+        mock_disk_usage.side_effect = lambda path: usage_map[path]
+
+        disks, storage_devices, warnings = collect_storage_state()
+
+        self.assertEqual([disk.path for disk in disks], ["/", "/home"])
+        self.assertEqual(disks[0].pressure_level, "low")
+        self.assertEqual(disks[0].role_hint, "system")
+        self.assertEqual(disks[1].role_hint, "user_data")
+        self.assertEqual(storage_devices, [])
+        self.assertEqual(warnings, [])
+
     @patch("occams_beard.collectors.storage.current_platform", return_value="macos")
     @patch("occams_beard.collectors.storage.macos.read_storage_device_health", return_value=[])
     @patch("occams_beard.collectors.storage.shutil.disk_usage")
@@ -52,6 +99,8 @@ class StorageCollectionTests(unittest.TestCase):
             [disk.path for disk in disks],
             ["/", "/System/Volumes/Data", "/System/Volumes/Data/home"],
         )
+        self.assertEqual(disks[0].role_hint, "system")
+        self.assertEqual(disks[0].free_percent, 60.0)
         self.assertEqual(storage_devices, [])
         self.assertEqual(warnings, [])
         self.assertEqual(

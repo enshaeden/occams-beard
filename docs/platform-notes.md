@@ -6,6 +6,7 @@
 - Missing commands degrade into warnings or `unsupported` execution status instead of silent skips.
 - Optional ping and traceroute remain best-effort.
 - Raw command capture is opt-in and local only.
+- The bounded process-snapshot commands used for host-pressure hints stay excluded from raw command capture so support bundles do not export raw process inventories.
 - Repo-root operator launch now uses platform-specific root shims that delegate to one shared Python bootstrap module; macOS keeps `Open Device Check.command`, and Windows uses `Open Device Check.cmd`.
 - The repo-root launcher now rejects an existing project virtualenv interpreter when it is older than the supported Python baseline, so stale local `.venv` state does not block browser launch.
 
@@ -16,6 +17,7 @@ Linux:
 - `/proc/uptime`
 - `/proc/meminfo`
 - `/sys/class/power_supply/BAT*`
+- `ps -A -o comm=,pcpu=,rss=`
 - `ip addr show`
 - `ip route show`
 - `/etc/resolv.conf`
@@ -25,8 +27,10 @@ macOS:
 
 - `sysctl`
 - `vm_stat`
+- `sysctl vm.swapusage`
 - `system_profiler SPPowerDataType`
 - `pmset -g batt`
+- `ps -A -o comm=,pcpu=,rss=`
 - `diskutil info -all`
 - `ifconfig`
 - `route -n get default`
@@ -39,6 +43,7 @@ Windows:
 - `GetTickCount64`
 - `GlobalMemoryStatusEx`
 - `GetSystemPowerStatus`
+- `Get-Process | Select-Object ProcessName,CPU,WorkingSet64`
 - PowerShell DNS server enumeration with `ipconfig /all` fallback
 - `Get-PhysicalDisk`
 - `ipconfig /all`
@@ -59,8 +64,16 @@ Windows:
 - Windows cannot execute the macOS `.command` file type directly, so true cross-platform root launch requires a Windows-specific sibling shim even though launch orchestration is shared underneath
 - VPN detection remains heuristic
 - Linux battery health is limited to what sysfs exposes, and non-privileged Linux storage-device health is still effectively unavailable in the current model
+- Linux storage pressure now ignores pseudo-filesystems such as `/proc`, `/run`, `/sys`, and `/dev/shm` so operator findings stay focused on real writable volumes
+- Linux can expose swap and commit pressure from `/proc/meminfo`, but not every distribution or containerized runtime exposes the same fields consistently
 - macOS storage-device health depends on `diskutil` exposing usable device and SMART state on the current host
+- macOS and Linux storage-space findings are based on `df` plus non-privileged filesystem usage snapshots; they show current free-space pressure only and do not represent a sustained trend
+- macOS can expose swap usage, but it does not expose the same commit-limit semantics as Linux in the current non-privileged model
 - Windows battery collection currently captures battery presence, charge, and coarse state without elevation, but it still does not expose design-capacity health in the current model
+- Windows storage-device health remains opportunistic because some environments expose only coarse `Get-PhysicalDisk` health states and some deny the query to standard users
+- Windows process hints currently lean more on working-set size than on true instantaneous CPU saturation because the standard unprivileged process snapshot is coarser there
+- process hints are snapshot-only and category-based; they are intentionally not a full process list or a sustained trend view
+- Storage-device health remains intentionally bounded. The project does not perform destructive disk testing, privileged repair actions, or broad vendor-specific SMART parsing.
 - Some enterprise Windows environments deny CIM access to standard users; host uptime, memory, resolver inventory, and basic battery state therefore avoid CIM and fall back to native APIs or unprivileged command output
 - traceroute parsing remains conservative
 - fixture coverage now includes representative split-tunnel, blackhole/default-route, resolver, VPN-adapter, malformed-route, legacy-netstat, and additional traceroute variants across Linux, macOS, and Windows, but it still does not cover every OS/version-localization combination

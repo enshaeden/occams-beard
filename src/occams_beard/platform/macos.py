@@ -40,9 +40,13 @@ def read_memory_snapshot() -> dict[str, int | None]:
 
     total_result = run_command(["sysctl", "-n", "hw.memsize"])
     vm_stat_result = run_command(["vm_stat"])
+    swap_result = run_command(["sysctl", "vm.swapusage"])
     total_bytes = int(total_result.stdout.strip()) if total_result.succeeded else None
     free_bytes = None
     available_bytes = None
+    swap_total_bytes = None
+    swap_free_bytes = None
+    swap_used_bytes = None
 
     if vm_stat_result.succeeded:
         page_size_match = re.search(r"page size of (\d+) bytes", vm_stat_result.stdout)
@@ -61,10 +65,22 @@ def read_memory_snapshot() -> dict[str, int | None]:
         free_bytes = free_pages * page_size
         available_bytes = (free_pages + inactive_pages + speculative_pages) * page_size
 
+    if swap_result.succeeded:
+        swap_usage = _parse_swapusage_bytes(swap_result.stdout)
+        if swap_usage is not None:
+            swap_total_bytes = swap_usage["total_bytes"]
+            swap_used_bytes = swap_usage["used_bytes"]
+            swap_free_bytes = swap_usage["free_bytes"]
+
     return {
         "total_bytes": total_bytes,
         "available_bytes": available_bytes,
         "free_bytes": free_bytes,
+        "swap_total_bytes": swap_total_bytes,
+        "swap_free_bytes": swap_free_bytes,
+        "swap_used_bytes": swap_used_bytes,
+        "committed_bytes": None,
+        "commit_limit_bytes": None,
     }
 
 
@@ -106,6 +122,41 @@ def read_storage_device_health() -> list[dict[str, object]] | None:
     if not result.succeeded:
         return None
     return _parse_diskutil_storage_devices(result.stdout)
+
+
+def read_process_snapshot() -> list[dict[str, object]] | None:
+    """Collect a bounded process snapshot from `ps` without persisting raw output."""
+
+    result = run_command(
+        ["ps", "-A", "-o", "comm=,pcpu=,rss="],
+        timeout=6.0,
+        capture_output_for_bundle=False,
+    )
+    if not result.succeeded:
+        return None
+
+    processes: list[dict[str, object]] = []
+    for raw_line in result.stdout.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = line.split(None, 2)
+        if len(parts) != 3:
+            continue
+        command, cpu_text, rss_text = parts
+        try:
+            cpu_percent = float(cpu_text)
+            rss_kib = int(rss_text)
+        except ValueError:
+            continue
+        processes.append(
+            {
+                "name": command,
+                "cpu_percent_estimate": round(cpu_percent, 1),
+                "memory_bytes": rss_kib * 1024,
+            }
+        )
+    return processes
 
 
 def read_interfaces() -> tuple[list[ParsedInterface], CommandResult]:
@@ -256,6 +307,35 @@ def _parse_diskutil_storage_devices(output: str) -> list[dict[str, object]]:
             }
         )
     return devices
+
+
+def _parse_swapusage_bytes(output: str) -> dict[str, int] | None:
+    match = re.search(
+        r"total = ([\d.]+[BKMGTP])\s+used = ([\d.]+[BKMGTP])\s+free = ([\d.]+[BKMGTP])",
+        output,
+    )
+    if not match:
+        return None
+
+    return {
+        "total_bytes": _parse_size_token(match.group(1)),
+        "used_bytes": _parse_size_token(match.group(2)),
+        "free_bytes": _parse_size_token(match.group(3)),
+    }
+
+
+def _parse_size_token(value: str) -> int:
+    number = float(value[:-1])
+    suffix = value[-1].upper()
+    multipliers = {
+        "B": 1,
+        "K": 1024,
+        "M": 1024**2,
+        "G": 1024**3,
+        "T": 1024**4,
+        "P": 1024**5,
+    }
+    return int(number * multipliers[suffix])
 
 
 def _snapshot_marks_battery_absent(snapshot: dict[str, object] | None) -> bool:

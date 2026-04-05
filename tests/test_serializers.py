@@ -17,6 +17,8 @@ from occams_beard.models import (
     Metadata,
     NetworkState,
     PlatformInfo,
+    ProcessCategoryLoad,
+    ProcessSnapshot,
     ResourceState,
     RouteSummary,
     ServiceState,
@@ -37,11 +39,39 @@ def build_result() -> EndpointDiagnosticResult:
             uptime_seconds=100,
         ),
         resources=ResourceState(
-            cpu=CpuState(logical_cpus=4, utilization_percent_estimate=20.0),
+            cpu=CpuState(
+                logical_cpus=4,
+                utilization_percent_estimate=20.0,
+                load_ratio_1m=0.2,
+                saturation_level="normal",
+            ),
             memory=MemoryState(
-                total_bytes=1000, available_bytes=500, free_bytes=400, pressure_level="normal"
+                total_bytes=1000,
+                available_bytes=500,
+                free_bytes=400,
+                pressure_level="normal",
+                available_percent=50.0,
+                swap_total_bytes=200,
+                swap_free_bytes=120,
+                swap_used_bytes=80,
+                committed_bytes=600,
+                commit_limit_bytes=1200,
+                commit_pressure_level="normal",
             ),
             disks=[],
+            process_snapshot=ProcessSnapshot(
+                sampled_process_count=12,
+                high_cpu_process_count=1,
+                high_memory_process_count=1,
+                top_categories=[
+                    ProcessCategoryLoad(
+                        category="browser",
+                        process_count=1,
+                        combined_cpu_percent_estimate=62.0,
+                        combined_memory_bytes=400,
+                    )
+                ],
+            ),
         ),
         network=NetworkState(
             route_summary=RouteSummary(
@@ -84,13 +114,15 @@ class SerializerTests(unittest.TestCase):
 
         payload = to_json_dict(result)
 
-        self.assertEqual(payload["schema_version"], "1.1.0")
+        self.assertEqual(payload["schema_version"], "1.3.0")
         self.assertIn("metadata", payload)
         self.assertIn("facts", payload)
         self.assertEqual(payload["platform"]["system"], "Linux")
         self.assertNotIn("raw_command_capture", payload)
         self.assertIn("battery", payload["facts"]["resources"])
         self.assertIn("storage_devices", payload["facts"]["resources"])
+        self.assertIn("process_snapshot", payload["facts"]["resources"])
+        self.assertIn("swap_used_bytes", payload["facts"]["resources"]["memory"])
 
     def test_write_json_file_persists_valid_json(self) -> None:
         result = build_result()

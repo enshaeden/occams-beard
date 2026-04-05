@@ -123,6 +123,11 @@ class WindowsHardwareHelperTests(unittest.TestCase):
                 "total_bytes": 32 * 1024**3,
                 "available_bytes": 20 * 1024**3,
                 "free_bytes": 20 * 1024**3,
+                "swap_total_bytes": None,
+                "swap_free_bytes": None,
+                "swap_used_bytes": None,
+                "committed_bytes": None,
+                "commit_limit_bytes": None,
             },
         )
 

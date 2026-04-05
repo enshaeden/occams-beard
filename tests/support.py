@@ -196,6 +196,9 @@ def build_default_run_result() -> EndpointDiagnosticResult:
                     used_bytes=245_000_000_000,
                     free_bytes=255_107_862_016,
                     percent_used=49.0,
+                    free_percent=51.0,
+                    pressure_level="normal",
+                    role_hint="system",
                 )
             ],
             battery=BatteryState(present=False),

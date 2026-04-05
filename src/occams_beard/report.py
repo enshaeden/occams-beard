@@ -35,6 +35,12 @@ def render_report(result: EndpointDiagnosticResult, json_path: str | None = None
         resources.cpu.logical_cpus if resources.cpu.logical_cpus is not None else "unknown"
     )
     cpu_utilization = _format_percent(resources.cpu.utilization_percent_estimate)
+    cpu_saturation = resources.cpu.saturation_level or "unknown"
+    swap_summary = _swap_summary(collected="resources" in selected_checks, resources=resources)
+    process_summary = _process_summary(
+        collected="resources" in selected_checks,
+        resources=resources,
+    )
     active_interfaces = (
         _join_or_none(network.active_interfaces)
         if "network" in selected_checks
@@ -157,12 +163,18 @@ def render_report(result: EndpointDiagnosticResult, json_path: str | None = None
             f"- Uptime (seconds): {uptime_seconds}",
             f"- CPU logical cores: {logical_cpus}",
             f"- CPU utilization estimate: {cpu_utilization}",
+            f"- CPU saturation: {cpu_saturation}",
             f"- Memory pressure: {resources.memory.pressure_level or 'unknown'}",
             (
                 "- Memory available: "
                 f"{_format_bytes(resources.memory.available_bytes)} / "
                 f"{_format_bytes(resources.memory.total_bytes)}"
             ),
+            (
+                f"- Memory available percent: {_format_percent(resources.memory.available_percent)}"
+            ),
+            f"- Swap or commit pressure: {swap_summary}",
+            f"- Bounded process hints: {process_summary}",
             f"- Battery health: {battery_summary}",
             "",
             "Storage Snapshot",
@@ -402,9 +414,18 @@ def _volume_summary(*, collected: bool, resources) -> str:
         return "not collected"
     if not resources.disks:
         return "none collected"
-    return ", ".join(
-        f"{disk.path} ({disk.percent_used:.1f}% used)" for disk in resources.disks[:4]
-    )
+    items = []
+    for disk in resources.disks[:4]:
+        if disk.free_percent is not None:
+            items.append(
+                f"{disk.path} "
+                f"({disk.percent_used:.1f}% used, "
+                f"{disk.free_percent:.1f}% free, "
+                f"{disk.pressure_level or 'unknown'} pressure)"
+            )
+        else:
+            items.append(f"{disk.path} ({disk.percent_used:.1f}% used)")
+    return ", ".join(items)
 
 
 def _storage_device_summary(*, collected: bool, resources) -> str:
@@ -419,6 +440,68 @@ def _storage_device_summary(*, collected: bool, resources) -> str:
         )
         for device in resources.storage_devices[:4]
     )
+
+
+def _swap_summary(*, collected: bool, resources) -> str:
+    if not collected:
+        return "not collected"
+
+    memory = resources.memory
+    parts = []
+    if memory.swap_used_bytes is not None or memory.swap_total_bytes is not None:
+        parts.append(
+            "swap "
+            f"{_format_bytes(memory.swap_used_bytes)} / {_format_bytes(memory.swap_total_bytes)}"
+        )
+    if memory.commit_pressure_level is not None:
+        parts.append(f"commit pressure {memory.commit_pressure_level}")
+    elif memory.committed_bytes is not None and memory.commit_limit_bytes is not None:
+        parts.append(
+            "commit "
+            f"{_format_bytes(memory.committed_bytes)} / {_format_bytes(memory.commit_limit_bytes)}"
+        )
+    return ", ".join(parts) if parts else "not exposed"
+
+
+def _process_summary(*, collected: bool, resources) -> str:
+    if not collected:
+        return "not collected"
+
+    snapshot = resources.process_snapshot
+    if snapshot is None:
+        return "unavailable"
+    if not snapshot.top_categories:
+        return f"sampled {snapshot.sampled_process_count}, no notable categories retained"
+
+    category_parts = []
+    for item in snapshot.top_categories[:3]:
+        cpu_part = (
+            f"{_format_percent(item.combined_cpu_percent_estimate)} CPU"
+            if item.combined_cpu_percent_estimate is not None
+            else "CPU not exposed"
+        )
+        memory_part = (
+            _format_bytes(item.combined_memory_bytes)
+            if item.combined_memory_bytes is not None
+            else "memory unknown"
+        )
+        category_parts.append(
+            f"{_process_category_label(item.category)} "
+            f"({item.process_count}, {cpu_part}, {memory_part})"
+        )
+    return "; ".join(category_parts)
+
+
+def _process_category_label(value: str) -> str:
+    return {
+        "browser": "browser",
+        "collaboration": "collaboration apps",
+        "container_runtime": "container runtime",
+        "database": "database",
+        "ide": "IDE or editor",
+        "other": "other processes",
+        "vm": "VM",
+    }.get(value, value.replace("_", " "))
 
 
 def _format_percentless(value: float | None) -> str:

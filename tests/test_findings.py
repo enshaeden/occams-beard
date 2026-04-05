@@ -18,6 +18,8 @@ from occams_beard.models import (
     MemoryState,
     NetworkInterface,
     NetworkState,
+    ProcessCategoryLoad,
+    ProcessSnapshot,
     ResourceState,
     RouteSummary,
     ServiceCheck,
@@ -44,12 +46,19 @@ def build_base_facts() -> CollectedFacts:
             uptime_seconds=7200,
         ),
         resources=ResourceState(
-            cpu=CpuState(logical_cpus=8, utilization_percent_estimate=35.0),
+            cpu=CpuState(
+                logical_cpus=8,
+                utilization_percent_estimate=35.0,
+                load_ratio_1m=0.35,
+                saturation_level="normal",
+            ),
             memory=MemoryState(
                 total_bytes=16 * 1024**3,
                 available_bytes=8 * 1024**3,
                 free_bytes=6 * 1024**3,
                 pressure_level="normal",
+                available_percent=50.0,
+                commit_pressure_level="normal",
             ),
             disks=[],
         ),
@@ -329,15 +338,18 @@ class FindingsTests(unittest.TestCase):
         self.assertEqual(probable_fault_domain, "upstream_network")
         self.assertEqual(findings[0].identifier, "internet-ok-selected-service-failure")
 
-    def test_low_disk_space_generates_local_host_finding(self) -> None:
+    def test_critical_disk_space_generates_high_severity_local_host_finding(self) -> None:
         facts = build_base_facts()
         facts.resources.disks = [
             DiskVolume(
                 path="/",
                 total_bytes=1000,
-                used_bytes=950,
-                free_bytes=50,
-                percent_used=95.0,
+                used_bytes=980,
+                free_bytes=20,
+                percent_used=98.0,
+                free_percent=2.0,
+                pressure_level="critical",
+                role_hint="system",
             )
         ]
 
@@ -347,9 +359,30 @@ class FindingsTests(unittest.TestCase):
         )
 
         self.assertEqual(probable_fault_domain, "local_host")
-        self.assertTrue(
-            any(finding.identifier.startswith("low-disk-space-") for finding in findings)
+        self.assertEqual(findings[0].identifier, "critical-disk-space-exhaustion")
+
+    def test_low_disk_space_generates_operational_risk_finding(self) -> None:
+        facts = build_base_facts()
+        facts.resources.disks = [
+            DiskVolume(
+                path="/home",
+                total_bytes=1000,
+                used_bytes=920,
+                free_bytes=80,
+                percent_used=92.0,
+                free_percent=8.0,
+                pressure_level="low",
+                role_hint="user_data",
+            )
+        ]
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["storage"],
         )
+
+        self.assertEqual(probable_fault_domain, "local_host")
+        self.assertEqual(findings[0].identifier, "low-disk-space-operational-risk")
 
     def test_explicit_battery_service_state_generates_local_host_finding(self) -> None:
         facts = build_base_facts()
@@ -390,6 +423,184 @@ class FindingsTests(unittest.TestCase):
 
         self.assertEqual(probable_fault_domain, "local_host")
         self.assertEqual(findings[0].identifier, "storage-device-health-failure")
+
+    def test_storage_profile_can_report_no_strong_local_storage_cause(self) -> None:
+        facts = build_base_facts()
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["storage"],
+            issue_category="low disk space",
+        )
+
+        identifiers = [finding.identifier for finding in findings]
+        self.assertEqual(probable_fault_domain, "healthy")
+        self.assertIn("no-significant-storage-pressure", identifiers)
+
+    def test_device_slow_profile_correlates_strong_host_pressure_to_reported_slowness(self) -> None:
+        facts = build_base_facts()
+        facts.resources.cpu = CpuState(
+            logical_cpus=8,
+            load_average_1m=12.0,
+            load_average_5m=9.5,
+            load_average_15m=8.0,
+            utilization_percent_estimate=150.0,
+            load_ratio_1m=1.5,
+            saturation_level="high",
+        )
+        facts.resources.memory = MemoryState(
+            total_bytes=16 * 1024**3,
+            available_bytes=512 * 1024**2,
+            free_bytes=256 * 1024**2,
+            pressure_level="high",
+            available_percent=3.1,
+            swap_total_bytes=8 * 1024**3,
+            swap_free_bytes=2 * 1024**3,
+            swap_used_bytes=6 * 1024**3,
+            committed_bytes=30 * 1024**3,
+            commit_limit_bytes=32 * 1024**3,
+            commit_pressure_level="high",
+        )
+        facts.resources.process_snapshot = ProcessSnapshot(
+            sampled_process_count=120,
+            high_cpu_process_count=3,
+            high_memory_process_count=2,
+            top_categories=[
+                ProcessCategoryLoad(
+                    category="browser",
+                    process_count=2,
+                    combined_cpu_percent_estimate=114.0,
+                    combined_memory_bytes=3 * 1024**3,
+                ),
+                ProcessCategoryLoad(
+                    category="ide",
+                    process_count=1,
+                    combined_cpu_percent_estimate=42.0,
+                    combined_memory_bytes=1500 * 1024**2,
+                ),
+            ],
+        )
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["resources", "routing", "dns", "connectivity"],
+            issue_category="device slow",
+        )
+
+        identifiers = [finding.identifier for finding in findings]
+        self.assertEqual(probable_fault_domain, "local_host")
+        self.assertEqual(findings[0].identifier, "device-slow-local-host-pressure")
+        self.assertIn("high-memory-pressure", identifiers)
+        self.assertIn("sustained-cpu-saturation", identifiers)
+        self.assertIn("network-explanation-not-supported", identifiers)
+
+    def test_device_slow_profile_can_report_no_significant_host_pressure(self) -> None:
+        facts = build_base_facts()
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["resources", "routing", "dns", "connectivity"],
+            issue_category="device slow",
+        )
+
+        identifiers = [finding.identifier for finding in findings]
+        self.assertEqual(probable_fault_domain, "healthy")
+        self.assertIn("no-significant-host-pressure", identifiers)
+        self.assertIn("network-explanation-not-supported", identifiers)
+
+    def test_local_resource_pressure_without_dominant_source_is_explicit(self) -> None:
+        facts = build_base_facts()
+        facts.resources.cpu = CpuState(
+            logical_cpus=8,
+            load_average_1m=7.6,
+            load_average_5m=6.2,
+            load_average_15m=5.7,
+            utilization_percent_estimate=95.0,
+            load_ratio_1m=0.95,
+            saturation_level="elevated",
+        )
+        facts.resources.memory = MemoryState(
+            total_bytes=16 * 1024**3,
+            available_bytes=2_500_000_000,
+            free_bytes=1_900_000_000,
+            pressure_level="elevated",
+            available_percent=14.5,
+            commit_pressure_level="elevated",
+        )
+        facts.resources.process_snapshot = ProcessSnapshot(
+            sampled_process_count=98,
+            high_cpu_process_count=2,
+            high_memory_process_count=2,
+            top_categories=[
+                ProcessCategoryLoad(
+                    category="browser",
+                    process_count=2,
+                    combined_cpu_percent_estimate=52.0,
+                ),
+                ProcessCategoryLoad(
+                    category="container_runtime",
+                    process_count=1,
+                    combined_memory_bytes=2 * 1024**3,
+                ),
+            ],
+        )
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["resources"],
+        )
+
+        self.assertEqual(probable_fault_domain, "local_host")
+        self.assertEqual(findings[0].identifier, "local-resource-pressure-no-dominant-source")
+
+    def test_host_pressure_with_connectivity_degradation_remains_heuristic(self) -> None:
+        facts = build_base_facts()
+        facts.resources.cpu = CpuState(
+            logical_cpus=8,
+            load_average_1m=11.0,
+            load_average_5m=9.0,
+            load_average_15m=7.5,
+            utilization_percent_estimate=137.5,
+            load_ratio_1m=1.38,
+            saturation_level="high",
+        )
+        facts.resources.memory = MemoryState(
+            total_bytes=16 * 1024**3,
+            available_bytes=700 * 1024**2,
+            free_bytes=512 * 1024**2,
+            pressure_level="high",
+            available_percent=4.3,
+            swap_total_bytes=8 * 1024**3,
+            swap_free_bytes=4 * 1024**3,
+            swap_used_bytes=4 * 1024**3,
+            commit_pressure_level="high",
+        )
+        facts.connectivity.internet_reachable = False
+        facts.connectivity.tcp_checks = [
+            TcpConnectivityCheck(
+                target=TcpTarget(host="github.com", port=443),
+                success=False,
+                error="timeout",
+            ),
+            TcpConnectivityCheck(
+                target=TcpTarget(host="1.1.1.1", port=53),
+                success=False,
+                error="timeout",
+            ),
+        ]
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["resources", "connectivity"],
+        )
+
+        heuristic_finding = next(
+            finding
+            for finding in findings
+            if finding.identifier == "host-pressure-with-connectivity-degradation"
+        )
+        self.assertEqual(probable_fault_domain, "local_host")
+        self.assertTrue(heuristic_finding.heuristic)
 
     def test_vpn_signal_with_private_target_failure_is_heuristic(self) -> None:
         facts = build_base_facts()

@@ -2,7 +2,7 @@
   "bundle_format_version": "1.0.0",
   "generated_at": "2026-04-01T00:15:00+00:00",
   "app_version": "0.1.0",
-  "schema_version": "1.1.0",
+  "schema_version": "1.3.0",
   "redaction_level": "safe",
   "raw_command_capture_included": false,
   "selected_checks": [
@@ -22,13 +22,13 @@
     },
     {
       "path": "report.txt",
-      "sha256": "324aa91b56997ca738f179ef8c5599c599672a776c5e0ac1ef1c3c814c504bda",
-      "size_bytes": 7714
+      "sha256": "44bb10e731daad6a2a966a2e9f151f5ee985c4820a5b4298866d1464edb0bbd0",
+      "size_bytes": 7856
     },
     {
       "path": "result.json",
-      "sha256": "1df6587714aee18bf99cb7b343c8895f4a3c683b717356bdd05f30587eb457ac",
-      "size_bytes": 18576
+      "sha256": "60e1fb77fe5b492b26fa65495a5922f41ac025b26f0d568820e1b9e50e893027",
+      "size_bytes": 18916
     }
   ],
   "notes": [],

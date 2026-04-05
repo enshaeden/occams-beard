@@ -20,6 +20,7 @@ from occams_beard.models import (
     HostBasics,
     MemoryState,
     NetworkState,
+    ProcessSnapshot,
     ResourceState,
     RouteSummary,
     ServiceState,
@@ -47,7 +48,9 @@ class DiagnosticsRunContext:
     completed_domains: set[str] = field(default_factory=set)
     completed_steps_by_domain: dict[str, int] = field(default_factory=dict)
     host: HostBasics | None = None
-    resources: ResourceState = field(default_factory=lambda: ResourceState(*_empty_resource_parts()))
+    resources: ResourceState = field(
+        default_factory=lambda: ResourceState(*_empty_resource_parts())
+    )
     network: NetworkState = field(default_factory=NetworkState)
     dns: DnsState = field(default_factory=DnsState)
     connectivity: ConnectivityState = field(
@@ -75,10 +78,12 @@ class DiagnosticsRunContext:
         cpu: CpuState,
         memory: MemoryState,
         battery: BatteryState | None,
+        process_snapshot: ProcessSnapshot | None = None,
     ) -> None:
         self.resources.cpu = cpu
         self.resources.memory = memory
         self.resources.battery = battery
+        self.resources.process_snapshot = process_snapshot
 
     def set_storage(
         self,
