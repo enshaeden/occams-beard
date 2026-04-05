@@ -36,3 +36,18 @@
 - no automatic remediation
 - no second frontend stack
 - no generalized conversational assistant
+
+## Intake Architecture Direction
+
+- Adopt an intent-driven intake control plane as a canonical internal contract under
+  `src/occams_beard/intake/`.
+- Keep user-facing symptom labels as presentation concerns, but map them through an
+  internal intent taxonomy before selecting clarification and execution pathways.
+- Keep profiles as fallback execution presets, not the primary intake abstraction.
+
+### Consequences
+
+- Symptom -> intent -> clarification -> pathway -> domains mapping is centralized and testable.
+- Runtime and route rewiring can happen incrementally while preserving existing behavior.
+- Future intake extensions can be reviewed in one contract location rather than spread across
+  web presentation and route code.
