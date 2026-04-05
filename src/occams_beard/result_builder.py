@@ -41,7 +41,13 @@ def assemble_endpoint_result(
     )
     findings = enrich_findings(findings)
     execution = build_execution_records(facts, options, context.warnings, context.durations_ms)
-    guided_experience = build_guided_experience(findings, execution, facts, options.profile)
+    guided_experience = build_guided_experience(
+        findings,
+        execution,
+        facts,
+        options.profile,
+        options.intake_context,
+    )
 
     return EndpointDiagnosticResult(
         metadata=Metadata(

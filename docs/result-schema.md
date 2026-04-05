@@ -23,7 +23,9 @@ This schema version is separate from the application version. The application ca
 Raw command capture is intentionally excluded from `result.json`. If enabled, it lives only in the support bundle as `raw-commands.json`.
 The bounded process-snapshot commands used for host-pressure hints are also excluded from raw-command capture so support bundles do not accidentally turn the feature into a process inventory export.
 
-`guided_experience` is a deterministic explanation surface derived from findings and execution state. It is not an independent reasoning engine and should not contradict or bypass `findings`. It now applies a final reasonableness gate before surfacing user-facing guidance, so internally inconsistent or non-actionable findings can remain in technical output without being repeated as guided advice.
+`guided_experience` is a deterministic explanation surface derived from findings, execution state, and any run-scoped intake context already carried into the run (reported symptom, intent key, scope rationale). It is not an independent reasoning engine and should not contradict or bypass `findings`. It now applies a final reasonableness gate before surfacing user-facing guidance, so internally inconsistent or non-actionable findings can remain in technical output without being repeated as guided advice.
+
+When intake context is available, guided text can explicitly explain why checks were selected, whether surfaced findings are direct vs adjacent to the selected scope, and when out-of-scope findings were intentionally withheld or retained only because they are high-severity and strongly supported.
 
 ## Additive `1.4.0` Fields
 

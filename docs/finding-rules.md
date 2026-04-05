@@ -29,6 +29,7 @@ Each finding now carries:
 - uncertainty notes
 
 The added guidance fields do not replace the deterministic finding. They are rendered from it.
+Guided summaries may suppress or downgrade findings that conflict with intake scope, but raw findings remain intact in result artifacts.
 
 ## Scope
 
@@ -83,3 +84,9 @@ It still does not infer hardware failure from cycle counts, generic low charge, 
 - VPN collection remains heuristic unless the platform exposes stronger state directly.
 - macOS `utun*` interfaces are not treated as meaningful active VPN sessions by default. Tunnel presence alone is weaker than a default-route change or clear route ownership.
 - The output distinguishes tunnel presence from stronger likely-active signals by using different heuristic signal types and confidences.
+
+## Intake-Aware Guidance Notes
+
+- Intake-aware guidance is deterministic: it uses only captured intake context (`selected_symptom`, `resolved_intent`, `scope_rationale`) and collected evidence.
+- Scope-awareness only affects guided narrative prioritization. It does not mutate or remove raw findings.
+- Findings outside selected symptom scope are withheld from guided summaries unless they are high-severity, non-heuristic, and strongly supported by multiple evidence points.

@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 
 from occams_beard.assistant import build_guided_experience, enrich_findings
+from occams_beard.intake.models import IntakeContext
 from occams_beard.models import DiagnosticProfile, DomainExecution, Finding
 from support import build_profile_dns_issue_result
 
@@ -139,6 +140,80 @@ class AssistantTests(unittest.TestCase):
         guided = build_guided_experience([finding], [], fixture.facts, None)
 
         self.assertEqual(guided.what_we_know, [])
+        self.assertEqual(guided.likely_happened, [])
+        self.assertIn(
+            "Guided summary withheld unsupported or internally inconsistent findings.",
+            guided.uncertainty_notes,
+        )
+
+    def test_guided_experience_includes_intake_scope_context(self) -> None:
+        fixture = build_profile_dns_issue_result()
+        findings = enrich_findings(
+            [
+                Finding(
+                    identifier="dns-failure-raw-ip-success",
+                    severity="high",
+                    title="DNS resolution failed but raw IP connectivity succeeded",
+                    summary="The endpoint can reach numeric IPs but cannot resolve hostnames.",
+                    evidence=["Numeric IP access worked.", "DNS lookup failed for baseline host."],
+                    probable_cause="The DNS path is the likeliest failure domain.",
+                    fault_domain="dns",
+                    confidence=0.92,
+                )
+            ]
+        )
+        intake_context = IntakeContext(
+            selected_symptom_key="apps-sites-not-loading",
+            selected_symptom_label="Apps or sites not loading",
+            resolved_intent_key="partial_access_or_dns",
+            clarification_answers=(),
+            scope_rationale="pathway_selected",
+        )
+
+        guided = build_guided_experience(findings, [], fixture.facts, None, intake_context)
+
+        self.assertTrue(
+            guided.what_we_know[0].startswith(
+                "Checks were scoped for the reported symptom 'Apps or sites not loading'"
+            )
+        )
+        self.assertIn(
+            "Likely explanation: The DNS path is the likeliest failure domain.",
+            guided.likely_happened,
+        )
+
+    def test_guided_experience_withholds_scope_inconsistent_noncritical_finding(self) -> None:
+        fixture = build_profile_dns_issue_result()
+        finding = Finding(
+            identifier="high-memory-pressure",
+            severity="medium",
+            title="High memory pressure observed",
+            summary="Available memory is low.",
+            evidence=["Available memory is below 10%."],
+            probable_cause="Local host pressure is likely contributing to symptoms.",
+            fault_domain="local_host",
+            confidence=0.8,
+        )
+        intake_context = IntakeContext(
+            selected_symptom_key="vpn-or-company-resource-issue",
+            selected_symptom_label="VPN or company resource issue",
+            resolved_intent_key="vpn_or_private_resource_access",
+            clarification_answers=(),
+            scope_rationale="intent_default_scope",
+        )
+
+        guided = build_guided_experience([finding], [], fixture.facts, None, intake_context)
+
+        self.assertEqual(
+            guided.what_we_know,
+            [
+                (
+                    "Checks were scoped for the reported symptom 'VPN or company resource issue' "
+                    "(intent=vpn_or_private_resource_access, "
+                    "scope_reason=intent_default_scope)."
+                )
+            ],
+        )
         self.assertEqual(guided.likely_happened, [])
         self.assertIn(
             "Guided summary withheld unsupported or internally inconsistent findings.",

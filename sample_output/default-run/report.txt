@@ -64,7 +64,7 @@ What We Know
 - The collected evidence did not match any of the tool's major fault signatures.
 
 What Likely Happened
-- No major failure domain was identified from the collected evidence.
+- Likely explanation: No major failure domain was identified from the collected evidence.
 
 What You Can Try Safely
 - If the problem is still happening, rerun with the most relevant optional probes or a narrower profile.
