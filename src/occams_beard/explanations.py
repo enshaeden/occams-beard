@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from typing import TYPE_CHECKING
 
 from occams_beard.models import (
     CollectedFacts,
@@ -12,6 +13,9 @@ from occams_beard.models import (
     GuidedExperience,
 )
 from occams_beard.storage_policy import classify_disk_pressure, is_actionable_volume_role
+
+if TYPE_CHECKING:
+    from occams_beard.intake.models import IntakeContext
 
 FINDING_GUIDANCE: dict[str, dict[str, object]] = {
     "healthy-baseline": {
@@ -641,6 +645,7 @@ def build_guided_experience(
     execution: list[DomainExecution],
     facts: CollectedFacts,
     profile: DiagnosticProfile | None = None,
+    intake_context: IntakeContext | None = None,
 ) -> GuidedExperience:
     """Create a deterministic self-service summary from findings and execution state."""
 
@@ -650,16 +655,42 @@ def build_guided_experience(
     escalation_guidance: list[str] = []
     uncertainty_notes: list[str] = []
 
-    guidance_safe_findings = [
-        finding for finding in findings if _finding_is_guidance_safe(finding, facts)
-    ]
+    scope_context = _build_scope_context(intake_context)
+
+    guidance_safe_findings = []
+    for finding in findings:
+        if not _finding_is_guidance_safe(finding, facts):
+            continue
+        scope_relevance = _finding_scope_relevance(finding, intake_context)
+        if scope_relevance == "inconsistent" and not _is_critical_well_supported(finding):
+            continue
+        guidance_safe_findings.append(finding)
+
+    if scope_context:
+        what_we_know.append(scope_context)
 
     for finding in guidance_safe_findings[:3]:
+        scope_relevance = _finding_scope_relevance(finding, intake_context)
         if finding.heuristic:
-            likely_happened.append(f"Heuristic conclusion: {finding.probable_cause}")
+            prefix = "Heuristic conclusion"
         else:
             what_we_know.append(finding.plain_language or finding.summary)
-            likely_happened.append(finding.probable_cause)
+            prefix = "Likely explanation"
+        if scope_relevance == "adjacent":
+            likely_happened.append(
+                f"{prefix} (adjacent to selected scope): {finding.probable_cause}"
+            )
+        elif scope_relevance == "inconsistent":
+            likely_happened.append(
+                f"{prefix} (outside selected scope, retained due to strength): "
+                f"{finding.probable_cause}"
+            )
+            uncertainty_notes.append(
+                "A high-severity finding outside the selected symptom scope was retained "
+                "because evidence strength was high."
+            )
+        else:
+            likely_happened.append(f"{prefix}: {finding.probable_cause}")
         safe_next_steps.extend(finding.safe_next_actions)
         escalation_guidance.extend(finding.escalation_triggers)
         uncertainty_notes.extend(finding.uncertainty_notes)
@@ -683,6 +714,11 @@ def build_guided_experience(
     if findings and not guidance_safe_findings:
         uncertainty_notes.append(
             "Guided summary withheld unsupported or internally inconsistent findings."
+        )
+    elif len(guidance_safe_findings) < len(findings):
+        uncertainty_notes.append(
+            "Some findings were downgraded or withheld because they did not align with the "
+            "selected symptom scope."
         )
 
     return GuidedExperience(
@@ -743,6 +779,65 @@ def _finding_is_guidance_safe(finding: Finding, facts: CollectedFacts) -> bool:
             for signal in facts.vpn.signals
         )
     return True
+
+
+def _build_scope_context(intake_context: IntakeContext | None) -> str | None:
+    if intake_context is None:
+        return None
+    symptom = intake_context.selected_symptom_label or intake_context.selected_symptom_key
+    intent = intake_context.resolved_intent_key or "unresolved-intent"
+    rationale = intake_context.scope_rationale or "unspecified"
+    if symptom:
+        return (
+            "Checks were scoped for the reported symptom "
+            f"'{symptom}' (intent={intent}, scope_reason={rationale})."
+        )
+    return f"Checks were scoped by intake context (intent={intent}, scope_reason={rationale})."
+
+
+def _finding_scope_relevance(
+    finding: Finding,
+    intake_context: IntakeContext | None,
+) -> str:
+    if intake_context is None:
+        return "direct"
+    intent_key = intake_context.resolved_intent_key
+    if intent_key in {None, "", "general_triage", "support_bundle_preparation"}:
+        return "direct"
+
+    direct_domains = _INTENT_DIRECT_FAULT_DOMAINS.get(intent_key, set())
+    adjacent_domains = _INTENT_ADJACENT_FAULT_DOMAINS.get(intent_key, set())
+    if finding.fault_domain in direct_domains:
+        return "direct"
+    if finding.fault_domain in adjacent_domains:
+        return "adjacent"
+    return "inconsistent"
+
+
+def _is_critical_well_supported(finding: Finding) -> bool:
+    return (
+        finding.severity == "high"
+        and finding.confidence >= 0.85
+        and len(_dedupe(finding.evidence)) >= 2
+        and not finding.heuristic
+    )
+
+
+_INTENT_DIRECT_FAULT_DOMAINS: dict[str, set[str]] = {
+    "internet_connectivity_loss": {"local_network", "dns", "internet_edge"},
+    "partial_access_or_dns": {"dns", "internet_edge", "upstream_network"},
+    "vpn_or_private_resource_access": {"vpn", "upstream_network", "dns"},
+    "local_performance_degradation": {"local_host"},
+    "clock_or_trust_failure": {"local_host", "dns"},
+}
+
+_INTENT_ADJACENT_FAULT_DOMAINS: dict[str, set[str]] = {
+    "internet_connectivity_loss": {"vpn", "upstream_network", "unknown"},
+    "partial_access_or_dns": {"local_network", "vpn", "unknown"},
+    "vpn_or_private_resource_access": {"local_network", "internet_edge", "unknown"},
+    "local_performance_degradation": {"local_network", "unknown"},
+    "clock_or_trust_failure": {"internet_edge", "unknown"},
+}
 
 
 def _storage_finding_is_guidance_safe(finding: Finding, facts: CollectedFacts) -> bool:

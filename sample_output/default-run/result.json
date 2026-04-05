@@ -691,7 +691,7 @@
       "The collected evidence did not match any of the tool's major fault signatures."
     ],
     "likely_happened": [
-      "No major failure domain was identified from the collected evidence."
+      "Likely explanation: No major failure domain was identified from the collected evidence."
     ],
     "safe_next_steps": [
       "If the problem is still happening, rerun with the most relevant optional probes or a narrower profile."

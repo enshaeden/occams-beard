@@ -894,7 +894,13 @@ def _finalize_result(
     findings, probable_fault_domain = evaluate_selected_findings(facts, options.selected_checks)
     findings = enrich_findings(findings)
     execution = build_execution_records(facts, options, warnings, durations_ms)
-    guided_experience = build_guided_experience(findings, execution, facts, options.profile)
+    guided_experience = build_guided_experience(
+        findings,
+        execution,
+        facts,
+        options.profile,
+        options.intake_context,
+    )
     return EndpointDiagnosticResult(
         metadata=Metadata(
             project_name="occams-beard",

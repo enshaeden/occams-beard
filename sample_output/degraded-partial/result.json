@@ -627,7 +627,7 @@
       "The host has a default route on paper, but the route and interface evidence do not line up cleanly."
     ],
     "likely_happened": [
-      "The route table contains a default path, but the host still appears locally misrouted, attached to the wrong interface, or missing a usable next-hop path.",
+      "Likely explanation: The route table contains a default path, but the host still appears locally misrouted, attached to the wrong interface, or missing a usable next-hop path.",
       "Heuristic conclusion: Resolver selection, split-horizon DNS, or intermittent upstream resolver reachability may be affecting only part of the configured namespace set."
     ],
     "safe_next_steps": [

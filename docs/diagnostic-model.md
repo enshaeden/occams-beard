@@ -27,7 +27,7 @@ CLI / Web / Launcher / Support Bundle Export
 - `findings.py` stays the stable findings entrypoint and delegates to explicit
   concern-focused rule modules only from collected evidence.
 - `execution.py` turns the completed run into per-domain and per-probe execution status.
-- `explanations.py` adds deterministic plain-language guidance on top of findings.
+- `explanations.py` adds deterministic plain-language guidance on top of findings, execution state, and intake context (reported symptom, resolved intent, and scope rationale).
 - `serializers.py`, `report.py`, and `support_bundle.py` render the same result object for different consumers.
 - `web/` keeps route composition, form parsing, run-session orchestration, progress shaping, and result presentation above the shared result model.
 - `intake/` centralizes intent-driven translation from user-selected symptom language into deterministic execution scope, clarification pathways, and support-path suggestions.
@@ -157,7 +157,7 @@ dependencies such as routing facts feeding VPN heuristics.
 - time facts stay under a dedicated `time` domain so local clock evidence and optional skew egress remain explicit instead of being hidden inside `resources`
 - process-level hints remain bounded and snapshot-only; there is no persistent history, full process explorer, or background sampling subsystem
 - UI stays above the result model
-- explanation stays bounded to evidence already collected
+- explanation stays bounded to evidence already collected and intake scope metadata already captured during run setup
 - support artifacts remain local and explicit
 - registered domains are composable, but the registry is still local code, not a remote or dynamic plug-in system
 - no automatic remediation is introduced

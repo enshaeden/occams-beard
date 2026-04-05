@@ -54,7 +54,7 @@ What We Know
 - The endpoint can reach a numeric external IP, but hostname lookups are failing.
 
 What Likely Happened
-- The most likely failure domain is the local or upstream DNS resolver path.
+- Likely explanation: The most likely failure domain is the local or upstream DNS resolver path.
 
 What You Can Try Safely
 - Compare the endpoint's resolver settings with the expected network or VPN profile.

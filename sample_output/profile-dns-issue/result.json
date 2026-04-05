@@ -540,7 +540,7 @@
       "The endpoint can reach a numeric external IP, but hostname lookups are failing."
     ],
     "likely_happened": [
-      "The most likely failure domain is the local or upstream DNS resolver path."
+      "Likely explanation: The most likely failure domain is the local or upstream DNS resolver path."
     ],
     "safe_next_steps": [
       "Compare the endpoint's resolver settings with the expected network or VPN profile.",
