@@ -43,7 +43,7 @@ Schema `1.4.0` adds optional host-pressure, storage-pressure, and clock-state fi
   - `local_time_iso` and `utc_time_iso`: the current local and UTC clock snapshot captured on the endpoint
   - `timezone_name`, optional `timezone_identifier`, and optional `timezone_identifier_source`: bounded local timezone state when the platform exposes it
   - `utc_offset_minutes` and optional `timezone_offset_consistent`: current offset facts and a bounded consistency check when an IANA timezone identifier is available
-  - `skew_check`: a one-shot bounded external reference comparison with `status`, reference metadata, optional measured skew, and explicit failure details when the operator enabled it
+  - `skew_check`: a one-shot bounded external reference comparison with `status`, reference metadata, optional measured skew, and explicit failure details when the operator enabled it; trusted skew measurements require a certificate-validated HTTPS reference in that run
 
 These fields are additive. Existing consumers that ignore unknown fields can continue to parse the rest of the result.
 The new fields remain read-only and snapshot-only. They do not represent background sampling, time synchronization, destructive testing, vendor-specific SMART parsing sprawl, or long-term baselines.

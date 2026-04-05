@@ -24,7 +24,8 @@ CLI / Web / Launcher / Support Bundle Export
 - Collectors gather facts and warnings.
 - `models.py` defines normalized facts, findings, execution records, guided summaries, and support-bundle metadata.
 - `result_builder.py` assembles the final `EndpointDiagnosticResult` from the completed run context.
-- `findings.py` evaluates deterministic rules only from collected evidence.
+- `findings.py` stays the stable findings entrypoint and delegates to explicit
+  concern-focused rule modules only from collected evidence.
 - `execution.py` turns the completed run into per-domain and per-probe execution status.
 - `explanations.py` adds deterministic plain-language guidance on top of findings.
 - `serializers.py`, `report.py`, and `support_bundle.py` render the same result object for different consumers.

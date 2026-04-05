@@ -80,7 +80,8 @@ The core layers are intentionally separated:
 - `collectors/` gathers raw endpoint evidence
 - `models.py` defines normalized facts, findings, execution records, guided
   summaries, and support-bundle metadata
-- `findings.py` evaluates deterministic rules over normalized facts
+- `findings.py` remains the stable orchestration entrypoint for deterministic
+  rules, with explicit domain-focused finding modules beneath it
 - `execution.py` records per-domain and per-probe status
 - `explanations.py` derives bounded plain-language guidance from findings
 - `serializers.py`, `report.py`, and `support_bundle.py` render the same result
@@ -96,8 +97,10 @@ runtime dependency and exists to serve the local web interface.
 
 For time-sensitive failures, the `time` domain stays bounded on purpose. It
 always collects a local clock and timezone snapshot when selected, and it can
-optionally perform one explicit external skew comparison. It does not sync
-time, run in the background, or change local clock settings.
+optionally perform one explicit external skew comparison against a verified
+HTTPS reference. If that reference cannot be trusted, the run records the skew
+result as inconclusive instead of overstating certainty. It does not sync time,
+run in the background, or change local clock settings.
 
 For slow-device scenarios, the `resources` domain now stays intentionally
 operator-shaped rather than turning into a general metrics dashboard. It keeps
@@ -309,6 +312,8 @@ verification, and manual assistive-technology validation.
 
 For incident-oriented walkthroughs of supported failure classes, see
 [`docs/case-studies.md`](docs/case-studies.md).
+For one polished interview-grade path through the current feature set, see
+[`docs/demo-scenario.md`](docs/demo-scenario.md).
 
 ## Documentation map
 
@@ -319,6 +324,8 @@ For incident-oriented walkthroughs of supported failure classes, see
   rationale and non-goals
 - [`docs/case-studies.md`](docs/case-studies.md): representative
   incident-style walkthroughs grounded in committed deterministic artifacts
+- [`docs/demo-scenario.md`](docs/demo-scenario.md): one focused,
+  deterministic walkthrough that shows the system at its strongest
 - [`docs/diagnostic-model.md`](docs/diagnostic-model.md): execution flow and
   model boundaries
 - [`docs/finding-rules.md`](docs/finding-rules.md): deterministic findings

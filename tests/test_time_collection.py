@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ssl
 import unittest
 from datetime import UTC, datetime
 from unittest.mock import patch
+from urllib import error as urllib_error
 
-from occams_beard.collectors.time import collect_time_state
+from occams_beard.collectors.time import _perform_clock_skew_check, collect_time_state
 from occams_beard.models import ClockSkewCheck
 
 
@@ -133,6 +135,60 @@ class TimeCollectionTests(unittest.TestCase):
 
         self.assertTrue(time_state.timezone_offset_consistent)
         self.assertEqual(warnings, [])
+
+    @patch("occams_beard.collectors.time.urllib_request.urlopen")
+    @patch("occams_beard.collectors.time.ssl.create_default_context")
+    def test_clock_skew_check_uses_verified_https_context(
+        self,
+        mock_create_default_context,
+        mock_urlopen,
+    ) -> None:
+        sentinel_context = object()
+        mock_create_default_context.return_value = sentinel_context
+        mock_urlopen.side_effect = urllib_error.HTTPError(
+            url="https://github.com/",
+            code=503,
+            msg="service unavailable",
+            hdrs=None,
+            fp=None,
+        )
+
+        skew_check = _perform_clock_skew_check(
+            reference_label="GitHub HTTPS response date",
+            reference_url="https://github.com/",
+        )
+
+        self.assertEqual(skew_check.status, "failed")
+        self.assertEqual(skew_check.error, "http-503")
+        self.assertIs(mock_urlopen.call_args.kwargs["context"], sentinel_context)
+        mock_create_default_context.assert_called_once_with()
+
+    @patch(
+        "occams_beard.collectors.time.urllib_request.urlopen",
+        side_effect=urllib_error.URLError(
+            ssl.SSLCertVerificationError("certificate verify failed")
+        ),
+    )
+    def test_clock_skew_check_treats_certificate_verification_failure_as_inconclusive(
+        self,
+        _mock_urlopen,
+    ) -> None:
+        skew_check = _perform_clock_skew_check(
+            reference_label="GitHub HTTPS response date",
+            reference_url="https://github.com/",
+        )
+
+        self.assertEqual(skew_check.status, "failed")
+        self.assertEqual(skew_check.error, "certificate-verification-failed")
+
+    def test_clock_skew_check_rejects_non_https_reference_urls(self) -> None:
+        skew_check = _perform_clock_skew_check(
+            reference_label="Example response date",
+            reference_url="http://example.com/",
+        )
+
+        self.assertEqual(skew_check.status, "failed")
+        self.assertEqual(skew_check.error, "unsupported-reference-scheme")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ Findings remain deterministic and evidence-based.
 - The findings engine still evaluates normalized facts after collection completes.
 - It still does not invent causes from uncollected data.
 - Heuristic conclusions are still labeled explicitly.
+- The public findings entrypoint stays narrow, while rule evaluation is split by
+  concern so time, network, storage, and host-pressure logic remain reviewable.
 
 ## Finding Output
 
@@ -58,8 +60,9 @@ It still does not infer hardware failure from cycle counts, generic low charge, 
 ## Time Notes
 
 - Time findings stay bounded to local clock state, local timezone configuration, and an optional one-shot skew comparison against a single explicit external reference.
+- The external skew comparison is trustworthy only when the HTTPS reference can be certificate-validated in the current run.
 - Strong time findings require strong evidence. The tool only claims material clock inaccuracy when the bounded skew check succeeds and the measured skew is large enough to matter operationally.
-- If the external reference check fails or was not enabled, the tool does not silently invent drift conclusions. It records the local time state and, when needed, states that clock drift remains inconclusive.
+- If the external reference check fails, cannot be certificate-validated, or was not enabled, the tool does not silently invent drift conclusions. It records the local time state and, when needed, states that clock drift remains inconclusive.
 - Time findings can explicitly note when selected DNS or connectivity checks looked healthy, which helps distinguish clock-related secure-service failures from a generic network explanation.
 - The project does not synchronize time, change timezone settings, run a background clock agent, or claim to measure sustained drift trends.
 

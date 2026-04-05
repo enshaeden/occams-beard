@@ -53,7 +53,7 @@ Windows:
 - `route print`
 - `arp -a`
 - PowerShell CIM queries for optional storage health only
-- optional one-shot HTTPS response `Date` header for bounded clock-skew comparison when the operator enables it
+- optional one-shot verified HTTPS response `Date` header for bounded clock-skew comparison when the operator enables it
 
 ## Live Smoke Validation
 
@@ -68,7 +68,7 @@ Windows:
 - Windows cannot execute the macOS `.command` file type directly, so true cross-platform root launch requires a Windows-specific sibling shim even though launch orchestration is shared underneath
 - VPN detection remains heuristic
 - local time collection is snapshot-only; it captures the current wall clock, UTC offset, and best-effort timezone identifier, not a sustained drift history
-- the optional clock-skew probe uses one bounded HTTPS response date and intentionally avoids any time-sync or remediation behavior
+- the optional clock-skew probe uses one bounded verified HTTPS response date, reports inconclusive when certificate validation fails, and intentionally avoids any time-sync or remediation behavior
 - Linux and macOS timezone identifiers are best-effort and depend on local configuration files or symlink layout exposing an IANA zone name cleanly
 - Linux battery health is limited to what sysfs exposes, and non-privileged Linux storage-device health is still effectively unavailable in the current model
 - Linux storage pressure now ignores pseudo-filesystems such as `/proc`, `/run`, `/sys`, and `/dev/shm` so operator findings stay focused on real writable volumes

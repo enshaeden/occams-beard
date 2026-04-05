@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import ssl
 import time
@@ -20,6 +21,7 @@ from occams_beard.platform.common import current_platform
 
 _TIME_REFERENCE_TIMEOUT_SECONDS = 5.0
 _ZONEINFO_MARKER = "zoneinfo/"
+LOGGER = logging.getLogger(__name__)
 
 
 def collect_time_state(
@@ -67,12 +69,17 @@ def collect_time_state(
     )
     time_state.skew_check = skew_check
     if skew_check.status != "checked":
+        LOGGER.warning(
+            "Clock skew check did not produce a trusted result: reference=%s error=%s",
+            reference_label,
+            skew_check.error or "unknown-error",
+        )
         warnings.append(
             DiagnosticWarning(
                 domain="time",
                 code="clock-skew-check-failed",
                 message=(
-                    "The bounded external clock-reference check could not confirm skew: "
+                    "The bounded trusted clock-reference check could not confirm skew: "
                     f"{skew_check.error or 'unknown-error'}."
                 ),
             )
@@ -172,12 +179,22 @@ def _perform_clock_skew_check(
     reference_label: str,
     reference_url: str,
 ) -> ClockSkewCheck:
+    parsed_url = urllib_parse.urlparse(reference_url)
+    if parsed_url.scheme.lower() != "https":
+        return ClockSkewCheck(
+            status="failed",
+            reference_kind="https-date-header",
+            reference_label=reference_label,
+            reference_url=reference_url,
+            error="unsupported-reference-scheme",
+        )
+
     request = urllib_request.Request(
         reference_url,
         method="HEAD",
         headers={"User-Agent": "occams-beard/time-check"},
     )
-    context = _ssl_context_for_reference(reference_url)
+    context = _ssl_context_for_reference()
     start_perf = time.perf_counter()
     start_utc = datetime.now(UTC)
     try:
@@ -222,6 +239,16 @@ def _perform_clock_skew_check(
             duration_ms=duration_ms,
             error=f"http-{exc.code}",
         )
+    except ssl.SSLCertVerificationError:
+        duration_ms = int((time.perf_counter() - start_perf) * 1000)
+        return ClockSkewCheck(
+            status="failed",
+            reference_kind="https-date-header",
+            reference_label=reference_label,
+            reference_url=reference_url,
+            duration_ms=duration_ms,
+            error="certificate-verification-failed",
+        )
     except urllib_error.URLError as exc:
         duration_ms = int((time.perf_counter() - start_perf) * 1000)
         return ClockSkewCheck(
@@ -253,14 +280,30 @@ def _parse_reference_time(raw_value: str | None) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
-def _ssl_context_for_reference(reference_url: str):
-    scheme = urllib_parse.urlparse(reference_url).scheme.lower()
-    if scheme != "https":
-        return None
-    return ssl._create_unverified_context()
+def _ssl_context_for_reference() -> ssl.SSLContext:
+    return ssl.create_default_context()
 
 
-def _normalize_reference_error(value: object) -> str:
-    if isinstance(value, str) and value.strip():
-        return value.strip().replace(" ", "-").lower()
+def _normalize_reference_error(reason: object) -> str:
+    if isinstance(reason, ssl.SSLCertVerificationError):
+        return "certificate-verification-failed"
+    if isinstance(reason, TimeoutError):
+        return "timeout"
+    if isinstance(reason, ssl.SSLError):
+        return "tls-handshake-failed"
+    reason_text = str(reason).strip().lower()
+    if not reason_text:
+        return "reference-unreachable"
+    if "timed out" in reason_text or "timeout" in reason_text:
+        return "timeout"
+    if "certificate" in reason_text and (
+        "verify" in reason_text or "expired" in reason_text or "not yet valid" in reason_text
+    ):
+        return "certificate-verification-failed"
+    if "ssl" in reason_text or "tls" in reason_text:
+        return "tls-handshake-failed"
+    if "name or service not known" in reason_text or (
+        "temporary failure in name resolution" in reason_text
+    ):
+        return "name-resolution-failed"
     return "reference-unreachable"
