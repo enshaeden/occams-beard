@@ -54,6 +54,9 @@ access-path failure classes, including:
 - application instability or local write failures where critically low free
   space or degraded storage-device health make a connectivity-only explanation
   less credible
+- authentication, TLS, certificate, or secure-service failures where the local
+  clock or timezone state is inaccurate enough to make DNS, VPN, or service
+  path explanations less likely
 
 These are representative classes, not a claim of exhaustive diagnosis.
 
@@ -90,6 +93,11 @@ The core layers are intentionally separated:
 
 The runtime remains standard-library-first apart from Flask, which is the only
 runtime dependency and exists to serve the local web interface.
+
+For time-sensitive failures, the `time` domain stays bounded on purpose. It
+always collects a local clock and timezone snapshot when selected, and it can
+optionally perform one explicit external skew comparison. It does not sync
+time, run in the background, or change local clock settings.
 
 For slow-device scenarios, the `resources` domain now stays intentionally
 operator-shaped rather than turning into a general metrics dashboard. It keeps
@@ -194,6 +202,12 @@ Load TCP targets from the example input file:
 
 ```bash
 occams-beard run --target-file sample_output/example-targets.json
+```
+
+Run a bounded clock skew check:
+
+```bash
+occams-beard run --checks time --enable-time-skew-check
 ```
 
 Validate an existing support bundle:

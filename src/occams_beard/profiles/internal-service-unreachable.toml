@@ -2,7 +2,7 @@ id = "internal-service-unreachable"
 name = "Internal Service Unreachable"
 description = "Profile for private or enterprise service paths that fail while the endpoint may still have general connectivity."
 issue_category = "internal service unreachable"
-recommended_checks = ["network", "routing", "dns", "connectivity", "services", "vpn"]
+recommended_checks = ["time", "network", "routing", "dns", "connectivity", "services", "vpn"]
 dns_hosts = ["github.com"]
 labels = ["service-path", "internal"]
 safe_user_guidance = [
@@ -23,4 +23,3 @@ label = "public-baseline"
 host = "10.0.0.10"
 port = 443
 label = "internal-service"
-

@@ -304,6 +304,10 @@
                   <input id="enable_trace" type="checkbox" name="enable_trace" {% if form_state.enable_trace %}checked{% endif %}>
                   <span>Enable traceroute</span>
                 </label>
+                <label class="toggle" for="enable_time_skew_check">
+                  <input id="enable_time_skew_check" type="checkbox" name="enable_time_skew_check" {% if form_state.enable_time_skew_check %}checked{% endif %}>
+                  <span>Enable bounded clock skew check</span>
+                </label>
                 <label class="toggle" for="capture_raw_commands">
                   <input id="capture_raw_commands" type="checkbox" name="capture_raw_commands" {% if form_state.capture_raw_commands %}checked{% endif %}>
                   <span>Capture raw command output for the support bundle</span>

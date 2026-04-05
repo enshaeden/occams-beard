@@ -16,6 +16,8 @@ from occams_beard.utils.subprocess import capture_command_output
 
 LOGGER = logging.getLogger(__name__)
 
+__all__ = ["DiagnosticsRunOptions", "build_run_options", "run_diagnostics"]
+
 
 def run_diagnostics(
     options: DiagnosticsRunOptions,
@@ -38,18 +40,20 @@ def run_diagnostics(
     )
 
     LOGGER.info(
-        "Running host and network diagnostics for checks: %s",
+        "Running endpoint diagnostics for checks: %s",
         ", ".join(options.selected_checks),
     )
     LOGGER.debug(
         (
             "Diagnostics input summary: tcp_targets=%d dns_hosts=%d "
-            "enable_ping=%s enable_trace=%s profile=%s raw_capture=%s"
+            "enable_ping=%s enable_trace=%s enable_time_skew_check=%s "
+            "profile=%s raw_capture=%s"
         ),
         len(options.targets),
         len(options.dns_hosts),
         options.enable_ping,
         options.enable_trace,
+        options.enable_time_skew_check,
         options.profile.profile_id if options.profile else None,
         options.capture_raw_commands,
     )

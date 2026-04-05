@@ -6,6 +6,7 @@ from occams_beard.execution import DOMAIN_LABELS
 
 DOMAIN_SUMMARIES = {
     "host": "Identify the device and capture the basic local host state.",
+    "time": "Capture local clock and timezone state for time-sensitive failures.",
     "resources": "Check CPU and memory pressure that can make the device unstable.",
     "storage": "Check for disk pressure that can block normal device behavior.",
     "network": "Look at local network adapters, addresses, and active links.",
@@ -24,6 +25,7 @@ def build_collection_plan(
     dns_hosts: list[str],
     enable_ping: bool,
     enable_trace: bool,
+    enable_time_skew_check: bool,
     capture_raw_commands: bool,
 ) -> dict[str, object]:
     """Build a concise description of the current collection plan."""
@@ -41,6 +43,8 @@ def build_collection_plan(
         probe_labels.append("Ping")
     if enable_trace:
         probe_labels.append("Traceroute")
+    if enable_time_skew_check:
+        probe_labels.append("Clock skew check")
     if capture_raw_commands:
         probe_labels.append("Raw command capture")
     egress_domains = [
@@ -48,6 +52,8 @@ def build_collection_plan(
         for check in selected_checks
         if check in {"dns", "connectivity", "services"}
     ]
+    if enable_time_skew_check and "time" in selected_checks:
+        egress_domains.append(DOMAIN_LABELS.get("time", "time"))
     has_network_activity = bool(egress_domains or enable_ping or enable_trace)
 
     return {
@@ -60,6 +66,7 @@ def build_collection_plan(
         "probe_summary": probe_summary(
             enable_ping=enable_ping,
             enable_trace=enable_trace,
+            enable_time_skew_check=enable_time_skew_check,
             capture_raw_commands=capture_raw_commands,
         ),
         "has_network_activity": has_network_activity,
@@ -82,6 +89,7 @@ def probe_summary(
     *,
     enable_ping: bool,
     enable_trace: bool,
+    enable_time_skew_check: bool,
     capture_raw_commands: bool,
 ) -> str:
     """Summarize which deeper probes were enabled for the run."""
@@ -91,6 +99,8 @@ def probe_summary(
         labels.append("Ping")
     if enable_trace:
         labels.append("Traceroute")
+    if enable_time_skew_check:
+        labels.append("Clock skew check")
     if capture_raw_commands:
         labels.append("Raw command capture")
     return ", ".join(labels) if labels else "Standard plan only"

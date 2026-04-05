@@ -1,11 +1,12 @@
 {
-  "schema_version": "1.3.0",
+  "schema_version": "1.4.0",
   "metadata": {
     "project_name": "occams-beard",
     "version": "0.1.0",
     "generated_at": "2026-04-01T00:10:00+00:00",
     "elapsed_ms": 175,
     "selected_checks": [
+      "time",
       "network",
       "routing",
       "dns",
@@ -193,6 +194,27 @@
     },
     "services": {
       "checks": []
+    },
+    "time": {
+      "local_time_iso": "2026-03-31T17:10:00-07:00",
+      "utc_time_iso": "2026-04-01T00:10:00+00:00",
+      "timezone_name": "PDT",
+      "timezone_identifier": "America/Los_Angeles",
+      "timezone_identifier_source": "localtime-symlink",
+      "utc_offset_minutes": -420,
+      "timezone_offset_consistent": true,
+      "skew_check": {
+        "status": "not_run",
+        "reference_kind": "https-date-header",
+        "reference_label": "GitHub HTTPS response date",
+        "reference_url": "https://github.com/",
+        "reference_time_iso": null,
+        "observed_at_utc_iso": null,
+        "skew_seconds": null,
+        "absolute_skew_seconds": null,
+        "duration_ms": null,
+        "error": null
+      }
     }
   },
   "findings": [
@@ -286,6 +308,44 @@
           ],
           "warnings": [],
           "creates_network_egress": false
+        }
+      ],
+      "creates_network_egress": false
+    },
+    {
+      "domain": "time",
+      "label": "Clock and time state",
+      "status": "passed",
+      "selected": true,
+      "duration_ms": 5,
+      "summary": "Collected local clock and timezone facts, with an optional bounded external skew comparison when explicitly enabled.",
+      "warnings": [],
+      "probes": [
+        {
+          "probe_id": "local-time-state",
+          "label": "Collect local clock and timezone state",
+          "status": "passed",
+          "duration_ms": 5,
+          "target": null,
+          "details": [
+            "Local time: 2026-03-31T17:10:00-07:00.",
+            "Timezone name: PDT.",
+            "Timezone identifier: America/Los_Angeles (localtime-symlink)."
+          ],
+          "warnings": [],
+          "creates_network_egress": false
+        },
+        {
+          "probe_id": "clock-skew-check",
+          "label": "Compare against the bounded external clock reference",
+          "status": "skipped",
+          "duration_ms": null,
+          "target": null,
+          "details": [
+            "The bounded external skew check was not enabled for this run."
+          ],
+          "warnings": [],
+          "creates_network_egress": true
         }
       ],
       "creates_network_egress": false

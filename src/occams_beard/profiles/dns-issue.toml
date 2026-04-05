@@ -2,7 +2,7 @@ id = "dns-issue"
 name = "DNS Issue"
 description = "Focused profile for name-resolution problems while generic network reachability may still work."
 issue_category = "DNS issue"
-recommended_checks = ["network", "routing", "dns", "connectivity"]
+recommended_checks = ["time", "network", "routing", "dns", "connectivity"]
 dns_hosts = ["github.com", "python.org", "pypi.org"]
 labels = ["dns", "resolution"]
 safe_user_guidance = [
@@ -23,4 +23,3 @@ label = "cloudflare-dns"
 host = "8.8.8.8"
 port = 53
 label = "google-dns"
-

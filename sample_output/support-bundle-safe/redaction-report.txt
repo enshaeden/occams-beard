@@ -7,7 +7,7 @@ Notes
 
 Counts
 - endpoint-host: 3
-- hostname: 34
+- hostname: 35
 - mac-address: 1
 - private-ip: 6
 - user: 2

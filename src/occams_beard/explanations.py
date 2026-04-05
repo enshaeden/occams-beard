@@ -334,6 +334,101 @@ FINDING_GUIDANCE: dict[str, dict[str, object]] = {
             ),
         ],
     },
+    "system-clock-materially-inaccurate": {
+        "plain_language": (
+            "System clock appears inaccurate; secure sign-in or TLS validation may fail."
+        ),
+        "safe_next_actions": [
+            (
+                "Review local date, time, and timezone settings without "
+                "changing them during evidence capture."
+            ),
+            "Capture a support bundle while the skew evidence is still current.",
+        ],
+        "escalation_triggers": [
+            "Escalate if the endpoint clock remains materially inaccurate across repeated checks.",
+        ],
+        "uncertainty_notes": [
+            (
+                "The skew reading comes from one bounded external reference check. It is strong "
+                "evidence of a local time problem, but it is still a one-time comparison."
+            ),
+        ],
+    },
+    "local-time-may-impact-secure-service-access": {
+        "plain_language": (
+            "Local time may be far enough off to affect sign-in, certificates, or secure services."
+        ),
+        "safe_next_actions": [
+            "Keep the current evidence and compare with any documented local time settings.",
+        ],
+        "escalation_triggers": [
+            "Escalate if secure service failures persist and the same skew pattern repeats.",
+        ],
+        "uncertainty_notes": [
+            (
+                "This identifies elevated clock skew, but not whether time is the only problem "
+                "affecting the service path."
+            ),
+        ],
+    },
+    "timezone-configuration-inconsistent": {
+        "plain_language": (
+            "Timezone configuration looks inconsistent with the observed local clock offset."
+        ),
+        "safe_next_actions": [
+            "Review the configured timezone identifier before changing any local settings.",
+        ],
+        "escalation_triggers": [
+            (
+                "Escalate if timezone inconsistency persists or coincides "
+                "with auth or certificate errors."
+            ),
+        ],
+        "uncertainty_notes": [
+            (
+                "This finding identifies a mismatch in timezone state, not how the inconsistency "
+                "was introduced."
+            ),
+        ],
+    },
+    "insufficient-clock-drift-evidence": {
+        "plain_language": (
+            "This run did not capture enough external reference evidence to confirm clock drift."
+        ),
+        "safe_next_actions": [
+            "Rerun with the bounded skew check enabled if clock drift is still suspected.",
+        ],
+        "escalation_triggers": [
+            "Escalate if secure service failures persist but clock evidence remains inconclusive.",
+        ],
+        "uncertainty_notes": [
+            (
+                "Local time state was still collected. The missing piece is a conclusive external "
+                "reference comparison."
+            ),
+        ],
+    },
+    "no-significant-time-issue": {
+        "plain_language": (
+            "No major time-related issue was detected from the collected evidence."
+        ),
+        "safe_next_actions": [
+            "Keep the bounded skew check enabled in future secure-service troubleshooting runs.",
+        ],
+        "escalation_triggers": [
+            (
+                "Escalate if the symptom persists and other local or "
+                "service-path evidence becomes stronger."
+            ),
+        ],
+        "uncertainty_notes": [
+            (
+                "This means the local clock looked close to the bounded reference in this run; "
+                "it does not prove the clock was healthy at every earlier moment."
+            ),
+        ],
+    },
     "battery-health-degraded": {
         "plain_language": (
             "The operating system says the battery itself is degraded or needs service."

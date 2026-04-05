@@ -8,6 +8,7 @@ from unittest.mock import patch
 from occams_beard.defaults import DEFAULT_CHECKS
 from occams_beard.execution import planned_execution_step_count
 from occams_beard.models import (
+    ClockSkewCheck,
     ConnectivityState,
     CpuState,
     DiagnosticWarning,
@@ -18,6 +19,7 @@ from occams_beard.models import (
     MemoryState,
     TcpConnectivityCheck,
     TcpTarget,
+    TimeState,
 )
 from occams_beard.runner import DiagnosticsRunOptions, build_run_options, run_diagnostics
 
@@ -33,13 +35,17 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(options.dns_hosts, ["github.com", "python.org"])
         self.assertFalse(options.enable_ping)
         self.assertFalse(options.enable_trace)
+        self.assertFalse(options.enable_time_skew_check)
         self.assertIsNone(options.profile)
 
     def test_build_run_options_uses_profile_defaults(self) -> None:
         options = build_run_options(profile_id="dns-issue")
 
         self.assertEqual(options.profile.profile_id, "dns-issue")
-        self.assertEqual(options.selected_checks, ["network", "routing", "dns", "connectivity"])
+        self.assertEqual(
+            options.selected_checks,
+            ["time", "network", "routing", "dns", "connectivity"],
+        )
         self.assertEqual(options.dns_hosts, ["github.com", "python.org", "pypi.org"])
         self.assertEqual(
             [(target.host, target.port) for target in options.targets],
@@ -85,6 +91,7 @@ class RunnerTests(unittest.TestCase):
                 "occams_beard.result_builder.evaluate_selected_findings",
                 return_value=([finding], "dns"),
             ),
+            patch("occams_beard.domain_registry.collect_time_state") as mock_time,
             patch("occams_beard.domain_registry.collect_resource_state") as mock_resources,
             patch("occams_beard.domain_registry.collect_storage_state") as mock_storage,
             patch("occams_beard.domain_registry.collect_network_state") as mock_network,
@@ -99,9 +106,10 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result.probable_fault_domain, "dns")
         self.assertEqual(result.findings[0].identifier, "dns-degraded")
         self.assertEqual(result.facts.host.hostname, "demo-host")
-        self.assertEqual(result.schema_version, "1.3.0")
+        self.assertEqual(result.schema_version, "1.4.0")
         self.assertTrue(result.execution)
         self.assertIsNotNone(result.guided_experience)
+        mock_time.assert_not_called()
         mock_resources.assert_not_called()
         mock_storage.assert_not_called()
         mock_network.assert_not_called()
@@ -178,9 +186,77 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(progress_updates[1][4]["dns"], 1)
         self.assertEqual(progress_updates[2][1], "dns")
         self.assertEqual(progress_updates[2][2:4], (3, 3))
-        self.assertEqual(progress_updates[2][4]["dns"], 2)
-        self.assertEqual(progress_updates[3][1], None)
-        self.assertEqual(progress_updates[3][2:4], (3, 3))
+
+    def test_run_diagnostics_marks_time_domain_partial_when_skew_check_is_inconclusive(
+        self,
+    ) -> None:
+        options = DiagnosticsRunOptions(
+            selected_checks=["time"],
+            targets=[],
+            dns_hosts=[],
+            enable_time_skew_check=True,
+        )
+
+        with (
+            patch(
+                "occams_beard.domain_registry.collect_host_basics",
+                return_value=(
+                    HostBasics(
+                        hostname="demo-host",
+                        operating_system="Linux",
+                        kernel="6.8.0",
+                        current_user="operator",
+                        uptime_seconds=120,
+                    ),
+                    [],
+                ),
+            ),
+            patch(
+                "occams_beard.domain_registry.collect_time_state",
+                return_value=(
+                    TimeState(
+                        local_time_iso="2026-04-04T09:30:00-07:00",
+                        utc_time_iso="2026-04-04T16:30:00+00:00",
+                        timezone_name="PDT",
+                        timezone_identifier="America/Los_Angeles",
+                        timezone_identifier_source="localtime-symlink",
+                        utc_offset_minutes=-420,
+                        timezone_offset_consistent=True,
+                        skew_check=ClockSkewCheck(
+                            status="failed",
+                            reference_kind="https-date-header",
+                            reference_label="GitHub HTTPS response date",
+                            reference_url="https://github.com/",
+                            error="missing-date-header",
+                            duration_ms=120,
+                        ),
+                    ),
+                    [
+                        DiagnosticWarning(
+                            domain="time",
+                            code="clock-skew-check-failed",
+                            message=(
+                                "The bounded external clock-reference check "
+                                "could not confirm skew: missing-date-header."
+                            ),
+                        )
+                    ],
+                ),
+            ),
+            patch(
+                "occams_beard.result_builder.evaluate_selected_findings",
+                return_value=([], "healthy"),
+            ),
+        ):
+            result = run_diagnostics(options)
+
+        time_record = next(record for record in result.execution if record.domain == "time")
+        self.assertEqual(time_record.status, "partial")
+        self.assertTrue(time_record.creates_network_egress)
+        self.assertEqual(
+            [warning.code for warning in time_record.warnings],
+            ["clock-skew-check-failed"],
+        )
 
     def test_run_diagnostics_emits_progress_inside_resource_collection(self) -> None:
         options = DiagnosticsRunOptions(

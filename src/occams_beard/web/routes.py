@@ -131,6 +131,7 @@ def register_web_routes(app: Flask) -> None:
                 profile_id=form_state["profile_id"],
                 enable_ping=form_state["enable_ping"],
                 enable_trace=form_state["enable_trace"],
+                enable_time_skew_check=form_state["enable_time_skew_check"],
                 capture_raw_commands=form_state["capture_raw_commands"],
             )
         except ValueError as exc:

@@ -14,6 +14,7 @@ from occams_beard.collectors.routing import collect_route_summary
 from occams_beard.collectors.services import collect_service_state
 from occams_beard.collectors.storage import collect_storage_state
 from occams_beard.collectors.system import collect_host_basics, collect_resource_state
+from occams_beard.collectors.time import collect_time_state
 from occams_beard.collectors.vpn import collect_vpn_state
 from occams_beard.models import TcpTarget
 
@@ -116,6 +117,21 @@ def _execute_resources(options: DiagnosticsRunOptions, context: DiagnosticsRunCo
     context.complete_domain("resources", started_at=started_at, warnings=warnings)
 
 
+def _execute_time(options: DiagnosticsRunOptions, context: DiagnosticsRunContext) -> None:
+    started_at = time.perf_counter()
+    time_state, warnings = collect_time_state(
+        enable_skew_check=options.enable_time_skew_check,
+        reference_label=options.time_reference_label,
+        reference_url=options.time_reference_url,
+        progress_callback=lambda completed_steps: context.record_domain_progress(
+            "time",
+            completed_steps,
+        ),
+    )
+    context.set_time(time_state)
+    context.complete_domain("time", started_at=started_at, warnings=warnings)
+
+
 def _execute_storage(options: DiagnosticsRunOptions, context: DiagnosticsRunContext) -> None:
     del options
     started_at = time.perf_counter()
@@ -213,6 +229,13 @@ def _resource_step_labels(options: DiagnosticsRunOptions) -> list[str]:
     ]
 
 
+def _time_step_labels(options: DiagnosticsRunOptions) -> list[str]:
+    labels = ["Capturing local clock and timezone state"]
+    if options.enable_time_skew_check:
+        labels.append("Comparing clock with the bounded external reference")
+    return labels
+
+
 def _storage_step_labels(options: DiagnosticsRunOptions) -> list[str]:
     del options
     return [
@@ -274,6 +297,12 @@ REGISTERED_DOMAINS: tuple[DiagnosticDomainDefinition, ...] = (
         always_selected=True,
     ),
     DiagnosticDomainDefinition(
+        domain="time",
+        label="Clock and time state",
+        execute=_execute_time,
+        planned_step_labels=_time_step_labels,
+    ),
+    DiagnosticDomainDefinition(
         domain="resources",
         label="Resource snapshot",
         execute=_execute_resources,
@@ -329,3 +358,11 @@ REGISTERED_DOMAINS: tuple[DiagnosticDomainDefinition, ...] = (
 NETWORK_EGRESS_DOMAINS = frozenset(
     definition.domain for definition in REGISTERED_DOMAINS if definition.creates_network_egress
 )
+
+
+def domain_creates_network_egress(domain: str, options: DiagnosticsRunOptions) -> bool:
+    """Return whether the selected domain will intentionally create network traffic."""
+
+    if domain == "time":
+        return domain in options.selected_checks and options.enable_time_skew_check
+    return domain in NETWORK_EGRESS_DOMAINS

@@ -2,7 +2,7 @@ id = "vpn-issue"
 name = "VPN Issue"
 description = "Profile for tunnel-state and private-resource access problems on endpoints that rely on VPN connectivity."
 issue_category = "VPN issue"
-recommended_checks = ["network", "routing", "dns", "connectivity", "vpn", "services"]
+recommended_checks = ["time", "network", "routing", "dns", "connectivity", "vpn", "services"]
 dns_hosts = ["github.com"]
 labels = ["vpn", "private-access"]
 safe_user_guidance = [
@@ -23,4 +23,3 @@ label = "public-baseline"
 host = "10.0.0.10"
 port = 443
 label = "private-service"
-

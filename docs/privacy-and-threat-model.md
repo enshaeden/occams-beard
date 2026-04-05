@@ -15,6 +15,7 @@ Potentially sensitive values include:
 
 - current username
 - endpoint hostname
+- local timezone identifier
 - DNS targets
 - configured service targets
 - local IP addresses
@@ -46,8 +47,10 @@ The following domains can create network egress:
 - `dns`
 - `connectivity`
 - `services`
+- `time` when the bounded clock-skew probe is explicitly enabled
 
 Within `connectivity`, optional `ping` and `trace` probes also create network egress when enabled.
+Within `time`, the default local clock snapshot stays on-device; only the optional skew probe creates network traffic.
 
 ## Threat Model Boundaries
 

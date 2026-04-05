@@ -59,6 +59,7 @@ dependencies such as routing facts feeding VPN heuristics.
 - registry-backed execution plan and run context for domain orchestration
 - schema-versioned `result.json`
 - execution status values for `passed`, `failed`, `partial`, `unsupported`, `skipped`, and `not_run`
+- a dedicated `time` domain for local clock state, timezone facts, and an optional bounded external skew comparison
 - additive battery and storage-device health facts under the existing `resources` and `storage` domains
 - additive host-pressure snapshot facts under `resources`, including CPU saturation, optional swap or commit pressure, and bounded process-load category summaries when available
 - local profile defaults for repeatable issue scenarios
@@ -69,6 +70,7 @@ dependencies such as routing facts feeding VPN heuristics.
 
 - platform parsing stays below findings
 - hardware facts stay additive under `resources` and `storage`; there is no new top-level hardware domain
+- time facts stay under a dedicated `time` domain so local clock evidence and optional skew egress remain explicit instead of being hidden inside `resources`
 - process-level hints remain bounded and snapshot-only; there is no persistent history, full process explorer, or background sampling subsystem
 - UI stays above the result model
 - explanation stays bounded to evidence already collected

@@ -128,10 +128,10 @@ class AppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
-        self.assertIn("Choose Your Path", text)
+        self.assertIn("Choose a Check Path", text)
         self.assertIn("Check My Device", text)
         self.assertIn("Work With Support", text)
-        self.assertIn("Runtime http://localhost", text)
+        self.assertIn("Collect on-device information and logs", text)
         self.assertIn("Skip to main content", text)
 
     def test_self_serve_mode_uses_symptom_led_copy_and_collapsed_advanced_settings(self) -> None:
@@ -139,7 +139,7 @@ class AppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
-        self.assertIn("Choose the symptom that feels closest.", text)
+        self.assertIn("Choose the symptom that best describes your issue.", text)
         self.assertIn("Internet not working", text)
         self.assertIn("VPN or company resource issue", text)
         self.assertIn("data-self-serve-symptom-form", text)
@@ -165,7 +165,7 @@ class AppTests(unittest.TestCase):
         self.assertIn('id="self-serve-plan-step"', text)
         self.assertIn("Review the plan before you run it.", text)
         self.assertIn("Start Device Check", text)
-        self.assertNotIn("Choose Your Path", text)
+        self.assertNotIn("Choose a Check Path", text)
 
     def test_guided_support_mode_shows_deeper_plan_controls(self) -> None:
         response = self.client.get("/?mode=support")
@@ -179,7 +179,7 @@ class AppTests(unittest.TestCase):
         self.assertIn("Support gave me a different plan", text)
         self.assertIn("Technician asked me to edit the plan details", text)
         self.assertIn("Run Support-Guided Check", text)
-        self.assertNotIn("Choose the symptom that feels closest.", text)
+        self.assertNotIn("Choose the symptom that best describes your issue.", text)
 
     def test_self_serve_submission_maps_symptom_to_profile(self) -> None:
         response = self.client.post(
@@ -208,10 +208,13 @@ class AppTests(unittest.TestCase):
         self.assertIn("Continue With Support", results_text)
         self.assertIn("What we know", results_text)
         self.assertIn("Download Support Bundle", results_text)
-        self.assertIn("Run ID", results_text)
-        self.assertIn("App version", results_text)
+        self.assertIn("Fault domain", results_text)
+        self.assertIn("Run time", results_text)
         self.assertIn(
-            "The next best step is to continue with support so they can review a deeper guided plan.",
+            (
+                "The next best step is to continue with support so they can "
+                "review a deeper guided plan."
+            ),
             results_text,
         )
 
@@ -287,7 +290,13 @@ class AppTests(unittest.TestCase):
         broken_profile = tempdir / "broken.toml"
         broken_profile.write_text("id = [\n", encoding="utf-8")
         self.addCleanup(lambda: broken_profile.unlink(missing_ok=True))
-        self.addCleanup(lambda: tempdir.rmdir() if tempdir.exists() and not any(tempdir.iterdir()) else None)
+        self.addCleanup(
+            lambda: (
+                tempdir.rmdir()
+                if tempdir.exists() and not any(tempdir.iterdir())
+                else None
+            )
+        )
 
         with patch.dict(os.environ, {"OCCAMS_BEARD_PROFILE_DIR": str(tempdir)}, clear=False):
             response = self.client.get("/?mode=support")
@@ -374,7 +383,10 @@ class AppTests(unittest.TestCase):
         self.assertEqual(payload["current_domain_label"], "DNS checks")
         self.assertEqual(payload["completed_count"], 2)
         assert self.captured_options is not None
-        self.assertEqual(payload["total_count"], planned_execution_step_count(self.captured_options))
+        self.assertEqual(
+            payload["total_count"],
+            planned_execution_step_count(self.captured_options),
+        )
         self.assertEqual(payload["rows"][0]["step_progress_label"], "1/1")
         self.assertEqual(payload["rows"][1]["status_label"], "Optional")
         self.assertEqual(payload["rows"][2]["status_label"], "Running now")

@@ -36,6 +36,8 @@ The findings engine still reasons about:
 - symptom-correlated local host pressure for slow-device runs
 - deterministic storage-pressure states from monitored filesystems
 - explicit distinction between filesystem space exhaustion and storage-device health degradation
+- deterministic local clock and timezone state
+- optional bounded clock-skew comparison when the operator explicitly enables it
 - local network state
 - DNS failures and partial failures
 - generic connectivity failures
@@ -52,6 +54,14 @@ It still does not infer hardware failure from cycle counts, generic low charge, 
 - Memory pressure can incorporate optional swap or commit pressure when the platform exposes it.
 - Slow-device findings can explicitly state when current network checks do not support a network-based explanation.
 - Bounded process hints are summaries only. They are coarse categories from one snapshot, not a process inventory or a sustained trend.
+
+## Time Notes
+
+- Time findings stay bounded to local clock state, local timezone configuration, and an optional one-shot skew comparison against a single explicit external reference.
+- Strong time findings require strong evidence. The tool only claims material clock inaccuracy when the bounded skew check succeeds and the measured skew is large enough to matter operationally.
+- If the external reference check fails or was not enabled, the tool does not silently invent drift conclusions. It records the local time state and, when needed, states that clock drift remains inconclusive.
+- Time findings can explicitly note when selected DNS or connectivity checks looked healthy, which helps distinguish clock-related secure-service failures from a generic network explanation.
+- The project does not synchronize time, change timezone settings, run a background clock agent, or claim to measure sustained drift trends.
 
 ## Storage Notes
 

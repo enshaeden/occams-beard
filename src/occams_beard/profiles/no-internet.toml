@@ -2,7 +2,7 @@ id = "no-internet"
 name = "No Internet"
 description = "Baseline internet-access profile for endpoints that cannot reach common external services."
 issue_category = "no internet"
-recommended_checks = ["host", "resources", "network", "routing", "dns", "connectivity"]
+recommended_checks = ["host", "time", "resources", "network", "routing", "dns", "connectivity"]
 dns_hosts = ["github.com", "python.org"]
 labels = ["baseline", "egress"]
 safe_user_guidance = [
@@ -23,4 +23,3 @@ label = "github-https"
 host = "1.1.1.1"
 port = 53
 label = "cloudflare-dns"
-

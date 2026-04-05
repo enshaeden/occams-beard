@@ -183,6 +183,20 @@ class WindowsHardwareHelperTests(unittest.TestCase):
         )
 
     @patch("occams_beard.platform.windows.run_command")
+    def test_read_timezone_identifier_uses_tzutil(self, mock_run_command) -> None:
+        mock_run_command.return_value = CommandResult(
+            args=("tzutil", "/g"),
+            returncode=0,
+            stdout="Pacific Standard Time\n",
+            stderr="",
+            duration_ms=4,
+        )
+
+        identifier = windows.read_timezone_identifier()
+
+        self.assertEqual(identifier, "Pacific Standard Time")
+
+    @patch("occams_beard.platform.windows.run_command")
     def test_read_resolvers_falls_back_to_ipconfig_when_powershell_is_denied(
         self, mock_run_command
     ) -> None:

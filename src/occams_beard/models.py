@@ -66,6 +66,36 @@ class HostBasics:
 
 
 @dataclass(slots=True)
+class ClockSkewCheck:
+    """Bounded external clock-reference comparison for the local endpoint."""
+
+    status: str
+    reference_kind: str
+    reference_label: str
+    reference_url: str | None = None
+    reference_time_iso: str | None = None
+    observed_at_utc_iso: str | None = None
+    skew_seconds: float | None = None
+    absolute_skew_seconds: float | None = None
+    duration_ms: int | None = None
+    error: str | None = None
+
+
+@dataclass(slots=True)
+class TimeState:
+    """Current local clock and timezone facts for the endpoint."""
+
+    local_time_iso: str
+    utc_time_iso: str
+    timezone_name: str | None = None
+    timezone_identifier: str | None = None
+    timezone_identifier_source: str | None = None
+    utc_offset_minutes: int | None = None
+    timezone_offset_consistent: bool | None = None
+    skew_check: ClockSkewCheck | None = None
+
+
+@dataclass(slots=True)
 class CpuState:
     """CPU-related facts."""
 
@@ -369,6 +399,7 @@ class CollectedFacts:
     connectivity: ConnectivityState
     vpn: VpnState
     services: ServiceState
+    time: TimeState | None = None
 
 
 @dataclass(slots=True)
@@ -506,7 +537,7 @@ class EndpointDiagnosticResult:
     metadata: Metadata
     platform: PlatformInfo
     facts: CollectedFacts
-    schema_version: str = "1.3.0"
+    schema_version: str = "1.4.0"
     findings: list[Finding] = field(default_factory=list)
     probable_fault_domain: FaultDomain = "unknown"
     warnings: list[DiagnosticWarning] = field(default_factory=list)

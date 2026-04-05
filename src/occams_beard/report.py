@@ -41,6 +41,14 @@ def render_report(result: EndpointDiagnosticResult, json_path: str | None = None
         collected="resources" in selected_checks,
         resources=resources,
     )
+    time_summary = _time_summary(
+        collected="time" in selected_checks,
+        time_state=result.facts.time,
+    )
+    time_skew_summary = _time_skew_summary(
+        collected="time" in selected_checks,
+        time_state=result.facts.time,
+    )
     active_interfaces = (
         _join_or_none(network.active_interfaces)
         if "network" in selected_checks
@@ -176,6 +184,10 @@ def render_report(result: EndpointDiagnosticResult, json_path: str | None = None
             f"- Swap or commit pressure: {swap_summary}",
             f"- Bounded process hints: {process_summary}",
             f"- Battery health: {battery_summary}",
+            "",
+            "Time Snapshot",
+            f"- Local time state: {time_summary}",
+            f"- Clock skew check: {time_skew_summary}",
             "",
             "Storage Snapshot",
             f"- Monitored volumes: {volume_summary}",
@@ -387,6 +399,15 @@ def _format_percent(value: float | None) -> str:
     return f"{value:.1f}%"
 
 
+def _format_utc_offset(offset_minutes: int | None) -> str:
+    if offset_minutes is None:
+        return "unknown"
+    sign = "+" if offset_minutes >= 0 else "-"
+    total_minutes = abs(offset_minutes)
+    hours, minutes = divmod(total_minutes, 60)
+    return f"UTC{sign}{hours:02d}:{minutes:02d}"
+
+
 def _battery_summary(*, collected: bool, battery) -> str:
     if not collected:
         return "not collected"
@@ -407,6 +428,43 @@ def _battery_summary(*, collected: bool, battery) -> str:
     if battery.cycle_count is not None:
         parts.append(f"{battery.cycle_count} cycles")
     return ", ".join(parts) if parts else "present"
+
+
+def _time_summary(*, collected: bool, time_state) -> str:
+    if not collected:
+        return "not collected"
+    if time_state is None:
+        return "unavailable"
+    identifier_part = (
+        f"{time_state.timezone_identifier} ({time_state.timezone_identifier_source})"
+        if time_state.timezone_identifier is not None
+        else "identifier unavailable"
+    )
+    offset_part = (
+        _format_utc_offset(time_state.utc_offset_minutes)
+        if time_state.utc_offset_minutes is not None
+        else "offset unknown"
+    )
+    return (
+        f"{time_state.local_time_iso}, {time_state.timezone_name or 'timezone unknown'}, "
+        f"{identifier_part}, {offset_part}"
+    )
+
+
+def _time_skew_summary(*, collected: bool, time_state) -> str:
+    if not collected:
+        return "not collected"
+    if time_state is None or time_state.skew_check is None:
+        return "unavailable"
+    skew_check = time_state.skew_check
+    if skew_check.status == "not_run":
+        return "not enabled"
+    if skew_check.status != "checked":
+        return f"inconclusive ({skew_check.error or 'unknown-error'})"
+    return (
+        f"{skew_check.skew_seconds:.1f}s vs {skew_check.reference_label} "
+        f"({skew_check.absolute_skew_seconds:.1f}s absolute)"
+    )
 
 
 def _volume_summary(*, collected: bool, resources) -> str:

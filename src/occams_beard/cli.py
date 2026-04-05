@@ -127,6 +127,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable best-effort traceroute or tracert checks.",
     )
+    probe_group.add_argument(
+        "--enable-time-skew-check",
+        action="store_true",
+        help=(
+            "Enable a bounded external clock-reference check using one HTTPS response date. "
+            "This creates network traffic."
+        ),
+    )
 
     logging_group = run_parser.add_argument_group("Logging")
     logging_group.add_argument("--verbose", action="store_true", help="Enable INFO-level logging.")
@@ -180,6 +188,7 @@ def _run_command(args: argparse.Namespace) -> int:
         profile_id=getattr(args, "profile", None),
         enable_ping=args.enable_ping,
         enable_trace=args.enable_trace,
+        enable_time_skew_check=getattr(args, "enable_time_skew_check", False),
         capture_raw_commands=getattr(args, "bundle_include_raw", False),
     )
     LOGGER.info(
@@ -187,7 +196,8 @@ def _run_command(args: argparse.Namespace) -> int:
     )
     LOGGER.debug(
         "Diagnostics input summary: tcp_targets=%d dns_hosts=%d json_out=%s support_bundle=%s "
-        "suppress_report=%s enable_ping=%s enable_trace=%s profile=%s raw_capture=%s",
+        "suppress_report=%s enable_ping=%s enable_trace=%s enable_time_skew_check=%s "
+        "profile=%s raw_capture=%s",
         len(options.targets),
         len(options.dns_hosts),
         bool(args.json_out),
@@ -195,6 +205,7 @@ def _run_command(args: argparse.Namespace) -> int:
         args.suppress_report,
         options.enable_ping,
         options.enable_trace,
+        options.enable_time_skew_check,
         options.profile.profile_id if options.profile else None,
         options.capture_raw_commands,
     )
@@ -244,6 +255,7 @@ def _run_examples_text() -> str:
         "  occams-beard run --checks network,dns,connectivity\n"
         "  occams-beard run --target github.com:443 --target 1.1.1.1:53\n"
         "  occams-beard run --target-file sample_output/example-targets.json\n"
+        "  occams-beard run --checks time --enable-time-skew-check\n"
         "  occams-beard run --enable-ping --enable-trace --verbose\n"
         "  occams-beard run --suppress-report --json-out report.json"
     )

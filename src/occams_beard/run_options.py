@@ -10,6 +10,8 @@ from occams_beard.defaults import (
     DEFAULT_CHECKS,
     DEFAULT_DNS_HOSTS,
     DEFAULT_TCP_TARGETS,
+    DEFAULT_TIME_REFERENCE_LABEL,
+    DEFAULT_TIME_REFERENCE_URL,
 )
 from occams_beard.models import DiagnosticProfile, TcpTarget
 from occams_beard.profile_catalog import get_profile
@@ -30,6 +32,9 @@ class DiagnosticsRunOptions:
     profile: DiagnosticProfile | None = None
     enable_ping: bool = False
     enable_trace: bool = False
+    enable_time_skew_check: bool = False
+    time_reference_label: str = DEFAULT_TIME_REFERENCE_LABEL
+    time_reference_url: str = DEFAULT_TIME_REFERENCE_URL
     capture_raw_commands: bool = False
 
 
@@ -42,6 +47,7 @@ def build_run_options(
     profile_id: str | None = None,
     enable_ping: bool = False,
     enable_trace: bool = False,
+    enable_time_skew_check: bool = False,
     capture_raw_commands: bool = False,
 ) -> DiagnosticsRunOptions:
     """Build validated run options from operator-facing input values."""
@@ -70,5 +76,6 @@ def build_run_options(
         profile=profile,
         enable_ping=enable_ping,
         enable_trace=enable_trace,
+        enable_time_skew_check=enable_time_skew_check,
         capture_raw_commands=capture_raw_commands,
     )

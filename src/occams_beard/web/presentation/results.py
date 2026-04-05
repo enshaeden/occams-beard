@@ -202,6 +202,11 @@ def build_results_view(
     technical_context = _dedupe_strings(
         [
             (
+                f"Time state: {_time_context(result)}."
+                if "time" in result.metadata.selected_checks
+                else "Time state: not collected."
+            ),
+            (
                 f"Battery health: {_battery_context(result)}."
                 if "resources" in result.metadata.selected_checks
                 else "Battery health: not collected."
@@ -249,6 +254,7 @@ def build_results_view(
             "value": probe_summary(
                 enable_ping=options.enable_ping,
                 enable_trace=options.enable_trace,
+                enable_time_skew_check=options.enable_time_skew_check,
                 capture_raw_commands=options.capture_raw_commands,
             ),
         },
@@ -699,6 +705,25 @@ def _battery_context(result: EndpointDiagnosticResult) -> str:
     if battery.health_percent is not None:
         parts.append(f"health {battery.health_percent:.1f}%")
     return ", ".join(parts) if parts else "present"
+
+
+def _time_context(result: EndpointDiagnosticResult) -> str:
+    time_state = result.facts.time
+    if time_state is None:
+        return "unavailable"
+    skew_check = time_state.skew_check
+    skew_part = "skew not enabled"
+    if skew_check is not None:
+        if skew_check.status == "checked" and skew_check.absolute_skew_seconds is not None:
+            skew_part = f"skew {skew_check.absolute_skew_seconds:.1f}s"
+        elif skew_check.status != "not_run":
+            skew_part = f"skew inconclusive ({skew_check.error or 'unknown-error'})"
+    timezone_part = (
+        time_state.timezone_identifier
+        if time_state.timezone_identifier is not None
+        else (time_state.timezone_name or "timezone unknown")
+    )
+    return f"{time_state.local_time_iso}, {timezone_part}, {skew_part}"
 
 
 def _storage_device_context(result: EndpointDiagnosticResult) -> str:

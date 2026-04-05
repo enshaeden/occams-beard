@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 from occams_beard.models import (
+    ClockSkewCheck,
     CollectedFacts,
     ConnectivityState,
     CpuState,
@@ -22,6 +23,7 @@ from occams_beard.models import (
     ResourceState,
     RouteSummary,
     ServiceState,
+    TimeState,
     VpnState,
 )
 from occams_beard.serializers import to_json_dict, write_json_file
@@ -85,6 +87,21 @@ def build_result() -> EndpointDiagnosticResult:
         connectivity=ConnectivityState(internet_reachable=True),
         vpn=VpnState(),
         services=ServiceState(),
+        time=TimeState(
+            local_time_iso="2026-04-04T09:30:00-07:00",
+            utc_time_iso="2026-04-04T16:30:00+00:00",
+            timezone_name="PDT",
+            timezone_identifier="America/Los_Angeles",
+            timezone_identifier_source="localtime-symlink",
+            utc_offset_minutes=-420,
+            timezone_offset_consistent=True,
+            skew_check=ClockSkewCheck(
+                status="not_run",
+                reference_kind="https-date-header",
+                reference_label="GitHub HTTPS response date",
+                reference_url="https://github.com/",
+            ),
+        ),
     )
     return EndpointDiagnosticResult(
         metadata=Metadata(
@@ -114,7 +131,7 @@ class SerializerTests(unittest.TestCase):
 
         payload = to_json_dict(result)
 
-        self.assertEqual(payload["schema_version"], "1.3.0")
+        self.assertEqual(payload["schema_version"], "1.4.0")
         self.assertIn("metadata", payload)
         self.assertIn("facts", payload)
         self.assertEqual(payload["platform"]["system"], "Linux")
@@ -123,6 +140,7 @@ class SerializerTests(unittest.TestCase):
         self.assertIn("storage_devices", payload["facts"]["resources"])
         self.assertIn("process_snapshot", payload["facts"]["resources"])
         self.assertIn("swap_used_bytes", payload["facts"]["resources"]["memory"])
+        self.assertIn("time", payload["facts"])
 
     def test_write_json_file_persists_valid_json(self) -> None:
         result = build_result()

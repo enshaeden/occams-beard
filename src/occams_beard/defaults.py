@@ -6,6 +6,7 @@ from occams_beard.models import TcpTarget
 
 DEFAULT_CHECKS = [
     "host",
+    "time",
     "resources",
     "storage",
     "network",
@@ -17,6 +18,9 @@ DEFAULT_CHECKS = [
 ]
 
 DEFAULT_DNS_HOSTS = ["github.com", "python.org"]
+
+DEFAULT_TIME_REFERENCE_LABEL = "GitHub HTTPS response date"
+DEFAULT_TIME_REFERENCE_URL = "https://github.com/"
 
 DEFAULT_TCP_TARGETS = (
     TcpTarget(host="github.com", port=443, label="github-https"),

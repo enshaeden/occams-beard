@@ -189,6 +189,16 @@ def read_storage_device_health() -> list[dict[str, object]] | None:
     return devices
 
 
+def read_timezone_identifier() -> str | None:
+    """Read the configured Windows timezone identifier."""
+
+    result = run_command(["tzutil", "/g"], timeout=5.0)
+    if not result.succeeded:
+        return None
+    identifier = result.stdout.strip()
+    return identifier or None
+
+
 def read_process_snapshot() -> list[dict[str, object]] | None:
     """Collect a bounded process snapshot without persisting raw process inventory."""
 

@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import cast
 
 from occams_beard.assistant import build_guided_experience, enrich_findings
-from occams_beard.defaults import DEFAULT_CHECKS, DEFAULT_TCP_TARGETS
+from occams_beard.defaults import (
+    DEFAULT_CHECKS,
+    DEFAULT_TCP_TARGETS,
+    DEFAULT_TIME_REFERENCE_LABEL,
+    DEFAULT_TIME_REFERENCE_URL,
+)
 from occams_beard.execution import build_execution_records
 from occams_beard.findings import evaluate_selected_findings
 from occams_beard.models import (
     ArpNeighbor,
     BatteryState,
+    ClockSkewCheck,
     CollectedFacts,
     ConnectivityState,
     CpuState,
@@ -37,6 +44,7 @@ from occams_beard.models import (
     StorageDeviceHealth,
     TcpConnectivityCheck,
     TcpTarget,
+    TimeState,
     TraceResult,
     VpnSignal,
     VpnState,
@@ -312,6 +320,7 @@ def build_default_run_result() -> EndpointDiagnosticResult:
                 ),
             ]
         ),
+        time=_baseline_time_state(local_time_iso="2026-03-31T17:00:00-07:00"),
     )
     return _finalize_result(
         facts=facts,
@@ -328,6 +337,7 @@ def build_default_run_result() -> EndpointDiagnosticResult:
         ),
         durations_ms={
             "host": 4,
+            "time": 5,
             "resources": 18,
             "storage": 7,
             "network": 12,
@@ -449,6 +459,10 @@ def build_profile_dns_issue_result() -> EndpointDiagnosticResult:
         ),
         vpn=VpnState(),
         services=ServiceState(),
+        time=_baseline_time_state(
+            local_time_iso="2026-03-31T17:05:00-07:00",
+            timezone_identifier="America/Los_Angeles",
+        ),
     )
     return _finalize_result(
         facts=facts,
@@ -465,6 +479,7 @@ def build_profile_dns_issue_result() -> EndpointDiagnosticResult:
         ),
         durations_ms={
             "host": 4,
+            "time": 5,
             "network": 13,
             "routing": 7,
             "dns": 38,
@@ -479,7 +494,7 @@ def build_degraded_partial_result() -> EndpointDiagnosticResult:
         TcpTarget(host="1.1.1.1", port=53, label="cloudflare-dns"),
     ]
     options = DiagnosticsRunOptions(
-        selected_checks=["network", "routing", "dns", "connectivity", "vpn"],
+        selected_checks=["time", "network", "routing", "dns", "connectivity", "vpn"],
         targets=targets,
         dns_hosts=["github.com", "python.org"],
         enable_trace=True,
@@ -623,6 +638,7 @@ def build_degraded_partial_result() -> EndpointDiagnosticResult:
         ),
         vpn=VpnState(),
         services=ServiceState(),
+        time=_baseline_time_state(local_time_iso="2026-03-31T17:10:00-07:00"),
     )
     result = _finalize_result(
         facts=facts,
@@ -639,6 +655,7 @@ def build_degraded_partial_result() -> EndpointDiagnosticResult:
         ),
         durations_ms={
             "host": 4,
+            "time": 5,
             "network": 10,
             "routing": 9,
             "dns": 30,
@@ -804,6 +821,13 @@ def build_profile_vpn_issue_result() -> EndpointDiagnosticResult:
                 ),
             ]
         ),
+        time=_baseline_time_state(
+            local_time_iso="2026-03-31T17:12:00-07:00",
+            timezone_identifier="Pacific Standard Time",
+            timezone_source="tzutil",
+            timezone_name="PDT",
+            timezone_offset_consistent=None,
+        ),
     )
     return _finalize_result(
         facts=facts,
@@ -820,6 +844,7 @@ def build_profile_vpn_issue_result() -> EndpointDiagnosticResult:
         ),
         durations_ms={
             "host": 4,
+            "time": 5,
             "network": 12,
             "routing": 8,
             "dns": 18,
@@ -827,6 +852,32 @@ def build_profile_vpn_issue_result() -> EndpointDiagnosticResult:
             "vpn": 2,
             "services": 29,
         },
+    )
+
+
+def _baseline_time_state(
+    *,
+    local_time_iso: str,
+    timezone_identifier: str = "America/Los_Angeles",
+    timezone_source: str = "localtime-symlink",
+    timezone_name: str = "PDT",
+    timezone_offset_consistent: bool | None = True,
+) -> TimeState:
+    observed_local = datetime.fromisoformat(local_time_iso)
+    return TimeState(
+        local_time_iso=local_time_iso,
+        utc_time_iso=observed_local.astimezone(UTC).isoformat(),
+        timezone_name=timezone_name,
+        timezone_identifier=timezone_identifier,
+        timezone_identifier_source=timezone_source,
+        utc_offset_minutes=-420,
+        timezone_offset_consistent=timezone_offset_consistent,
+        skew_check=ClockSkewCheck(
+            status="not_run",
+            reference_kind="https-date-header",
+            reference_label=DEFAULT_TIME_REFERENCE_LABEL,
+            reference_url=DEFAULT_TIME_REFERENCE_URL,
+        ),
     )
 
 

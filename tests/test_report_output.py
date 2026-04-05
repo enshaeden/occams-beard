@@ -6,6 +6,7 @@ import unittest
 
 from occams_beard.models import (
     BatteryState,
+    ClockSkewCheck,
     CollectedFacts,
     ConnectivityState,
     CpuState,
@@ -31,6 +32,7 @@ from occams_beard.models import (
     StorageDeviceHealth,
     TcpConnectivityCheck,
     TcpTarget,
+    TimeState,
     TraceHop,
     TraceResult,
     VpnState,
@@ -306,7 +308,7 @@ class ReportOutputTests(unittest.TestCase):
                 version="0.1.0",
                 generated_at="2026-04-01T00:00:00+00:00",
                 elapsed_ms=100,
-                selected_checks=["resources", "storage"],
+                selected_checks=["resources", "storage", "time"],
             ),
             platform=PlatformInfo(
                 system="macOS",
@@ -384,6 +386,26 @@ class ReportOutputTests(unittest.TestCase):
                         ],
                     ),
                 ),
+                time=TimeState(
+                    local_time_iso="2026-04-04T09:30:00-07:00",
+                    utc_time_iso="2026-04-04T16:30:00+00:00",
+                    timezone_name="PDT",
+                    timezone_identifier="America/Los_Angeles",
+                    timezone_identifier_source="localtime-symlink",
+                    utc_offset_minutes=-420,
+                    timezone_offset_consistent=True,
+                    skew_check=ClockSkewCheck(
+                        status="checked",
+                        reference_kind="https-date-header",
+                        reference_label="GitHub HTTPS response date",
+                        reference_url="https://github.com/",
+                        reference_time_iso="2026-04-04T16:29:30+00:00",
+                        observed_at_utc_iso="2026-04-04T16:30:00+00:00",
+                        skew_seconds=30.0,
+                        absolute_skew_seconds=30.0,
+                        duration_ms=120,
+                    ),
+                ),
                 network=NetworkState(route_summary=RouteSummary(None, None, False, [])),
                 dns=DnsState(),
                 connectivity=ConnectivityState(internet_reachable=False),
@@ -402,6 +424,8 @@ class ReportOutputTests(unittest.TestCase):
             text,
         )
         self.assertIn("Bounded process hints: browser (2, 44.0% CPU, 2.0 GiB)", text)
+        self.assertIn("Time Snapshot", text)
+        self.assertIn("Clock skew check: 30.0s vs GitHub HTTPS response date", text)
         self.assertIn("Storage Snapshot", text)
         self.assertIn("Monitored volumes: / (98.0% used, 2.0% free, critical pressure)", text)
         self.assertIn("Storage device health: disk0=Verified", text)

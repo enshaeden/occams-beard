@@ -16,6 +16,7 @@ Linux:
 
 - `/proc/uptime`
 - `/proc/meminfo`
+- `/etc/timezone` or `/etc/localtime`
 - `/sys/class/power_supply/BAT*`
 - `ps -A -o comm=,pcpu=,rss=`
 - `ip addr show`
@@ -28,6 +29,7 @@ macOS:
 - `sysctl`
 - `vm_stat`
 - `sysctl vm.swapusage`
+- `/etc/localtime`
 - `system_profiler SPPowerDataType`
 - `pmset -g batt`
 - `ps -A -o comm=,pcpu=,rss=`
@@ -43,6 +45,7 @@ Windows:
 - `GetTickCount64`
 - `GlobalMemoryStatusEx`
 - `GetSystemPowerStatus`
+- `tzutil /g`
 - `Get-Process | Select-Object ProcessName,CPU,WorkingSet64`
 - PowerShell DNS server enumeration with `ipconfig /all` fallback
 - `Get-PhysicalDisk`
@@ -50,6 +53,7 @@ Windows:
 - `route print`
 - `arp -a`
 - PowerShell CIM queries for optional storage health only
+- optional one-shot HTTPS response `Date` header for bounded clock-skew comparison when the operator enables it
 
 ## Live Smoke Validation
 
@@ -63,13 +67,18 @@ Windows:
 - command output still varies by platform and OS version
 - Windows cannot execute the macOS `.command` file type directly, so true cross-platform root launch requires a Windows-specific sibling shim even though launch orchestration is shared underneath
 - VPN detection remains heuristic
+- local time collection is snapshot-only; it captures the current wall clock, UTC offset, and best-effort timezone identifier, not a sustained drift history
+- the optional clock-skew probe uses one bounded HTTPS response date and intentionally avoids any time-sync or remediation behavior
+- Linux and macOS timezone identifiers are best-effort and depend on local configuration files or symlink layout exposing an IANA zone name cleanly
 - Linux battery health is limited to what sysfs exposes, and non-privileged Linux storage-device health is still effectively unavailable in the current model
 - Linux storage pressure now ignores pseudo-filesystems such as `/proc`, `/run`, `/sys`, and `/dev/shm` so operator findings stay focused on real writable volumes
 - Linux can expose swap and commit pressure from `/proc/meminfo`, but not every distribution or containerized runtime exposes the same fields consistently
 - macOS storage-device health depends on `diskutil` exposing usable device and SMART state on the current host
+- macOS and Linux can expose timezone identifiers locally, but not every endpoint preserves them in a stable or parseable form
 - macOS and Linux storage-space findings are based on `df` plus non-privileged filesystem usage snapshots; they show current free-space pressure only and do not represent a sustained trend
 - macOS can expose swap usage, but it does not expose the same commit-limit semantics as Linux in the current non-privileged model
 - Windows battery collection currently captures battery presence, charge, and coarse state without elevation, but it still does not expose design-capacity health in the current model
+- Windows timezone identifiers come from `tzutil /g`, which returns Windows timezone names rather than IANA identifiers
 - Windows storage-device health remains opportunistic because some environments expose only coarse `Get-PhysicalDisk` health states and some deny the query to standard users
 - Windows process hints currently lean more on working-set size than on true instantaneous CPU saturation because the standard unprivileged process snapshot is coarser there
 - process hints are snapshot-only and category-based; they are intentionally not a full process list or a sustained trend view

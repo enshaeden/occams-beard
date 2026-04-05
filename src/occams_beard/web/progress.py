@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from occams_beard.domain_registry import NETWORK_EGRESS_DOMAINS
 from occams_beard.defaults import DEFAULT_CHECKS
+from occams_beard.domain_registry import domain_creates_network_egress
 from occams_beard.execution import (
     DOMAIN_LABELS,
     next_execution_step_label,
@@ -37,7 +37,7 @@ def initial_progress_execution(options: DiagnosticsRunOptions) -> list[DomainExe
                         else "Optional and not selected for this run."
                     )
                 ),
-                creates_network_egress=domain in NETWORK_EGRESS_DOMAINS,
+                creates_network_egress=domain_creates_network_egress(domain, options),
             )
         )
     return progress_execution
@@ -82,14 +82,12 @@ def build_progress_view(session) -> dict[str, object]:
             else "Following the support-guided plan on this device."
         )
         body = (
-            (
-                f"Currently running: {current_domain_label}. {current_substep_label}."
-                if current_domain_label is not None and current_substep_label is not None
-                else (
-                    f"Currently running: {current_domain_label}."
-                    if current_domain_label is not None
-                    else "Preparing the next step."
-                )
+            f"Currently running: {current_domain_label}. {current_substep_label}."
+            if current_domain_label is not None and current_substep_label is not None
+            else (
+                f"Currently running: {current_domain_label}."
+                if current_domain_label is not None
+                else "Preparing the next step."
             )
         )
 
@@ -139,7 +137,9 @@ def build_progress_view(session) -> dict[str, object]:
                 "status": row_status,
                 "status_label": row_status_label,
                 "step_progress_label": (
-                    f"{completed_steps}/{total_steps}" if record.selected and total_steps else "Optional"
+                    f"{completed_steps}/{total_steps}"
+                    if record.selected and total_steps
+                    else "Optional"
                 ),
                 "duration_label": duration_label,
                 "scope_label": (

@@ -69,7 +69,7 @@ class SupportBundleTests(unittest.TestCase):
         self.assertTrue(manifest.raw_command_capture_included)
 
         result_payload = json.loads(files["result.json"].decode("utf-8"))
-        self.assertEqual(result_payload["schema_version"], "1.3.0")
+        self.assertEqual(result_payload["schema_version"], "1.4.0")
         self.assertNotEqual(result_payload["facts"]["host"]["hostname"], "demo-host")
         self.assert_no_registered_value_leaks(
             files,

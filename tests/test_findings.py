@@ -7,6 +7,7 @@ import unittest
 from occams_beard.findings import evaluate_selected_findings
 from occams_beard.models import (
     BatteryState,
+    ClockSkewCheck,
     CollectedFacts,
     ConnectivityState,
     CpuState,
@@ -27,6 +28,7 @@ from occams_beard.models import (
     StorageDeviceHealth,
     TcpConnectivityCheck,
     TcpTarget,
+    TimeState,
     TraceHop,
     TraceResult,
     VpnSignal,
@@ -139,7 +141,100 @@ class FindingsTests(unittest.TestCase):
         )
 
         self.assertEqual(probable_fault_domain, "local_network")
-        self.assertEqual(findings[0].identifier, "no-default-route-no-internet")
+
+    def test_material_clock_skew_generates_local_host_finding(self) -> None:
+        facts = build_base_facts()
+        facts.time = TimeState(
+            local_time_iso="2026-04-04T09:30:00-07:00",
+            utc_time_iso="2026-04-04T16:30:00+00:00",
+            timezone_name="PDT",
+            timezone_identifier="America/Los_Angeles",
+            timezone_identifier_source="localtime-symlink",
+            utc_offset_minutes=-420,
+            timezone_offset_consistent=True,
+            skew_check=ClockSkewCheck(
+                status="checked",
+                reference_kind="https-date-header",
+                reference_label="GitHub HTTPS response date",
+                reference_url="https://github.com/",
+                reference_time_iso="2026-04-04T16:20:00+00:00",
+                observed_at_utc_iso="2026-04-04T16:30:00+00:00",
+                skew_seconds=600.0,
+                absolute_skew_seconds=600.0,
+                duration_ms=150,
+            ),
+        )
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["time", "routing", "dns", "connectivity"],
+        )
+
+        self.assertEqual(findings[0].identifier, "system-clock-materially-inaccurate")
+        self.assertEqual(probable_fault_domain, "local_host")
+        self.assertTrue(
+            any("Measured clock skew is 600.0 seconds" in item for item in findings[0].evidence)
+        )
+        self.assertIn("DNS checks succeeded", " ".join(findings[0].evidence))
+
+    def test_inconclusive_clock_skew_generates_info_finding(self) -> None:
+        facts = build_base_facts()
+        facts.time = TimeState(
+            local_time_iso="2026-04-04T09:30:00-07:00",
+            utc_time_iso="2026-04-04T16:30:00+00:00",
+            timezone_name="PDT",
+            timezone_identifier="America/Los_Angeles",
+            timezone_identifier_source="localtime-symlink",
+            utc_offset_minutes=-420,
+            timezone_offset_consistent=True,
+            skew_check=ClockSkewCheck(
+                status="failed",
+                reference_kind="https-date-header",
+                reference_label="GitHub HTTPS response date",
+                reference_url="https://github.com/",
+                duration_ms=150,
+                error="missing-date-header",
+            ),
+        )
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["time"],
+        )
+
+        self.assertEqual(findings[0].identifier, "insufficient-clock-drift-evidence")
+        self.assertEqual(probable_fault_domain, "healthy")
+
+    def test_checked_clock_with_small_skew_can_rule_out_major_time_issue(self) -> None:
+        facts = build_base_facts()
+        facts.time = TimeState(
+            local_time_iso="2026-04-04T09:30:00-07:00",
+            utc_time_iso="2026-04-04T16:30:00+00:00",
+            timezone_name="PDT",
+            timezone_identifier="America/Los_Angeles",
+            timezone_identifier_source="localtime-symlink",
+            utc_offset_minutes=-420,
+            timezone_offset_consistent=True,
+            skew_check=ClockSkewCheck(
+                status="checked",
+                reference_kind="https-date-header",
+                reference_label="GitHub HTTPS response date",
+                reference_url="https://github.com/",
+                reference_time_iso="2026-04-04T16:29:20+00:00",
+                observed_at_utc_iso="2026-04-04T16:30:00+00:00",
+                skew_seconds=40.0,
+                absolute_skew_seconds=40.0,
+                duration_ms=130,
+            ),
+        )
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["time"],
+        )
+
+        self.assertEqual(findings[0].identifier, "no-significant-time-issue")
+        self.assertEqual(probable_fault_domain, "healthy")
 
     def test_dns_failure_with_raw_ip_success_maps_to_dns(self) -> None:
         facts = build_base_facts()

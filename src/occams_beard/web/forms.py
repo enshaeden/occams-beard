@@ -90,6 +90,7 @@ def query_form_state() -> dict[str, object]:
         ),
         enable_ping=request.args.get("enable_ping") == "1",
         enable_trace=request.args.get("enable_trace") == "1",
+        enable_time_skew_check=request.args.get("enable_time_skew_check") == "1",
         capture_raw_commands=request.args.get("capture_raw_commands") == "1",
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
@@ -142,6 +143,7 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         dns_hosts_text=dns_hosts_text or "\n".join(effective_dns_hosts),
         enable_ping=request.form.get("enable_ping") == "on",
         enable_trace=request.form.get("enable_trace") == "on",
+        enable_time_skew_check=request.form.get("enable_time_skew_check") == "on",
         capture_raw_commands=request.form.get("capture_raw_commands") == "on",
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
@@ -206,6 +208,7 @@ def request_error_form_state(error_message: str) -> dict[str, object]:
         dns_hosts_text=dns_hosts_text,
         enable_ping=request.form.get("enable_ping") == "on",
         enable_trace=request.form.get("enable_trace") == "on",
+        enable_time_skew_check=request.form.get("enable_time_skew_check") == "on",
         capture_raw_commands=request.form.get("capture_raw_commands") == "on",
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
@@ -224,6 +227,7 @@ def build_form_state(
     dns_hosts_text: str,
     enable_ping: bool,
     enable_trace: bool,
+    enable_time_skew_check: bool,
     capture_raw_commands: bool,
     from_run_id: str | None,
     bridge: dict[str, str] | None,
@@ -237,6 +241,7 @@ def build_form_state(
         dns_hosts=split_multiline_entries(dns_hosts_text),
         enable_ping=enable_ping,
         enable_trace=enable_trace,
+        enable_time_skew_check=enable_time_skew_check,
         capture_raw_commands=capture_raw_commands,
     )
     return {
@@ -254,6 +259,7 @@ def build_form_state(
         "dns_hosts_text": dns_hosts_text,
         "enable_ping": enable_ping,
         "enable_trace": enable_trace,
+        "enable_time_skew_check": enable_time_skew_check,
         "capture_raw_commands": capture_raw_commands,
         "plan": plan,
         "from_run_id": from_run_id,
@@ -280,6 +286,7 @@ def default_form_state() -> dict[str, object]:
         "dns_hosts_text": "",
         "enable_ping": False,
         "enable_trace": False,
+        "enable_time_skew_check": False,
         "capture_raw_commands": False,
         "plan": build_collection_plan(
             selected_checks=[],
@@ -287,6 +294,7 @@ def default_form_state() -> dict[str, object]:
             dns_hosts=[],
             enable_ping=False,
             enable_trace=False,
+            enable_time_skew_check=False,
             capture_raw_commands=False,
         ),
         "from_run_id": None,
@@ -416,6 +424,7 @@ def support_bridge_url(
             if record.options.enable_trace or "connectivity" in merged_checks
             else "0"
         ),
+        enable_time_skew_check="1" if record.options.enable_time_skew_check else "0",
         capture_raw_commands="0",
     )
 
@@ -430,6 +439,7 @@ def rerun_url(record: RunSession) -> str:
         "dns_hosts": "\n".join(record.options.dns_hosts),
         "enable_ping": "1" if record.options.enable_ping else "0",
         "enable_trace": "1" if record.options.enable_trace else "0",
+        "enable_time_skew_check": "1" if record.options.enable_time_skew_check else "0",
         "capture_raw_commands": "1" if record.options.capture_raw_commands else "0",
     }
     if record.experience.mode == SELF_SERVE_MODE and record.experience.symptom_id:

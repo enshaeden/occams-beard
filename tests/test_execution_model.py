@@ -86,6 +86,7 @@ class ExecutionModelTests(unittest.TestCase):
             planned_execution_step_breakdown(multi_domain_options),
             {
                 "host": 1,
+                "time": 0,
                 "resources": 0,
                 "storage": 0,
                 "network": 0,
@@ -96,6 +97,22 @@ class ExecutionModelTests(unittest.TestCase):
                 "services": 2,
             },
         )
+
+    def test_time_domain_adds_optional_skew_probe_step_only_when_enabled(self) -> None:
+        local_only_options = DiagnosticsRunOptions(
+            selected_checks=["time"],
+            targets=[],
+            dns_hosts=[],
+        )
+        skew_options = DiagnosticsRunOptions(
+            selected_checks=["time"],
+            targets=[],
+            dns_hosts=[],
+            enable_time_skew_check=True,
+        )
+
+        self.assertEqual(planned_execution_step_breakdown(local_only_options)["time"], 1)
+        self.assertEqual(planned_execution_step_breakdown(skew_options)["time"], 2)
 
     def test_complete_domain_tracks_duration_warnings_and_steps(self) -> None:
         options = DiagnosticsRunOptions(
@@ -155,6 +172,8 @@ class ExecutionModelTests(unittest.TestCase):
         context.set_connectivity(fixture.facts.connectivity)
         context.set_vpn(fixture.facts.vpn)
         context.set_services(fixture.facts.services)
+        if fixture.facts.time is not None:
+            context.set_time(fixture.facts.time)
         context.warnings.extend(fixture.warnings)
         context.durations_ms.update(
             {
@@ -181,7 +200,7 @@ class ExecutionModelTests(unittest.TestCase):
         self.assertEqual(result.findings[0].identifier, "dns-failure-raw-ip-success")
         self.assertEqual(
             [record.domain for record in result.execution if record.selected],
-            ["host", "network", "routing", "dns", "connectivity"],
+            ["host", "time", "network", "routing", "dns", "connectivity"],
         )
 
     def test_registry_execution_order_is_explicit_and_deterministic(self) -> None:
@@ -191,6 +210,7 @@ class ExecutionModelTests(unittest.TestCase):
             registered_order,
             [
                 "host",
+                "time",
                 "resources",
                 "storage",
                 "network",

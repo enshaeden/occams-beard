@@ -2,7 +2,7 @@
 
 ## Schema Version
 
-Current result schema: `1.3.0`
+Current result schema: `1.4.0`
 
 This schema version is separate from the application version. The application can change without changing the result schema, and the result schema can change even if the operator-facing UI stays similar.
 
@@ -25,9 +25,9 @@ The bounded process-snapshot commands used for host-pressure hints are also excl
 
 `guided_experience` is a deterministic explanation surface derived from findings and execution state. It is not an independent reasoning engine and should not contradict or bypass `findings`.
 
-## Additive `1.3.0` Fields
+## Additive `1.4.0` Fields
 
-Schema `1.3.0` adds optional host-pressure and storage-pressure fields:
+Schema `1.4.0` adds optional host-pressure, storage-pressure, and clock-state fields:
 
 - Under `facts.resources`:
   - `battery`: read-only battery state when the endpoint exposes it
@@ -39,9 +39,14 @@ Schema `1.3.0` adds optional host-pressure and storage-pressure fields:
   - `free_percent`: operator-friendly free-space percentage for the current filesystem snapshot
   - `pressure_level`: deterministic storage-pressure classification for that volume: `critical`, `low`, `normal`, or `unknown`
   - `role_hint`: coarse operational role for the monitored volume, used only to explain likely impact areas such as system writes or user-data writes
+- Under `facts.time`:
+  - `local_time_iso` and `utc_time_iso`: the current local and UTC clock snapshot captured on the endpoint
+  - `timezone_name`, optional `timezone_identifier`, and optional `timezone_identifier_source`: bounded local timezone state when the platform exposes it
+  - `utc_offset_minutes` and optional `timezone_offset_consistent`: current offset facts and a bounded consistency check when an IANA timezone identifier is available
+  - `skew_check`: a one-shot bounded external reference comparison with `status`, reference metadata, optional measured skew, and explicit failure details when the operator enabled it
 
 These fields are additive. Existing consumers that ignore unknown fields can continue to parse the rest of the result.
-The new resource fields remain read-only and snapshot-only. They do not represent background sampling, destructive testing, vendor-specific SMART parsing sprawl, or long-term baselines.
+The new fields remain read-only and snapshot-only. They do not represent background sampling, time synchronization, destructive testing, vendor-specific SMART parsing sprawl, or long-term baselines.
 
 ## Execution Status Model
 
@@ -81,7 +86,8 @@ Supported status values:
 - Schema `1.0.0` is the first explicit compatibility point.
 - Schema `1.1.0` remains a prior compatibility point.
 - Schema `1.2.0` remains a prior compatibility point.
-- Schema `1.3.0` is the current compatibility point.
+- Schema `1.3.0` remains a prior compatibility point.
+- Schema `1.4.0` is the current compatibility point.
 - Additive fields should not require a major schema bump.
 - Renaming or removing fields should require a major schema bump.
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from occams_beard.defaults import DEFAULT_CHECKS
 from occams_beard.domain_registry import (
-    NETWORK_EGRESS_DOMAINS,
+    domain_creates_network_egress,
     iter_registered_domains,
     planned_step_labels_by_domain,
 )
@@ -89,7 +89,7 @@ def build_execution_records(
     records: list[DomainExecution] = []
     selected = set(options.selected_checks)
     for domain in DEFAULT_CHECKS:
-        creates_network_egress = domain in NETWORK_EGRESS_DOMAINS
+        creates_network_egress = domain_creates_network_egress(domain, options)
         if completed_domains is not None and domain not in completed_domains:
             if domain == "host" or domain in selected:
                 records.append(
@@ -250,6 +250,75 @@ def _resources_execution(
         ),
         warnings=warnings,
         probes=probes,
+    )
+
+
+def _time_execution(
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    *,
+    options: DiagnosticsRunOptions,
+) -> DomainExecution:
+    creates_network_egress = options.enable_time_skew_check
+    if not selected:
+        return _not_run_record("time", creates_network_egress=creates_network_egress)
+
+    time_state = facts.time
+    local_probe_warnings = [
+        warning for warning in warnings if warning.code != "clock-skew-check-failed"
+    ]
+    skew_probe_warnings = [
+        warning for warning in warnings if warning.code == "clock-skew-check-failed"
+    ]
+    local_status: ExecutionStatus = "passed" if time_state is not None else "failed"
+    if local_probe_warnings and time_state is not None:
+        local_status = "partial"
+    probes = [
+        ExecutionProbe(
+            probe_id="local-time-state",
+            label="Collect local clock and timezone state",
+            status=local_status,
+            duration_ms=duration_ms,
+            details=(
+                [
+                    f"Local time: {time_state.local_time_iso}.",
+                    f"Timezone name: {time_state.timezone_name or 'unknown'}.",
+                    (
+                        "Timezone identifier: "
+                        f"{time_state.timezone_identifier} "
+                        f"({time_state.timezone_identifier_source or 'unknown source'})."
+                        if time_state.timezone_identifier is not None
+                        else "Timezone identifier was not exposed on this endpoint."
+                    ),
+                ]
+                if time_state is not None
+                else ["Local clock state was not collected in this run."]
+            ),
+            warnings=local_probe_warnings,
+        ),
+        _time_skew_probe(
+            facts,
+            duration_ms=duration_ms,
+            warnings=skew_probe_warnings,
+            enabled=options.enable_time_skew_check,
+        ),
+    ]
+    status = _aggregate_probe_statuses(probe.status for probe in probes)
+    return DomainExecution(
+        domain="time",
+        label=DOMAIN_LABELS["time"],
+        status=status,
+        selected=True,
+        duration_ms=duration_ms,
+        summary=(
+            "Collected local clock and timezone facts, with an optional bounded external skew "
+            "comparison when explicitly enabled."
+        ),
+        warnings=warnings,
+        probes=probes,
+        creates_network_egress=creates_network_egress,
     )
 
 
@@ -780,6 +849,52 @@ def _process_snapshot_probe(
     )
 
 
+def _time_skew_probe(
+    facts: CollectedFacts,
+    *,
+    duration_ms: int | None,
+    warnings: list[DiagnosticWarning],
+    enabled: bool,
+) -> ExecutionProbe:
+    time_state = facts.time
+    skew_check = time_state.skew_check if time_state is not None else None
+    if not enabled:
+        status: ExecutionStatus = "skipped"
+        details = ["The bounded external skew check was not enabled for this run."]
+    elif warnings:
+        status = "partial"
+        details = [
+            "The bounded external clock-reference check did not produce a conclusive skew result."
+        ]
+    elif skew_check is None or skew_check.status != "checked":
+        status = "failed"
+        details = ["The bounded external clock-reference check did not return a usable result."]
+    else:
+        status = "passed"
+        details = [
+            f"Reference label: {skew_check.reference_label}.",
+            (
+                "Measured skew: "
+                f"{skew_check.skew_seconds:.1f} seconds "
+                f"(absolute {skew_check.absolute_skew_seconds:.1f} seconds)."
+            ),
+            (
+                f"Reference time: {skew_check.reference_time_iso}."
+                if skew_check.reference_time_iso is not None
+                else "Reference time was not reported."
+            ),
+        ]
+    return ExecutionProbe(
+        probe_id="clock-skew-check",
+        label="Compare against the bounded external clock reference",
+        status=status,
+        duration_ms=skew_check.duration_ms if skew_check is not None else duration_ms,
+        details=details,
+        warnings=warnings,
+        creates_network_egress=True,
+    )
+
+
 def _storage_device_probe(
     facts: CollectedFacts,
     *,
@@ -916,6 +1031,19 @@ def _build_resources_record(
     return _resources_execution(selected, facts, warnings, duration_ms)
 
 
+def _build_time_record(
+    *,
+    selected: bool,
+    facts: CollectedFacts,
+    warnings: list[DiagnosticWarning],
+    duration_ms: int | None,
+    options: DiagnosticsRunOptions,
+    selected_checks: set[str],
+) -> DomainExecution:
+    del selected_checks
+    return _time_execution(selected, facts, warnings, duration_ms, options=options)
+
+
 def _build_storage_record(
     *,
     selected: bool,
@@ -1015,6 +1143,7 @@ def _build_services_record(
 
 _EXECUTION_BUILDERS = {
     "host": _build_host_record,
+    "time": _build_time_record,
     "resources": _build_resources_record,
     "storage": _build_storage_record,
     "network": _build_network_record,

@@ -25,6 +25,7 @@ from occams_beard.models import (
     RouteSummary,
     ServiceState,
     StorageDeviceHealth,
+    TimeState,
     VpnState,
 )
 
@@ -58,6 +59,7 @@ class DiagnosticsRunContext:
     )
     vpn: VpnState = field(default_factory=VpnState)
     services: ServiceState = field(default_factory=ServiceState)
+    time: TimeState | None = None
     total_steps: int = field(init=False, default=0)
     _selected_execution_order: tuple[str, ...] = field(init=False, default=(), repr=False)
     _planned_steps_by_domain: dict[str, int] = field(init=False, default_factory=dict, repr=False)
@@ -96,6 +98,9 @@ class DiagnosticsRunContext:
 
     def set_network(self, network: NetworkState) -> None:
         self.network = network
+
+    def set_time(self, time_state: TimeState) -> None:
+        self.time = time_state
 
     def set_route_summary(self, route_summary: RouteSummary) -> None:
         self.network.route_summary = route_summary
@@ -146,6 +151,7 @@ class DiagnosticsRunContext:
             connectivity=self.connectivity,
             vpn=self.vpn,
             services=self.services,
+            time=self.time,
         )
 
     def emit_progress(self, *, active_domain: str | None) -> None:
