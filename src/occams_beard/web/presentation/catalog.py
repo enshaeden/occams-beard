@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from occams_beard.intake import resolve_self_serve_profile_id, suggest_support_profile_id
-
 SELF_SERVE_MODE = "self-serve"
 SUPPORT_MODE = "support"
 

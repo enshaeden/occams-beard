@@ -22,6 +22,7 @@ from occams_beard.intake.contracts import (
     collect_contract_issues,
     validate_contract,
 )
+from occams_beard.intake.domain_mapper import DomainMappingResult, map_intake_to_scope
 from occams_beard.intake.intents import (
     IntakeIntent,
     resolve_intake_intent,
@@ -36,6 +37,7 @@ __all__ = [
     "ClarificationPrompt",
     "ClarificationResult",
     "DecisionContext",
+    "DomainMappingResult",
     "ClarificationQuestion",
     "ContractIntakeIntent",
     "ContractValidationIssue",
@@ -47,6 +49,7 @@ __all__ = [
     "build_clarification_questions",
     "collect_contract_issues",
     "get_intake_contract",
+    "map_intake_to_scope",
     "resolve_intake_intent",
     "resolve_intake_interpretation",
     "refine_decision_context",
