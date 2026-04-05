@@ -36,42 +36,27 @@ SYMPTOM_OPTIONS = (
     {
         "id": "internet-not-working",
         "label": "Internet not working",
-        "description": (
-            "Websites and online apps are not connecting, or the device appears offline."
-        ),
-        "hint": "Checks baseline connectivity across the network path.",
+        "description": "Websites and online apps do not connect, or the device appears offline.",
     },
     {
         "id": "apps-sites-not-loading",
         "label": "Apps or sites not loading",
-        "description": (
-            "Some apps, sites, or sign-in pages stall, fail, or only partly load."
-        ),
-        "hint": "Checks partial failures, access interruptions, and sign-in loops.",
+        "description": "Some apps, sites, or sign-in pages stall, fail, or load partially.",
     },
     {
         "id": "vpn-or-company-resource-issue",
         "label": "VPN or company resource issue",
-        "description": (
-            "A VPN, internal app, file share, or company-only service is not working."
-        ),
-        "hint": "Checks VPN paths, DNS resolution, and private resource access.",
+        "description": "A VPN, internal app, file share, or company-only service is unavailable.",
     },
     {
         "id": "device-feels-slow",
         "label": "Device feels slow",
-        "description": (
-            "The device feels unusually slow, overloaded, or unstable while you work."
-        ),
-        "hint": "Checks local system state and resource pressure.",
+        "description": "The device is slow, overloaded, or unstable during normal work.",
     },
     {
         "id": "something-else",
         "label": "Something else / unsure",
-        "description": (
-            "You need a general local check before deciding what kind of help you need."
-        ),
-        "hint": "Runs the default baseline diagnostic set.",
+        "description": "Run the default diagnostic set when the issue category is not clear.",
     },
 )
 
