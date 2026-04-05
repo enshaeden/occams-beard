@@ -23,7 +23,7 @@ This schema version is separate from the application version. The application ca
 Raw command capture is intentionally excluded from `result.json`. If enabled, it lives only in the support bundle as `raw-commands.json`.
 The bounded process-snapshot commands used for host-pressure hints are also excluded from raw-command capture so support bundles do not accidentally turn the feature into a process inventory export.
 
-`guided_experience` is a deterministic explanation surface derived from findings and execution state. It is not an independent reasoning engine and should not contradict or bypass `findings`.
+`guided_experience` is a deterministic explanation surface derived from findings and execution state. It is not an independent reasoning engine and should not contradict or bypass `findings`. It now applies a final reasonableness gate before surfacing user-facing guidance, so internally inconsistent or non-actionable findings can remain in technical output without being repeated as guided advice.
 
 ## Additive `1.4.0` Fields
 
@@ -39,6 +39,8 @@ Schema `1.4.0` adds optional host-pressure, storage-pressure, and clock-state fi
   - `free_percent`: operator-friendly free-space percentage for the current filesystem snapshot
   - `pressure_level`: deterministic storage-pressure classification for that volume: `critical`, `low`, `normal`, or `unknown`; classification is role-aware and is not driven by one global absolute free-bytes threshold
   - `role_hint`: coarse operational role for the monitored volume, used to distinguish primary writable volumes from auxiliary or ephemeral diagnostic mounts when explaining storage impact
+
+Execution output now distinguishes storage-device inventory collection from actual health assessment. A storage-device probe can report inventory-only partial results when the platform enumerates devices but does not expose health-state strings.
 - Under `facts.time`:
   - `local_time_iso` and `utc_time_iso`: the current local and UTC clock snapshot captured on the endpoint
   - `timezone_name`, optional `timezone_identifier`, and optional `timezone_identifier_source`: bounded local timezone state when the platform exposes it

@@ -142,6 +142,22 @@ default            192.168.1.1        UGScg                 en0
         self.assertEqual(parsed["routes"][2]["interface"], "utun3")
         self.assertEqual(parsed["routes"][3]["gateway"], "10.8.0.1")
 
+    def test_parse_netstat_rn_uses_netif_column_instead_of_numeric_expire_values(self) -> None:
+        output = """
+Routing tables
+
+Internet:
+Destination        Gateway            Flags        Refs      Use    Mtu   Netif Expire
+default            192.168.1.1        UGSc          57        12   1500     en0   1200
+10.20/16           10.8.0.1           UGSc           2         1   1380   utun3    866
+""".strip()
+
+        parsed = parse_netstat_rn(output)
+
+        self.assertEqual(parsed["default_interface"], "en0")
+        self.assertEqual(parsed["routes"][1]["interface"], "utun3")
+        self.assertNotIn("1200", [route["interface"] for route in parsed["routes"]])
+
     def test_parse_netstat_rn_supports_legacy_linux_route_table_layout(self) -> None:
         parsed = parse_netstat_rn(_fixture("linux-netstat-rn-legacy.txt"))
 

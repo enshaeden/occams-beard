@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
+from collections.abc import Iterable
 from dataclasses import dataclass
+
+from occams_beard.models import DiskVolume
 
 GiB = 1024**3
 MiB = 1024**2
 
 _ACTIONABLE_VOLUME_ROLES = frozenset({"system", "user_data", "other"})
 _DIAGNOSTIC_VOLUME_ROLES = frozenset({"auxiliary", "ephemeral"})
+_MACOS_PRIMARY_CAPACITY_PATHS = frozenset({"/", "/System/Volumes/Data"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +110,57 @@ def is_diagnostic_only_volume_role(role_hint: str | None) -> bool:
     return role_hint in _DIAGNOSTIC_VOLUME_ROLES
 
 
+def disk_has_capacity_data(disk: DiskVolume) -> bool:
+    """Return whether the mount exposes usable capacity metrics."""
+
+    return disk.total_bytes > 0 and disk.free_percent is not None
+
+
+def is_zero_capacity_pseudo_mount(disk: DiskVolume) -> bool:
+    """Return whether the mount is diagnostic-only for capacity reasoning."""
+
+    return not disk_has_capacity_data(disk)
+
+
+def distinct_capacity_groups(
+    disks: Iterable[DiskVolume],
+    *,
+    actionable_only: bool = False,
+) -> list[list[DiskVolume]]:
+    """Group mounts that should count as one underlying capacity condition."""
+
+    groups: OrderedDict[tuple[object, ...], list[DiskVolume]] = OrderedDict()
+    for disk in disks:
+        if not disk_has_capacity_data(disk):
+            continue
+        if actionable_only and not is_actionable_volume_role(disk.role_hint):
+            continue
+        key = _capacity_group_key(disk)
+        groups.setdefault(key, []).append(disk)
+    return list(groups.values())
+
+
+def capacity_group_label(group: list[DiskVolume]) -> str:
+    """Render a stable operator-facing label for a grouped capacity pool."""
+
+    paths = sorted({disk.path for disk in group}, key=_path_preference_key)
+    if len(paths) == 2 and set(paths) == _MACOS_PRIMARY_CAPACITY_PATHS:
+        return "/ and /System/Volumes/Data"
+    return ", ".join(paths)
+
+
+def capacity_group_representative(group: list[DiskVolume]) -> DiskVolume:
+    """Pick the most actionable representative for a grouped capacity pool."""
+
+    return min(
+        group,
+        key=lambda disk: (
+            _role_preference(disk.role_hint),
+            _path_preference_key(disk.path),
+        ),
+    )
+
+
 def _disk_pressure_policy(*, role_hint: str | None) -> DiskPressurePolicy:
     if role_hint in {"system", "user_data"}:
         return _PRIMARY_PRESSURE_POLICY
@@ -113,3 +169,36 @@ def _disk_pressure_policy(*, role_hint: str | None) -> DiskPressurePolicy:
     if role_hint == "ephemeral":
         return _EPHEMERAL_PRESSURE_POLICY
     return _GENERAL_PRESSURE_POLICY
+
+
+def _capacity_group_key(disk: DiskVolume) -> tuple[object, ...]:
+    normalized = disk.path.rstrip("/") or "/"
+    if normalized in _MACOS_PRIMARY_CAPACITY_PATHS and disk.role_hint in {"system", "user_data"}:
+        return (
+            "macos-primary-container",
+            disk.total_bytes,
+            disk.used_bytes,
+            disk.free_bytes,
+        )
+    return ("mount", normalized)
+
+
+def _role_preference(role_hint: str | None) -> int:
+    return {
+        "user_data": 0,
+        "system": 1,
+        "other": 2,
+        "auxiliary": 3,
+        "ephemeral": 4,
+        None: 5,
+    }.get(role_hint, 5)
+
+
+def _path_preference_key(path: str) -> tuple[int, str]:
+    return (
+        {
+            "/System/Volumes/Data": 0,
+            "/": 1,
+        }.get(path.rstrip("/") or "/", 10),
+        path,
+    )

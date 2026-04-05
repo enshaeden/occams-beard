@@ -236,6 +236,7 @@ def parse_netstat_rn(output: str) -> ParsedRouteData:
     parse_warnings: list[str] = []
     saw_section_header = False
     in_internet_section = False
+    interface_column_index: int | None = None
 
     for raw_line in output.splitlines():
         line = raw_line.strip()
@@ -251,7 +252,14 @@ def parse_netstat_rn(output: str) -> ParsedRouteData:
             continue
         if saw_section_header and not in_internet_section:
             continue
-        if line.startswith(("Routing", "Destination", "Kernel")):
+        if line.startswith("Destination"):
+            header_parts = line.split()
+            if "Netif" in header_parts:
+                interface_column_index = header_parts.index("Netif")
+            elif "Iface" in header_parts:
+                interface_column_index = header_parts.index("Iface")
+            continue
+        if line.startswith(("Routing", "Kernel")):
             continue
         parts = line.split()
         if len(parts) < 4:
@@ -259,7 +267,10 @@ def parse_netstat_rn(output: str) -> ParsedRouteData:
             continue
         destination = parts[0]
         gateway = parts[1]
-        interface = parts[-1]
+        if interface_column_index is not None and len(parts) > interface_column_index:
+            interface = parts[interface_column_index]
+        else:
+            interface = parts[-1]
         metric = None
         if destination in {"default", "0.0.0.0"}:
             destination = "default"

@@ -9,7 +9,7 @@ Summary
 - Internet reachable: yes
 - Default route present: yes
 - Probable fault domain: vpn
-- Fault-domain basis: VPN or tunnel appears active while private targets remain unreachable (0.90 confidence)
+- Fault-domain basis: VPN or tunnel appears active while private targets remain unreachable (0.82 confidence)
 - Profile: VPN Issue (VPN issue)
 
 Execution Status
@@ -46,16 +46,15 @@ Key Findings
 1. [MEDIUM] VPN or tunnel appears active while private targets remain unreachable
    Derived finding: A VPN-like interface is present, but private resource checks still failed.
    Plain language: A tunnel or VPN signal is present, but private targets are still unreachable.
-   Evidence summary: VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address). VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.90, 1 usable address).
+   Evidence summary: VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address). Default route uses interface utun2.
    Observed fact: VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address).
-   Observed fact: VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.90, 1 usable address).
    Observed fact: Default route uses interface utun2.
-   Observed fact: 1 more supporting signal(s) not shown
+   Observed fact: Private target 10.0.0.10:443 failed with timeout.
    Heuristic conclusion: The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.
    Safe next actions: Reconnect the VPN client once if that is already part of the documented workflow.; Keep one public baseline target in the run to separate tunnel issues from wider internet loss.
    Escalate when: Escalate if private targets still fail while VPN-like interfaces and routes remain present.
    Uncertainty: VPN state is heuristic in this tool; interface and route signals do not prove the remote network path is healthy.
-   Fault domain: vpn (0.90 confidence, heuristic)
+   Fault domain: vpn (0.82 confidence, heuristic)
 
 What Likely Happened
 - Heuristic conclusion: The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.

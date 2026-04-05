@@ -5,11 +5,13 @@ from __future__ import annotations
 from collections import OrderedDict
 
 from occams_beard.models import (
+    CollectedFacts,
     DiagnosticProfile,
     DomainExecution,
     Finding,
     GuidedExperience,
 )
+from occams_beard.storage_policy import classify_disk_pressure, is_actionable_volume_role
 
 FINDING_GUIDANCE: dict[str, dict[str, object]] = {
     "healthy-baseline": {
@@ -637,6 +639,7 @@ def enrich_findings(findings: list[Finding]) -> list[Finding]:
 def build_guided_experience(
     findings: list[Finding],
     execution: list[DomainExecution],
+    facts: CollectedFacts,
     profile: DiagnosticProfile | None = None,
 ) -> GuidedExperience:
     """Create a deterministic self-service summary from findings and execution state."""
@@ -647,7 +650,11 @@ def build_guided_experience(
     escalation_guidance: list[str] = []
     uncertainty_notes: list[str] = []
 
-    for finding in findings[:3]:
+    guidance_safe_findings = [
+        finding for finding in findings if _finding_is_guidance_safe(finding, facts)
+    ]
+
+    for finding in guidance_safe_findings[:3]:
         if finding.heuristic:
             likely_happened.append(f"Heuristic conclusion: {finding.probable_cause}")
         else:
@@ -672,6 +679,11 @@ def build_guided_experience(
     if profile is not None:
         safe_next_steps.extend(profile.safe_user_guidance)
         escalation_guidance.extend(profile.escalation_guidance)
+
+    if findings and not guidance_safe_findings:
+        uncertainty_notes.append(
+            "Guided summary withheld unsupported or internally inconsistent findings."
+        )
 
     return GuidedExperience(
         issue_category=profile.issue_category if profile else None,
@@ -708,3 +720,80 @@ def _guidance_list(
 
 def _dedupe(values: list[str]) -> list[str]:
     return list(OrderedDict.fromkeys(value for value in values if value))
+
+
+def _finding_is_guidance_safe(finding: Finding, facts: CollectedFacts) -> bool:
+    if not finding.evidence:
+        return False
+    if finding.identifier in {
+        "critical-disk-space-exhaustion",
+        "low-disk-space-operational-risk",
+    }:
+        return _storage_finding_is_guidance_safe(finding, facts)
+    if finding.identifier == "no-significant-storage-pressure":
+        return not _storage_issue_present(facts)
+    if finding.identifier == "vpn-signal-private-resource-failure":
+        return any(
+            signal.signal_type
+            in {
+                "default-route-tunnel-heuristic",
+                "route-owned-tunnel-heuristic",
+                "interface-name-and-address-heuristic",
+            }
+            for signal in facts.vpn.signals
+        )
+    return True
+
+
+def _storage_finding_is_guidance_safe(finding: Finding, facts: CollectedFacts) -> bool:
+    path_text = _storage_path_from_title(finding.title)
+    if path_text is None:
+        return False
+    candidate_paths = [part.strip() for part in path_text.split(" and ")]
+    disks = [disk for disk in facts.resources.disks if disk.path in candidate_paths]
+    if not disks:
+        return False
+    if any(not is_actionable_volume_role(disk.role_hint) for disk in disks):
+        return False
+    expected_level = "critical" if finding.identifier == "critical-disk-space-exhaustion" else "low"
+    return any(
+        classify_disk_pressure(
+            total_bytes=disk.total_bytes,
+            free_bytes=disk.free_bytes,
+            role_hint=disk.role_hint,
+        )
+        == expected_level
+        for disk in disks
+        if disk.total_bytes > 0
+    )
+
+
+def _storage_issue_present(facts: CollectedFacts) -> bool:
+    if any(
+        is_actionable_volume_role(disk.role_hint)
+        and disk.total_bytes > 0
+        and classify_disk_pressure(
+            total_bytes=disk.total_bytes,
+            free_bytes=disk.free_bytes,
+            role_hint=disk.role_hint,
+        )
+        in {"critical", "low"}
+        for disk in facts.resources.disks
+    ):
+        return True
+    return any(
+        status is not None
+        and any(marker in status.lower() for marker in ("fail", "warning", "degraded"))
+        for device in facts.resources.storage_devices
+        for status in (device.health_status, device.operational_status)
+    )
+
+
+def _storage_path_from_title(title: str) -> str | None:
+    for prefix in (
+        "Critical disk-space exhaustion on ",
+        "Low available disk space may affect local operations on ",
+    ):
+        if title.startswith(prefix):
+            return title.removeprefix(prefix)
+    return None

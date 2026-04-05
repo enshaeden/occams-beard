@@ -250,16 +250,15 @@
       "summary": "A VPN-like interface is present, but private resource checks still failed.",
       "evidence": [
         "VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address).",
-        "VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.90, 1 usable address).",
         "Default route uses interface utun2.",
         "Private target 10.0.0.10:443 failed with timeout."
       ],
       "probable_cause": "The tunnel may be established, but its routes, security policy, or remote network path may be incomplete.",
       "fault_domain": "vpn",
-      "confidence": 0.9,
+      "confidence": 0.82,
       "heuristic": true,
       "plain_language": "A tunnel or VPN signal is present, but private targets are still unreachable.",
-      "evidence_summary": "VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address). VPN heuristic matched interface utun2 (default-route-heuristic, confidence 0.90, 1 usable address).",
+      "evidence_summary": "VPN heuristic matched interface utun2 (interface-name-and-address-heuristic, confidence 0.82, 1 usable address). Default route uses interface utun2.",
       "safe_next_actions": [
         "Reconnect the VPN client once if that is already part of the documented workflow.",
         "Keep one public baseline target in the run to separate tunnel issues from wider internet loss."

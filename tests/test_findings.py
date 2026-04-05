@@ -587,7 +587,10 @@ class FindingsTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
-                item.startswith("Primary writable volumes: / (69.6% free, normal pressure)")
+                item.startswith(
+                    "Primary writable volumes: / and /System/Volumes/Data "
+                    "(69.6% free, normal pressure)"
+                )
                 for item in absence_finding.evidence
             )
         )
@@ -630,6 +633,115 @@ class FindingsTests(unittest.TestCase):
         self.assertIn(
             "Storage pressure classification for this volume is critical.",
             findings[0].evidence,
+        )
+
+    def test_storage_finding_does_not_include_unrelated_network_success_evidence(self) -> None:
+        facts = build_base_facts()
+        facts.resources.disks = [
+            DiskVolume(
+                path="/",
+                total_bytes=1000,
+                used_bytes=980,
+                free_bytes=20,
+                percent_used=98.0,
+                free_percent=2.0,
+                pressure_level="critical",
+                role_hint="system",
+            )
+        ]
+
+        findings, _probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["storage", "routing", "dns", "connectivity"],
+        )
+
+        evidence = findings[0].evidence
+        self.assertFalse(any("Routing summary" in item for item in evidence))
+        self.assertFalse(any("DNS checks succeeded" in item for item in evidence))
+        self.assertFalse(any("External TCP checks succeeded" in item for item in evidence))
+        self.assertFalse(
+            any("internet reachability checks succeeded" in item.lower() for item in evidence)
+        )
+
+    def test_storage_findings_dedupe_shared_macos_primary_capacity_pool(self) -> None:
+        facts = build_base_facts()
+        facts.host.operating_system = "macOS"
+        facts.resources.disks = [
+            DiskVolume(
+                path="/",
+                total_bytes=500 * 1024**3,
+                used_bytes=480 * 1024**3,
+                free_bytes=20 * 1024**3,
+                percent_used=96.0,
+                free_percent=4.0,
+                pressure_level="critical",
+                role_hint="system",
+            ),
+            DiskVolume(
+                path="/System/Volumes/Data",
+                total_bytes=500 * 1024**3,
+                used_bytes=480 * 1024**3,
+                free_bytes=20 * 1024**3,
+                percent_used=96.0,
+                free_percent=4.0,
+                pressure_level="critical",
+                role_hint="user_data",
+            ),
+        ]
+
+        findings, _probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["storage"],
+        )
+
+        storage_findings = [
+            finding
+            for finding in findings
+            if finding.identifier == "critical-disk-space-exhaustion"
+        ]
+        self.assertEqual(len(storage_findings), 1)
+        self.assertEqual(
+            storage_findings[0].title,
+            "Critical disk-space exhaustion on / and /System/Volumes/Data",
+        )
+        self.assertIn(
+            "Related mount points share this capacity pool: / and /System/Volumes/Data.",
+            storage_findings[0].evidence,
+        )
+
+    def test_vpn_finding_requires_more_than_tunnel_presence_on_macos(self) -> None:
+        facts = build_base_facts()
+        facts.vpn = VpnState(
+            signals=[
+                VpnSignal(
+                    interface_name="utun2",
+                    signal_type="tunnel-interface-present",
+                    description="Tunnel-like interface is present with a usable address.",
+                    active=True,
+                    confidence=0.45,
+                    address_count=1,
+                )
+            ]
+        )
+        facts.services = ServiceState(
+            checks=[
+                ServiceCheck(
+                    target=TcpTarget(host="10.0.0.10", port=443),
+                    success=False,
+                    error="timeout",
+                )
+            ]
+        )
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["vpn", "services"],
+        )
+
+        self.assertEqual(probable_fault_domain, "healthy")
+        self.assertNotIn(
+            "vpn-signal-private-resource-failure",
+            [finding.identifier for finding in findings],
         )
 
     def test_device_slow_profile_correlates_strong_host_pressure_to_reported_slowness(self) -> None:

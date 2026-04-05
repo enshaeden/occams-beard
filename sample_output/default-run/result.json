@@ -397,7 +397,7 @@
       "status": "passed",
       "selected": true,
       "duration_ms": 7,
-      "summary": "Collected filesystem capacity and storage-device health, with explicit low-space pressure classification when available.",
+      "summary": "Collected filesystem capacity and storage-device inventory, with explicit low-space pressure classification and health assessment when exposed.",
       "warnings": [],
       "probes": [
         {
@@ -420,7 +420,7 @@
           "duration_ms": 7,
           "target": null,
           "details": [
-            "Storage devices collected: 1.",
+            "Storage-device inventory collected: 1.",
             "Reported health states: nvme0n1=Healthy."
           ],
           "warnings": [],

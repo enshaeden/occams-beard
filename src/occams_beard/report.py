@@ -8,6 +8,12 @@ from occams_beard.models import (
     ServiceCheck,
     TcpConnectivityCheck,
 )
+from occams_beard.storage_policy import (
+    capacity_group_label,
+    capacity_group_representative,
+    distinct_capacity_groups,
+    is_zero_capacity_pseudo_mount,
+)
 
 
 def render_report(result: EndpointDiagnosticResult, json_path: str | None = None) -> str:
@@ -473,16 +479,24 @@ def _volume_summary(*, collected: bool, resources) -> str:
     if not resources.disks:
         return "none collected"
     items = []
-    for disk in resources.disks[:4]:
+    for group in distinct_capacity_groups(resources.disks)[:4]:
+        disk = capacity_group_representative(group)
         if disk.free_percent is not None:
             items.append(
-                f"{disk.path} "
+                f"{capacity_group_label(group)} "
                 f"({disk.percent_used:.1f}% used, "
                 f"{disk.free_percent:.1f}% free, "
                 f"{disk.pressure_level or 'unknown'} pressure)"
             )
         else:
-            items.append(f"{disk.path} ({disk.percent_used:.1f}% used)")
+            items.append(f"{capacity_group_label(group)} ({disk.percent_used:.1f}% used)")
+    pseudo_mounts = [disk.path for disk in resources.disks if is_zero_capacity_pseudo_mount(disk)]
+    if pseudo_mounts:
+        items.append(
+            "non-capacity pseudo-mounts: "
+            + ", ".join(pseudo_mounts[:2])
+            + (" and more" if len(pseudo_mounts) > 2 else "")
+        )
     return ", ".join(items)
 
 
@@ -491,6 +505,11 @@ def _storage_device_summary(*, collected: bool, resources) -> str:
         return "not collected"
     if not resources.storage_devices:
         return "none exposed"
+    if not any(
+        device.health_status or device.operational_status
+        for device in resources.storage_devices
+    ):
+        return "inventory only (no health state exposed)"
     return ", ".join(
         (
             f"{device.device_id}="

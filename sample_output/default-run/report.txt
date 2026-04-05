@@ -26,7 +26,7 @@ Execution Status
   Probe Collect bounded process-load hints: skipped (Bounded process-load hints were not collected in this run.)
 - Storage snapshot: passed (local only)
   Duration: 7 ms
-  Summary: Collected filesystem capacity and storage-device health, with explicit low-space pressure classification when available.
+  Summary: Collected filesystem capacity and storage-device inventory, with explicit low-space pressure classification and health assessment when exposed.
 - Interface inventory: passed (local only)
   Duration: 12 ms
   Summary: Collected interface state, local addresses, and neighbor context.

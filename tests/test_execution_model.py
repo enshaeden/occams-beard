@@ -6,13 +6,17 @@ import unittest
 from unittest.mock import patch
 
 from occams_beard.domain_registry import build_execution_plan, iter_registered_domains
-from occams_beard.execution import planned_execution_step_breakdown, planned_execution_step_count
-from occams_beard.models import DiagnosticWarning, TcpTarget
+from occams_beard.execution import (
+    build_execution_records,
+    planned_execution_step_breakdown,
+    planned_execution_step_count,
+)
+from occams_beard.models import DiagnosticWarning, StorageDeviceHealth, TcpTarget
 from occams_beard.profile_catalog import get_profile
 from occams_beard.result_builder import assemble_endpoint_result
 from occams_beard.run_context import DiagnosticsRunContext
 from occams_beard.runner import DiagnosticsRunOptions
-from support import build_profile_dns_issue_result
+from support import build_default_run_result, build_profile_dns_issue_result
 
 
 class ExecutionModelTests(unittest.TestCase):
@@ -202,6 +206,39 @@ class ExecutionModelTests(unittest.TestCase):
             [record.domain for record in result.execution if record.selected],
             ["host", "time", "network", "routing", "dns", "connectivity"],
         )
+
+    def test_storage_execution_marks_inventory_only_device_health_as_partial(self) -> None:
+        fixture = build_default_run_result()
+        fixture.facts.resources.storage_devices = [
+            StorageDeviceHealth(
+                device_id="disk0",
+                model="Demo SSD",
+                protocol="NVMe",
+                medium="SSD",
+                health_status=None,
+                operational_status=None,
+            )
+        ]
+        options = DiagnosticsRunOptions(
+            selected_checks=["storage"],
+            targets=[],
+            dns_hosts=[],
+        )
+
+        execution = build_execution_records(
+            fixture.facts,
+            options,
+            warnings=[],
+            durations_ms={"storage": 10},
+        )
+
+        storage_record = next(record for record in execution if record.domain == "storage")
+        device_probe = next(
+            probe for probe in storage_record.probes if probe.probe_id == "storage-device-health"
+        )
+        self.assertEqual(device_probe.status, "partial")
+        self.assertIn("inventory collected", " ".join(device_probe.details).lower())
+        self.assertIn("health was unavailable", " ".join(device_probe.details).lower())
 
     def test_registry_execution_order_is_explicit_and_deterministic(self) -> None:
         registered_order = [definition.domain for definition in iter_registered_domains()]

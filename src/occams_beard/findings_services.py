@@ -92,9 +92,15 @@ def evaluate_vpn_path(facts: CollectedFacts) -> list[Finding]:
     ]
     if private_service_failures:
         route_summary = facts.network.route_summary
-        confidence = max(signal.confidence for signal in facts.vpn.signals)
+        meaningful_signals = [
+            signal for signal in facts.vpn.signals if _vpn_signal_is_meaningful(signal)
+        ]
+        if not meaningful_signals:
+            return findings
+        confidence = max(signal.confidence for signal in meaningful_signals)
         if route_summary.default_interface and any(
-            signal.interface_name == route_summary.default_interface for signal in facts.vpn.signals
+            signal.interface_name == route_summary.default_interface
+            for signal in meaningful_signals
         ):
             confidence = max(confidence, 0.82)
 
@@ -107,7 +113,9 @@ def evaluate_vpn_path(facts: CollectedFacts) -> list[Finding]:
                     "A VPN-like interface is present, but private resource checks still failed."
                 ),
                 evidence=vpn_evidence(
-                    facts.vpn.signals, private_service_failures, route_summary.default_interface
+                    meaningful_signals,
+                    private_service_failures,
+                    route_summary.default_interface,
                 ),
                 probable_cause=(
                     "The tunnel may be established, but its routes, security "
@@ -144,3 +152,11 @@ def vpn_evidence(
         for check in failures
     )
     return evidence
+
+
+def _vpn_signal_is_meaningful(signal: VpnSignal) -> bool:
+    return signal.signal_type in {
+        "default-route-tunnel-heuristic",
+        "route-owned-tunnel-heuristic",
+        "interface-name-and-address-heuristic",
+    }

@@ -77,6 +77,9 @@ Windows:
 - macOS and Linux can expose timezone identifiers locally, but not every endpoint preserves them in a stable or parseable form
 - macOS and Linux storage-space findings are based on `df` plus non-privileged filesystem usage snapshots; they show current free-space pressure only and do not represent a sustained trend
 - macOS storage collection keeps APFS helper and ephemeral mounts in the raw snapshot for diagnostics, but default storage incidents are driven by primary writable volumes such as `/` and `/System/Volumes/Data` rather than auxiliary helper volumes under `/System/Volumes/*`
+- macOS APFS capacity summaries now deduplicate shared-capacity primary mounts and exclude zero-capacity pseudo-mounts from storage-pressure reasoning while keeping them visible in raw facts
+- macOS `netstat -rn` parsing now keys interface names from the `Netif` column so trailing numeric expiry values do not leak into route interfaces
+- macOS `utun*` interfaces now need stronger route correlation before the tool treats them as likely active VPN state; tunnel presence alone is retained as weaker context or suppressed when too ambiguous
 - macOS can expose swap usage, but it does not expose the same commit-limit semantics as Linux in the current non-privileged model
 - Windows battery collection currently captures battery presence, charge, and coarse state without elevation, but it still does not expose design-capacity health in the current model
 - Windows timezone identifiers come from `tzutil /g`, which returns Windows timezone names rather than IANA identifiers

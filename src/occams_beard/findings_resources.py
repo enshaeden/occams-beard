@@ -15,9 +15,14 @@ from occams_beard.findings_common import (
 )
 from occams_beard.models import CollectedFacts, Finding, StorageDeviceHealth
 from occams_beard.storage_policy import (
+    capacity_group_label,
+    capacity_group_representative,
     classify_disk_pressure,
+    disk_has_capacity_data,
+    distinct_capacity_groups,
     is_actionable_volume_role,
     is_diagnostic_only_volume_role,
+    is_zero_capacity_pseudo_mount,
 )
 from occams_beard.utils.validation import is_private_or_loopback_host
 
@@ -219,15 +224,7 @@ def evaluate_resource_pressure(
                     "This run did not capture critically low free space or a device-health state "
                     "that would strongly explain the reported issue."
                 ),
-                evidence=no_storage_pressure_evidence(resources)
-                + (
-                    network_health_evidence(facts, enabled_checks=enabled_checks)
-                    if network_explanation_not_supported(
-                        facts,
-                        enabled_checks=enabled_checks,
-                    )
-                    else []
-                ),
+                evidence=no_storage_pressure_evidence(resources),
                 probable_cause=(
                     "The current snapshot does not support local storage exhaustion or exposed "
                     "storage-device degradation as the dominant explanation."
@@ -337,11 +334,9 @@ def storage_space_findings(
     enabled_checks: set[str],
 ) -> list[Finding]:
     findings: list[Finding] = []
-    weakens_network_explanation = network_explanation_not_supported(
-        facts,
-        enabled_checks=enabled_checks,
-    )
-    for disk in facts.resources.disks:
+    _ = enabled_checks
+    for group in distinct_capacity_groups(facts.resources.disks, actionable_only=True):
+        disk = capacity_group_representative(group)
         if not storage_finding_eligible(disk):
             LOGGER.debug(
                 "Suppressing storage finding for non-actionable volume: path=%s role=%s",
@@ -355,17 +350,20 @@ def storage_space_findings(
 
         operational_impact = storage_operational_impact(disk)
         evidence = disk_pressure_evidence(disk)
+        if len(group) > 1:
+            evidence.append(
+                "Related mount points share this capacity pool: "
+                f"{capacity_group_label(group)}."
+            )
         if operational_impact is not None:
             evidence.append(operational_impact)
-        if weakens_network_explanation:
-            evidence.extend(network_health_evidence(facts, enabled_checks=enabled_checks))
 
         if pressure_level == "critical":
             findings.append(
                 Finding(
                     identifier="critical-disk-space-exhaustion",
                     severity="high",
-                    title=f"Critical disk-space exhaustion on {disk.path}",
+                    title=f"Critical disk-space exhaustion on {capacity_group_label(group)}",
                     summary=(
                         "Available disk space is critically low and may affect application "
                         "stability."
@@ -410,7 +408,10 @@ def storage_space_findings(
                 Finding(
                     identifier="low-disk-space-operational-risk",
                     severity="medium",
-                    title=f"Low available disk space may affect local operations on {disk.path}",
+                    title=(
+                        "Low available disk space may affect local operations on "
+                        f"{capacity_group_label(group)}"
+                    ),
                     summary=(
                         "Available disk space is low enough that local writes, logs, or updates "
                         "may start failing."
@@ -488,7 +489,11 @@ def storage_device_status(device: StorageDeviceHealth) -> str | None:
 
 
 def storage_issue_present(resources) -> bool:
-    if any(storage_finding_eligible(disk) for disk in resources.disks):
+    actionable_groups = distinct_capacity_groups(resources.disks, actionable_only=True)
+    if any(
+        storage_finding_eligible(capacity_group_representative(group))
+        for group in actionable_groups
+    ):
         return True
     return any(
         storage_device_status(device) in {"failure", "warning"}
@@ -552,6 +557,8 @@ def is_operational_volume(disk) -> bool:
 
 
 def storage_finding_eligible(disk) -> bool:
+    if not disk_has_capacity_data(disk):
+        return False
     pressure_level = disk_pressure_level(disk)
     if pressure_level not in {"critical", "low"}:
         return False
@@ -587,21 +594,20 @@ def no_storage_pressure_evidence(resources) -> list[str]:
         return ["No disk-capacity or storage-device health facts were collected in this run."]
 
     evidence: list[str] = []
-    actionable_disks = [
-        disk for disk in resources.disks if is_actionable_volume_role(disk.role_hint)
-    ]
+    actionable_groups = distinct_capacity_groups(resources.disks, actionable_only=True)
     diagnostic_disks = [
         disk for disk in resources.disks if is_diagnostic_only_volume_role(disk.role_hint)
     ]
+    pseudo_mounts = [disk for disk in resources.disks if is_zero_capacity_pseudo_mount(disk)]
 
-    if actionable_disks:
+    if actionable_groups:
         healthiest = [
             (
-                f"{disk.path} ({disk.free_percent:.1f}% free, "
-                f"{disk_pressure_level(disk)} pressure)"
+                f"{capacity_group_label(group)} "
+                f"({capacity_group_representative(group).free_percent:.1f}% free, "
+                f"{disk_pressure_level(capacity_group_representative(group))} pressure)"
             )
-            for disk in actionable_disks[:3]
-            if disk.free_percent is not None
+            for group in actionable_groups[:3]
         ]
         if healthiest:
             evidence.append(f"Primary writable volumes: {', '.join(healthiest)}.")
@@ -611,6 +617,11 @@ def no_storage_pressure_evidence(resources) -> list[str]:
     if diagnostic_disks:
         evidence.append(
             "Additional auxiliary or ephemeral mounts were collected for diagnostics only."
+        )
+    if pseudo_mounts:
+        evidence.append(
+            "Non-capacity pseudo-mounts were collected for diagnostics but excluded from "
+            "storage-pressure reasoning."
         )
     healthy_devices = [
         device
@@ -622,6 +633,10 @@ def no_storage_pressure_evidence(resources) -> list[str]:
             "Storage-device health reported healthy state for "
             + ", ".join(device.device_id for device in healthy_devices[:3])
             + "."
+        )
+    elif resources.storage_devices:
+        evidence.append(
+            "Storage-device inventory was collected, but no explicit health state was exposed."
         )
     elif not resources.storage_devices:
         evidence.append("Storage-device health was not exposed on this endpoint.")

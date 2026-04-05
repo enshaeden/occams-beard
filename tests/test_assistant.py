@@ -6,6 +6,7 @@ import unittest
 
 from occams_beard.assistant import build_guided_experience, enrich_findings
 from occams_beard.models import DiagnosticProfile, DomainExecution, Finding
+from support import build_profile_dns_issue_result
 
 
 class AssistantTests(unittest.TestCase):
@@ -65,7 +66,12 @@ class AssistantTests(unittest.TestCase):
             recommended_checks=["dns", "connectivity"],
         )
 
-        guided = build_guided_experience(findings, execution, profile)
+        guided = build_guided_experience(
+            findings,
+            execution,
+            build_profile_dns_issue_result().facts,
+            profile,
+        )
 
         self.assertIn(
             "The endpoint can reach a numeric external IP, but hostname lookups are failing.",
@@ -114,6 +120,29 @@ class AssistantTests(unittest.TestCase):
                 "Deterministic rule evaluation completed without triggering "
                 "supported fault signatures."
             ),
+        )
+
+    def test_guided_experience_suppresses_inconsistent_storage_finding(self) -> None:
+        fixture = build_profile_dns_issue_result()
+        finding = Finding(
+            identifier="critical-disk-space-exhaustion",
+            severity="high",
+            title="Critical disk-space exhaustion on /System/Volumes/Hardware",
+            summary="Available disk space is critically low.",
+            evidence=["Filesystem /System/Volumes/Hardware is 4.0% utilized."],
+            probable_cause="Local filesystem exhaustion is likely affecting writes.",
+            fault_domain="local_host",
+            confidence=0.95,
+            plain_language="Available disk space is critically low.",
+        )
+
+        guided = build_guided_experience([finding], [], fixture.facts, None)
+
+        self.assertEqual(guided.what_we_know, [])
+        self.assertEqual(guided.likely_happened, [])
+        self.assertIn(
+            "Guided summary withheld unsupported or internally inconsistent findings.",
+            guided.uncertainty_notes,
         )
 
 

@@ -24,6 +24,11 @@ from occams_beard.models import (
     TcpConnectivityCheck,
     TraceResult,
 )
+from occams_beard.storage_policy import (
+    capacity_group_representative,
+    distinct_capacity_groups,
+    is_zero_capacity_pseudo_mount,
+)
 
 if TYPE_CHECKING:
     from occams_beard.run_options import DiagnosticsRunOptions
@@ -368,8 +373,8 @@ def _storage_execution(
         selected=True,
         duration_ms=duration_ms,
         summary=(
-            "Collected filesystem capacity and storage-device health, with explicit low-space "
-            "pressure classification when available."
+            "Collected filesystem capacity and storage-device inventory, with explicit "
+            "low-space pressure classification and health assessment when exposed."
         ),
         warnings=warnings,
         probes=probes,
@@ -906,25 +911,30 @@ def _storage_device_probe(
         status: ExecutionStatus = "partial"
         details = ["Storage-device health facts could not be collected on this endpoint."]
     elif storage_devices:
-        status = "passed"
-        notable_statuses = ", ".join(
-            filter(
-                None,
+        status_strings = [
+            device.health_status or device.operational_status
+            for device in storage_devices
+            if device.health_status or device.operational_status
+        ]
+        if status_strings:
+            status = "passed"
+            notable_statuses = ", ".join(
                 (
                     f"{device.device_id}="
                     f"{device.health_status or device.operational_status or 'unknown'}"
-                    for device in storage_devices[:3]
-                ),
+                )
+                for device in storage_devices[:3]
             )
-        )
-        details = [
-            f"Storage devices collected: {len(storage_devices)}.",
-            (
-                f"Reported health states: {notable_statuses}."
-                if notable_statuses
-                else "No storage-device health status strings were reported."
-            ),
-        ]
+            details = [
+                f"Storage-device inventory collected: {len(storage_devices)}.",
+                f"Reported health states: {notable_statuses}.",
+            ]
+        else:
+            status = "partial"
+            details = [
+                f"Storage-device inventory collected: {len(storage_devices)}.",
+                "Storage-device health was unavailable even though inventory was collected.",
+            ]
     else:
         status = "skipped"
         details = ["No storage-device health facts were exposed on this endpoint."]
@@ -942,11 +952,19 @@ def _storage_pressure_summary(disks) -> str:
     if not disks:
         return "no volumes collected"
     counts = {"critical": 0, "low": 0, "normal": 0}
-    for disk in disks:
-        level = getattr(disk, "pressure_level", None)
+    for group in distinct_capacity_groups(disks):
+        level = getattr(capacity_group_representative(group), "pressure_level", None)
         if level in counts:
             counts[level] += 1
-    return ", ".join(f"{count} {level}" for level, count in counts.items() if count) or "unknown"
+    summary = ", ".join(f"{count} {level}" for level, count in counts.items() if count) or "unknown"
+    pseudo_mount_count = sum(1 for disk in disks if is_zero_capacity_pseudo_mount(disk))
+    if pseudo_mount_count:
+        pseudo_label = (
+            f"{pseudo_mount_count} non-capacity pseudo-mount"
+            f"{'s' if pseudo_mount_count != 1 else ''}"
+        )
+        return f"{summary}, {pseudo_label}"
+    return summary
 
 
 def _status_from_collection(

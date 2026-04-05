@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from occams_beard.collectors.storage import collect_storage_state
-from occams_beard.storage_policy import classify_disk_pressure
+from occams_beard.storage_policy import classify_disk_pressure, distinct_capacity_groups
 from occams_beard.utils.subprocess import CommandResult
 
 
@@ -273,6 +273,45 @@ class StorageCollectionTests(unittest.TestCase):
         collect_storage_state(progress_callback=progress_updates.append)
 
         self.assertEqual(progress_updates, [1, 2])
+
+    @patch("occams_beard.collectors.storage.current_platform", return_value="macos")
+    @patch("occams_beard.collectors.storage.macos.read_storage_device_health", return_value=[])
+    @patch("occams_beard.collectors.storage.shutil.disk_usage")
+    @patch("occams_beard.collectors.storage.run_command")
+    def test_zero_capacity_pseudo_mount_is_retained_but_not_counted_in_capacity_groups(
+        self,
+        mock_run_command,
+        mock_disk_usage,
+        _mock_storage_health,
+        _mock_platform,
+    ) -> None:
+        mock_run_command.return_value = CommandResult(
+            args=("df", "-kP"),
+            returncode=0,
+            stdout=(
+                "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
+                "/dev/disk3s5 100 20 80 20% /System/Volumes/Data\n"
+                "map auto_home 0 0 0 100% /System/Volumes/Data/home\n"
+            ),
+            stderr="",
+            duration_ms=4,
+        )
+        usage_map = {
+            "/System/Volumes/Data": shutil._ntuple_diskusage(2000, 800, 1200),
+            "/System/Volumes/Data/home": shutil._ntuple_diskusage(0, 0, 0),
+        }
+        mock_disk_usage.side_effect = lambda path: usage_map[path]
+
+        disks, _storage_devices, warnings = collect_storage_state()
+
+        self.assertEqual(
+            [disk.path for disk in disks],
+            ["/System/Volumes/Data", "/System/Volumes/Data/home"],
+        )
+        self.assertEqual(disks[1].pressure_level, "unknown")
+        self.assertIsNone(disks[1].free_percent)
+        self.assertEqual(len(distinct_capacity_groups(disks)), 1)
+        self.assertEqual(warnings, [])
 
 
 if __name__ == "__main__":

@@ -72,6 +72,14 @@ It still does not infer hardware failure from cycle counts, generic low charge, 
 - Low-space findings are split between warning and critical severity so the report can distinguish operational risk from likely application-stability impact.
 - Storage pressure classification is role-aware. It treats low free percentage as the main danger signal, combines it with role-specific free-byte floors, and does not let tiny helper volumes become critical solely because they have small absolute capacity.
 - macOS APFS helper and ephemeral mounts remain visible in collected facts, but they are diagnostic context by default. Primary writable volumes such as `/` and `/System/Volumes/Data` are the default basis for storage-space incidents and guided cleanup/escalation advice.
+- Zero-capacity pseudo-mounts remain visible in collected facts, but they are excluded from storage-pressure reasoning and labeled as non-capacity diagnostic context.
+- Shared-capacity APFS mounts are deduplicated for storage-pressure findings and summaries so one underlying capacity condition does not appear as several independent incidents.
 - Storage-device health findings remain bounded to explicit healthy, warning, degraded, failing, or unhealthy states surfaced by the operating system. They do not infer device failure from generic slowness alone.
-- When selected network checks look healthy, storage findings can explicitly note that the current evidence makes a network-only explanation less likely.
+- Storage findings do not inject unrelated routing, DNS, or TCP-success evidence into local disk incidents.
 - Absence findings such as `no-significant-storage-pressure` stay narrow. They mean the current snapshot did not expose strong local storage pressure, not that historical or intermittent storage issues are impossible.
+
+## VPN Notes
+
+- VPN collection remains heuristic unless the platform exposes stronger state directly.
+- macOS `utun*` interfaces are not treated as meaningful active VPN sessions by default. Tunnel presence alone is weaker than a default-route change or clear route ownership.
+- The output distinguishes tunnel presence from stronger likely-active signals by using different heuristic signal types and confidences.
