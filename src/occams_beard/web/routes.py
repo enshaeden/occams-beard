@@ -18,6 +18,7 @@ from flask import (
 )
 
 from occams_beard.execution import planned_execution_step_count
+from occams_beard.intake import IntakeContext
 from occams_beard.models import EndpointDiagnosticResult
 from occams_beard.web.forms import (
     default_form_state,
@@ -129,6 +130,7 @@ def register_web_routes(app: Flask) -> None:
                 targets=form_state["targets"],
                 dns_hosts=form_state["dns_hosts"],
                 profile_id=form_state["profile_id"],
+                intake_context=cast(IntakeContext | None, form_state["intake_context"]),
                 enable_ping=form_state["enable_ping"],
                 enable_trace=form_state["enable_trace"],
                 enable_time_skew_check=form_state["enable_time_skew_check"],

@@ -13,6 +13,7 @@ from occams_beard.defaults import (
     DEFAULT_TIME_REFERENCE_LABEL,
     DEFAULT_TIME_REFERENCE_URL,
 )
+from occams_beard.intake.models import IntakeContext
 from occams_beard.models import DiagnosticProfile, TcpTarget
 from occams_beard.profile_catalog import get_profile
 from occams_beard.utils.validation import (
@@ -30,6 +31,7 @@ class DiagnosticsRunOptions:
     targets: list[TcpTarget]
     dns_hosts: list[str]
     profile: DiagnosticProfile | None = None
+    intake_context: IntakeContext | None = None
     enable_ping: bool = False
     enable_trace: bool = False
     enable_time_skew_check: bool = False
@@ -45,6 +47,7 @@ def build_run_options(
     target_file: str | None = None,
     dns_hosts: Iterable[str] | None = None,
     profile_id: str | None = None,
+    intake_context: IntakeContext | None = None,
     enable_ping: bool = False,
     enable_trace: bool = False,
     enable_time_skew_check: bool = False,
@@ -74,6 +77,7 @@ def build_run_options(
         ),
         dns_hosts=resolve_dns_hosts(list(dns_hosts or []), default_hosts=default_dns_hosts),
         profile=profile,
+        intake_context=intake_context,
         enable_ping=enable_ping,
         enable_trace=enable_trace,
         enable_time_skew_check=enable_time_skew_check,

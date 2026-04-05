@@ -199,6 +199,20 @@ class AppTests(unittest.TestCase):
         self.assertIsNotNone(self.captured_options.profile)
         assert self.captured_options.profile is not None
         self.assertEqual(self.captured_options.profile.profile_id, "vpn-issue")
+        self.assertIsNotNone(self.captured_options.intake_context)
+        assert self.captured_options.intake_context is not None
+        self.assertEqual(
+            self.captured_options.intake_context.selected_symptom_key,
+            "vpn-or-company-resource-issue",
+        )
+        self.assertEqual(
+            self.captured_options.intake_context.resolved_intent_key,
+            "vpn_or_private_resource_access",
+        )
+        self.assertEqual(
+            self.captured_options.intake_context.scope_rationale,
+            "intent_default_scope",
+        )
         self.assertIn("vpn", self.captured_options.selected_checks)
         self.assertIn("services", self.captured_options.selected_checks)
 
@@ -266,6 +280,7 @@ class AppTests(unittest.TestCase):
         )
         self.assertTrue(self.captured_options.enable_trace)
         self.assertTrue(self.captured_options.capture_raw_commands)
+        self.assertIsNone(self.captured_options.intake_context)
         self.assertEqual(
             [(target.host, target.port) for target in self.captured_options.targets],
             [("github.com", 443), ("10.0.0.10", 443)],

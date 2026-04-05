@@ -29,6 +29,7 @@ from occams_beard.intake.intents import (
     resolve_self_serve_profile_id,
     suggest_support_profile_id,
 )
+from occams_beard.intake.models import IntakeContext
 from occams_beard.intake.resolver import IntakeResolution, resolve_intake_interpretation
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     "ContractValidationIssue",
     "IntakeContract",
     "IntakeIntent",
+    "IntakeContext",
     "IntakeResolution",
     "RefinedAnswerPathway",
     "SymptomEntry",

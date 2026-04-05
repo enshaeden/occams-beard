@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from occams_beard.defaults import DEFAULT_CHECKS
 from occams_beard.execution import planned_execution_step_count
+from occams_beard.intake import IntakeContext
 from occams_beard.models import (
     ClockSkewCheck,
     ConnectivityState,
@@ -51,6 +52,20 @@ class RunnerTests(unittest.TestCase):
             [(target.host, target.port) for target in options.targets],
             [("1.1.1.1", 53), ("8.8.8.8", 53)],
         )
+
+    def test_build_run_options_preserves_intake_context_when_supplied(self) -> None:
+        intake_context = IntakeContext(
+            selected_symptom_key="apps-sites-not-loading",
+            selected_symptom_label="Apps or sites not loading",
+            resolved_intent_key="partial_access_or_dns",
+            clarification_answers=(("vpn_connected", "no"),),
+            scope_rationale="refined_context_supplied",
+        )
+
+        options = build_run_options(intake_context=intake_context)
+
+        self.assertIsNotNone(options.intake_context)
+        self.assertEqual(options.intake_context, intake_context)
 
     def test_run_diagnostics_returns_result_and_skips_unselected_collectors(self) -> None:
         options = DiagnosticsRunOptions(
