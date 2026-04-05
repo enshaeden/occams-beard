@@ -30,6 +30,7 @@ CLI / Web / Launcher / Support Bundle Export
 - `explanations.py` adds deterministic plain-language guidance on top of findings.
 - `serializers.py`, `report.py`, and `support_bundle.py` render the same result object for different consumers.
 - `web/` keeps route composition, form parsing, run-session orchestration, progress shaping, and result presentation above the shared result model.
+- `intake/` centralizes intent-driven translation from user-selected symptom language into deterministic profile defaults and support-path suggestions.
 
 ## Execution Model
 

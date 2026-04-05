@@ -15,14 +15,13 @@ from occams_beard.models import (
     TcpTarget,
 )
 from occams_beard.profile_catalog import ProfileCatalogIssue, get_profile, get_profile_catalog
+from occams_beard.intake import resolve_self_serve_profile_id, suggest_support_profile_id
 from occams_beard.web.presentation.catalog import (
     SELF_SERVE_MODE,
     SUPPORT_MODE,
     get_mode_option,
     get_symptom_option,
     normalize_mode,
-    resolve_self_serve_profile_id,
-    suggest_support_profile_id,
 )
 from occams_beard.web.presentation.plans import build_collection_plan
 from occams_beard.web.sessions import RunSession, get_store
