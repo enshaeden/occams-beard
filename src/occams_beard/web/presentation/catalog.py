@@ -1,6 +1,13 @@
-"""Mode and symptom metadata for the local troubleshooting experience."""
+"""Presentation metadata for top-level local troubleshooting choices.
+
+This module intentionally holds only UI-facing card copy for the browser
+experience. Diagnostic scope and symptom-to-intent resolution live in the
+intake contract and resolver modules.
+"""
 
 from __future__ import annotations
+
+from occams_beard.intake import resolve_self_serve_profile_id, suggest_support_profile_id
 
 SELF_SERVE_MODE = "self-serve"
 SUPPORT_MODE = "support"
@@ -32,6 +39,7 @@ SYMPTOM_OPTIONS = (
         "description": (
             "Websites and online apps are not connecting, or everything looks offline."
         ),
+        "hint": "Start with a broad connectivity check.",
     },
     {
         "id": "apps-sites-not-loading",
@@ -39,6 +47,7 @@ SYMPTOM_OPTIONS = (
         "description": (
             "Some apps, sites, or sign-in pages stall, fail, or only partly load."
         ),
+        "hint": "Great for partial failures and login loops.",
     },
     {
         "id": "vpn-or-company-resource-issue",
@@ -46,6 +55,7 @@ SYMPTOM_OPTIONS = (
         "description": (
             "A VPN, internal app, file share, or company-only service is not working."
         ),
+        "hint": "Focus on company access and private resources.",
     },
     {
         "id": "device-feels-slow",
@@ -53,13 +63,15 @@ SYMPTOM_OPTIONS = (
         "description": (
             "The device feels unusually slow, overloaded, or unstable while you work."
         ),
+        "hint": "Prioritizes local device health checks.",
     },
     {
         "id": "something-else",
-        "label": "Something else",
+        "label": "Something else / unsure",
         "description": (
             "You need a general local check before deciding what kind of help you need."
         ),
+        "hint": "Safe fallback when you are not sure yet.",
     },
 )
 

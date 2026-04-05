@@ -80,6 +80,7 @@ function setupSelfServeSymptomPicker() {
   }
   const planUrl = form.dataset.planUrl;
   let activePlanRequest = null;
+  updateSelfServeChoiceState(form);
   const inputs = form.querySelectorAll('input[name="symptom"]');
   for (const input of inputs) {
     input.addEventListener("change", () => {

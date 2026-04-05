@@ -71,6 +71,8 @@ def register_web_routes(app: Flask) -> None:
 
     @app.get("/self-serve/plan")
     def self_serve_plan():
+        if not request.args.get("symptom"):
+            abort(400, description="Choose a symptom before loading a self-serve plan.")
         try:
             form_state = query_form_state()
         except ValueError as exc:

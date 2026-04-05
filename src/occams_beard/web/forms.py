@@ -12,12 +12,15 @@ from occams_beard.defaults import DEFAULT_DNS_HOSTS, DEFAULT_TCP_TARGETS
 from occams_beard.models import DiagnosticProfile, EndpointDiagnosticResult, RedactionLevel, TcpTarget
 from occams_beard.profile_catalog import ProfileCatalogIssue, get_profile, get_profile_catalog
 from occams_beard.intake import (
+    ClarificationPrompt,
     DecisionContext,
     DomainMappingResult,
     IntakeContext,
     IntakeResolution,
+    build_clarification_questions,
     get_intake_contract,
     map_intake_to_scope,
+    refine_decision_context,
     resolve_intake_interpretation,
     suggest_support_profile_id,
 )
@@ -60,8 +63,7 @@ def query_form_state() -> dict[str, object]:
             resolve_self_serve_intake_state(
                 symptom["id"],
                 symptom_label=symptom["label"],
-                refined_domains=request.args.get("refined_domains"),
-                profile_fallback_id=request.args.get("profile_fallback_id"),
+                clarification_source=request.args,
             )
             if symptom is not None
             else None
@@ -119,6 +121,12 @@ def query_form_state() -> dict[str, object]:
         intake_context=(
             intake_state.intake_context if mode == SELF_SERVE_MODE and intake_state else None
         ),
+        clarification=(
+            intake_state.clarification if mode == SELF_SERVE_MODE and intake_state else None
+        ),
+        plan_preview=(
+            intake_state.plan_preview if mode == SELF_SERVE_MODE and intake_state else None
+        ),
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
         error_message=None,
@@ -145,8 +153,7 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         intake_state = resolve_self_serve_intake_state(
             symptom["id"],
             symptom_label=symptom["label"],
-            refined_domains=request.form.get("refined_domains"),
-            profile_fallback_id=request.form.get("profile_fallback_id"),
+            clarification_source=request.form,
         )
         scope = intake_state.scope
         profile = get_profile(scope.suggested_profile_id) if scope.suggested_profile_id else None
@@ -186,6 +193,8 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         enable_time_skew_check=request.form.get("enable_time_skew_check") == "on",
         capture_raw_commands=request.form.get("capture_raw_commands") == "on",
         intake_context=intake_state.intake_context if intake_state is not None else None,
+        clarification=intake_state.clarification if intake_state is not None else None,
+        plan_preview=intake_state.plan_preview if intake_state is not None else None,
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
         error_message=error_message,
@@ -229,8 +238,7 @@ def request_error_form_state(error_message: str) -> dict[str, object]:
             resolve_self_serve_intake_state(
                 symptom["id"],
                 symptom_label=symptom["label"],
-                refined_domains=request.form.get("refined_domains"),
-                profile_fallback_id=request.form.get("profile_fallback_id"),
+                clarification_source=request.form,
             )
             if symptom is not None
             else None
@@ -271,6 +279,8 @@ def request_error_form_state(error_message: str) -> dict[str, object]:
         enable_time_skew_check=request.form.get("enable_time_skew_check") == "on",
         capture_raw_commands=request.form.get("capture_raw_commands") == "on",
         intake_context=intake_state.intake_context if intake_state is not None else None,
+        clarification=intake_state.clarification if intake_state is not None else None,
+        plan_preview=intake_state.plan_preview if intake_state is not None else None,
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
         error_message=error_message,
@@ -291,6 +301,8 @@ def build_form_state(
     enable_time_skew_check: bool,
     capture_raw_commands: bool,
     intake_context: IntakeContext | None,
+    clarification: dict[str, object] | None,
+    plan_preview: dict[str, str] | None,
     from_run_id: str | None,
     bridge: dict[str, str] | None,
     error_message: str | None,
@@ -324,6 +336,8 @@ def build_form_state(
         "enable_time_skew_check": enable_time_skew_check,
         "capture_raw_commands": capture_raw_commands,
         "intake_context": intake_context,
+        "clarification": clarification,
+        "plan_preview": plan_preview,
         "plan": plan,
         "from_run_id": from_run_id,
         "bridge": bridge,
@@ -352,6 +366,8 @@ def default_form_state() -> dict[str, object]:
         "enable_time_skew_check": False,
         "capture_raw_commands": False,
         "intake_context": None,
+        "clarification": None,
+        "plan_preview": None,
         "plan": build_collection_plan(
             selected_checks=[],
             targets=[],
@@ -397,24 +413,26 @@ def resolve_self_serve_intake_state(
     symptom_id: str | None,
     *,
     symptom_label: str | None = None,
-    refined_domains: str | None = None,
-    profile_fallback_id: str | None = None,
+    clarification_source: Any | None = None,
 ):
     """Resolve intake scope and preserve the rationale context for execution."""
 
     resolution = resolve_intake_interpretation(symptom_id)
-    context = clarification_context_from_refinement(
+    context = clarification_context_from_submission(
         intent_key=resolution.primary_intent,
-        refined_domains=refined_domains,
-        profile_fallback_id=profile_fallback_id,
+        clarification_source=clarification_source,
     )
     scope = map_intake_to_scope(
         resolution=resolution,
         contract=get_intake_contract(),
         context=context,
     )
+    clarification = clarification_template_state(context)
+    plan_preview = build_plan_preview(scope, symptom_label=symptom_label, context=context)
     return SelfServeIntakeState(
         scope=scope,
+        clarification=clarification,
+        plan_preview=plan_preview,
         intake_context=build_intake_context(
             symptom_id=symptom_id,
             symptom_label=symptom_label,
@@ -429,6 +447,8 @@ class SelfServeIntakeState:
     """Resolved self-serve scope plus stable intake context."""
 
     scope: DomainMappingResult
+    clarification: dict[str, object] | None
+    plan_preview: dict[str, str] | None
     intake_context: IntakeContext
 
 
@@ -463,30 +483,135 @@ def intake_scope_rationale(
     return "intent_default_scope"
 
 
-def clarification_context_from_refinement(
+def clarification_context_from_submission(
     *,
     intent_key: str | None,
-    refined_domains: str | None,
-    profile_fallback_id: str | None,
+    clarification_source: Any | None,
 ) -> DecisionContext | None:
-    """Build an optional refined decision context from posted refinement inputs."""
+    """Build an optional refined context from submitted clarification answers."""
 
-    domains = tuple(item.strip() for item in (refined_domains or "").split(",") if item.strip())
-    if not domains and not profile_fallback_id:
+    question_set = build_clarification_questions(intent_key)
+    context = question_set.context
+    if not context.asked_questions:
         return None
 
-    return DecisionContext(
-        intent_key=intent_key,
-        status="ready",
-        asked_questions=(),
-        answered=(),
-        remaining_question_keys=(),
-        pathway_candidates=(),
-        selected_pathway_key=None,
-        next_domains=domains,
-        profile_fallback_id=profile_fallback_id,
-        reason="refined_context_supplied",
-    )
+    answered_any = False
+    for prompt in context.asked_questions:
+        answer = clarification_value(clarification_source, prompt.key)
+        if not answer:
+            continue
+        updated_context, error = refine_decision_context(
+            context,
+            question_key=prompt.key,
+            answer=answer,
+        )
+        if error is not None:
+            continue
+        answered_any = True
+        context = updated_context
+    return context if answered_any else None
+
+
+def clarification_value(source: Any | None, question_key: str) -> str | None:
+    """Read one clarification value from form or query sources."""
+
+    if source is None:
+        return None
+    getter = getattr(source, "get", None)
+    if not callable(getter):
+        return None
+    raw_value = getter(f"clar_{question_key}")
+    return cast(str | None, raw_value)
+
+
+def clarification_template_state(context: DecisionContext | None) -> dict[str, object] | None:
+    """Build template state for showing one minimal clarification prompt."""
+
+    if context is None or not context.asked_questions:
+        return None
+
+    next_prompt = next_unanswered_prompt(context)
+    answered = [
+        {
+            "key": key,
+            "prompt": prompt_text_for(context.asked_questions, key),
+            "answer": answer,
+            "answer_label": user_facing_option(answer),
+        }
+        for key, answer in context.answered
+    ]
+    query_values = [f"clar_{key}={answer}" for key, answer in context.answered]
+    return {
+        "question": prompt_template(next_prompt) if next_prompt is not None else None,
+        "answered": answered,
+        "query_values": query_values,
+        "has_pending_question": next_prompt is not None,
+    }
+
+
+def prompt_template(prompt: ClarificationPrompt) -> dict[str, object]:
+    """Render one clarification prompt for template use."""
+
+    return {
+        "key": prompt.key,
+        "prompt": prompt.prompt,
+        "options": [
+            {
+                "value": option,
+                "label": user_facing_option(option),
+            }
+            for option in prompt.options
+        ],
+    }
+
+
+def next_unanswered_prompt(context: DecisionContext) -> ClarificationPrompt | None:
+    """Return the next prompt in sequence that still needs an answer."""
+
+    remaining = set(context.remaining_question_keys)
+    for prompt in context.asked_questions:
+        if prompt.key in remaining:
+            return prompt
+    return None
+
+
+def prompt_text_for(prompts: tuple[ClarificationPrompt, ...], key: str) -> str:
+    """Return prompt text for a question key when available."""
+
+    for prompt in prompts:
+        if prompt.key == key:
+            return prompt.prompt
+    return key.replace("_", " ").capitalize()
+
+
+def user_facing_option(value: str) -> str:
+    """Convert contract option tokens into readable user-facing labels."""
+
+    tokens = value.replace("/", " ").replace("_", " ").split()
+    if not tokens:
+        return value
+    return " ".join(tokens).capitalize()
+
+
+def build_plan_preview(
+    scope: DomainMappingResult,
+    *,
+    symptom_label: str | None,
+    context: DecisionContext | None,
+) -> dict[str, str]:
+    """Build a short plain-language explanation shown before execution."""
+
+    top_checks = ", ".join(scope.selected_checks[:3])
+    if len(scope.selected_checks) > 3:
+        top_checks = f"{top_checks}, and related checks"
+    because = symptom_label or "the symptom you selected"
+    if context is not None and context.answered:
+        latest_answer = user_facing_option(context.answered[-1][1]).lower()
+        because = f"{because} and your clarification answer ({latest_answer})"
+    return {
+        "check_areas": top_checks or "baseline device checks",
+        "because": because,
+    }
 
 
 def default_support_profile_id(source_record: RunSession | None) -> str:

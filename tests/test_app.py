@@ -151,9 +151,10 @@ class AppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
-        self.assertIn("Review the plan before you run it.", text)
+        self.assertIn("Answer one quick question, then review your plan.", text)
         self.assertIn('type="hidden" name="symptom_id" value="internet-not-working"', text)
         self.assertIn('id="self-serve-plan-step"', text)
+        self.assertIn("We are going to check", text)
         self.assertIn("Support asked me to change this plan", text)
         self.assertIn("Start Device Check", text)
 
@@ -163,7 +164,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
         self.assertIn('id="self-serve-plan-step"', text)
-        self.assertIn("Review the plan before you run it.", text)
+        self.assertIn("Answer one quick question, then review your plan.", text)
         self.assertIn("Start Device Check", text)
         self.assertNotIn("Choose a Check Path", text)
 
