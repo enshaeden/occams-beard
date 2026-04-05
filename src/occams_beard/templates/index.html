@@ -80,8 +80,11 @@
                   data-symptom-choice="{{ symptom.id }}"
                   {% if form_state.symptom_id == symptom.id %}checked{% endif %}
                 >
-                <span class="choice-badge">{{ symptom.label }}</span>
-                <span class="choice-title">{{ symptom.description }}</span>
+                <span class="choice-content stack-xs">
+                  <span class="choice-badge">{{ symptom.label }}</span>
+                  <span class="choice-title">{{ symptom.description }}</span>
+                  <span class="choice-body">{{ symptom.hint }}</span>
+                </span>
               </label>
             {% endfor %}
           </div>

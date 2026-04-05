@@ -263,7 +263,8 @@ code {
   transition:
     transform 150ms ease,
     border-color 150ms ease,
-    box-shadow 150ms ease;
+    box-shadow 150ms ease,
+    background 150ms ease;
 }
 
 .choice-card:hover,
@@ -277,8 +278,11 @@ code {
 }
 
 .choice-card-active {
-  border-color: rgba(13, 95, 115, 0.38);
-  background: linear-gradient(180deg, rgba(13, 95, 115, 0.09), #fff);
+  border-color: rgba(13, 95, 115, 0.65);
+  background: linear-gradient(180deg, rgba(13, 95, 115, 0.16), #fff);
+  box-shadow:
+    inset 0 0 0 2px rgba(13, 95, 115, 0.35),
+    0 20px 40px rgba(13, 95, 115, 0.16);
   transform: translateY(-1px);
 }
 
@@ -286,6 +290,12 @@ code {
   position: absolute;
   inset: 0;
   opacity: 0;
+}
+
+.choice-input:focus-visible ~ .choice-content {
+  outline: 3px solid rgba(13, 95, 115, 0.48);
+  outline-offset: 6px;
+  border-radius: 12px;
 }
 
 .choice-badge,

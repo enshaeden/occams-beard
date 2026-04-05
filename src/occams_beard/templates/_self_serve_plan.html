@@ -5,6 +5,11 @@
     {% if form_state.from_run_id %}
       <input type="hidden" name="from_run_id" value="{{ form_state.from_run_id }}">
     {% endif %}
+    {% if form_state.clarification and form_state.clarification.answered %}
+      {% for answer in form_state.clarification.answered %}
+        <input type="hidden" name="clar_{{ answer.key }}" value="{{ answer.answer }}">
+      {% endfor %}
+    {% endif %}
 
     <article
       id="self-serve-plan-step"
@@ -15,8 +20,47 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">Step 2</p>
-          <h2>Review the plan before you run it.</h2>
+          <h2>Answer one quick question, then review your plan.</h2>
         </div>
+      </div>
+
+      {% if form_state.clarification and form_state.clarification.question %}
+        <fieldset class="stack-sm form-fieldset">
+          <legend>{{ form_state.clarification.question.prompt }}</legend>
+          <div class="check-grid">
+            {% for option in form_state.clarification.question.options %}
+              <label class="check-tile">
+                <input
+                  type="radio"
+                  name="clar_{{ form_state.clarification.question.key }}"
+                  value="{{ option.value }}"
+                  required
+                >
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+          <p class="field-help">This keeps the run focused while staying easy to start.</p>
+        </fieldset>
+      {% endif %}
+
+      {% if form_state.clarification and form_state.clarification.answered %}
+        <div class="info-panel stack-sm">
+          <h3>What you already told us</h3>
+          <ul class="result-list">
+            {% for answer in form_state.clarification.answered %}
+              <li><strong>{{ answer.prompt }}</strong> {{ answer.answer_label }}.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <div class="info-panel stack-sm">
+        <h3>Before we run</h3>
+        <p>
+          We are going to check <strong>{{ form_state.plan_preview.check_areas }}</strong>
+          because {{ form_state.plan_preview.because }}.
+        </p>
       </div>
 
       <p class="lede">{{ form_state.selected_profile.description }}</p>
@@ -122,6 +166,7 @@
         <h3>Step 3</h3>
         <button type="submit" class="primary-button">Start Device Check</button>
       </div>
+    </div>
   </form>
 {% else %}
   <article class="card">
