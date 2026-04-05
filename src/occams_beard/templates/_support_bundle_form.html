@@ -20,33 +20,67 @@
 </div>
 
 <form method="get" action="{{ url_for('download_support_bundle', run_id=record.run_id) }}" class="stack-md">
-  <div class="stack-xs">
-    <p class="field-label">Choose a redaction level</p>
+  <fieldset class="stack-xs form-fieldset">
+    <legend id="redaction-level-label" class="field-label">Choose a redaction level</legend>
     <p class="field-help">{{ view.bundle_redaction_note }}</p>
-    <div class="redaction-grid">
-      <label class="redaction-option">
-        <input type="radio" name="redaction_level" value="safe" checked>
-        <span class="redaction-copy">
-          <strong>Safe</strong>
-          <span>Recommended for most support handoffs.</span>
-        </span>
-      </label>
-      <label class="redaction-option">
-        <input type="radio" name="redaction_level" value="strict">
-        <span class="redaction-copy">
-          <strong>Strict</strong>
-          <span>Hide more values when support only needs broad evidence.</span>
-        </span>
-      </label>
-      <label class="redaction-option">
-        <input type="radio" name="redaction_level" value="none">
-        <span class="redaction-copy">
-          <strong>None</strong>
-          <span>Keep the collected values unredacted.</span>
-        </span>
-      </label>
+    <div
+      class="redaction-grid"
+      role="radiogroup"
+      aria-labelledby="redaction-level-label"
+    >
+      <div class="redaction-card">
+        <input
+          id="redaction-level-safe"
+          class="redaction-input"
+          type="radio"
+          name="redaction_level"
+          value="safe"
+          checked
+        >
+        <label class="redaction-option" for="redaction-level-safe">
+          <span class="redaction-indicator" aria-hidden="true"></span>
+          <span class="redaction-copy">
+            <span class="redaction-title">Safe</span>
+            <span class="redaction-description">Recommended for most support handoffs.</span>
+          </span>
+        </label>
+      </div>
+      <div class="redaction-card">
+        <input
+          id="redaction-level-strict"
+          class="redaction-input"
+          type="radio"
+          name="redaction_level"
+          value="strict"
+        >
+        <label class="redaction-option" for="redaction-level-strict">
+          <span class="redaction-indicator" aria-hidden="true"></span>
+          <span class="redaction-copy">
+            <span class="redaction-title">Strict</span>
+            <span class="redaction-description">
+              Hide more values when support only needs broad evidence.
+            </span>
+          </span>
+        </label>
+      </div>
+      <div class="redaction-card">
+        <input
+          id="redaction-level-none"
+          class="redaction-input"
+          type="radio"
+          name="redaction_level"
+          value="none"
+        >
+        <label class="redaction-option" for="redaction-level-none">
+          <span class="redaction-indicator" aria-hidden="true"></span>
+          <span class="redaction-copy">
+            <span class="redaction-title">None</span>
+            <span class="redaction-description">Keep the collected values unredacted.</span>
+          </span>
+        </label>
+      </div>
     </div>
-  </div>
+  </fieldset>
 
   <label class="toggle" for="include_raw">
     <input

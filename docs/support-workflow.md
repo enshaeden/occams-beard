@@ -59,6 +59,20 @@ The validator checks the manifest, listed files, hashes, sizes, raw-capture pres
 - `strict`: use when the bundle may leave the local admin boundary.
 - `none`: local engineering use only when sensitive data exposure is acceptable.
 
+## Bundle Export UI
+
+The redaction-level selector in the support-bundle export form uses native radio
+inputs wrapped by full-width selectable cards. This keeps the control
+screen-reader and keyboard friendly while making the selected state obvious from
+the card border, background tint, and focus ring instead of relying only on the
+radio dot.
+
+The implementation intentionally keeps native radio semantics so:
+
+- the entire row is clickable through the associated label
+- `Tab` moves focus into the group and arrow keys move between options
+- assistive technology announces the group, option label, and selected state
+
 ## Escalation Guidance
 
 - A self-serve run can continue into the guided-support path without discarding the earlier result.

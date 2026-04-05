@@ -432,6 +432,16 @@ class AppTests(unittest.TestCase):
         self.assertIn("Check details", text)
         self.assertIn("Download Support Bundle", text)
         self.assertIn("Choose a redaction level", text)
+        self.assertIn('role="radiogroup"', text)
+        self.assertIn('aria-labelledby="redaction-level-label"', text)
+        self.assertIn('id="redaction-level-safe"', text)
+        self.assertIn('for="redaction-level-safe"', text)
+        self.assertIn('id="redaction-level-strict"', text)
+        self.assertIn('for="redaction-level-strict"', text)
+        self.assertIn('id="redaction-level-none"', text)
+        self.assertIn('for="redaction-level-none"', text)
+        self.assertIn('class="redaction-input"', text)
+        self.assertIn('class="redaction-option"', text)
 
     def test_mode_specific_results_cta_ordering_is_stable(self) -> None:
         self_serve_response = self.client.post(
