@@ -14,6 +14,7 @@ from occams_beard.defaults import (
     DEFAULT_TIME_REFERENCE_URL,
 )
 from occams_beard.intake.models import IntakeContext
+from occams_beard.intake.validator import validate_intake_selected_checks
 from occams_beard.models import DiagnosticProfile, TcpTarget
 from occams_beard.profile_catalog import get_profile
 from occams_beard.utils.validation import (
@@ -64,12 +65,20 @@ def build_run_options(
         profile.dns_hosts if profile is not None and profile.dns_hosts else DEFAULT_DNS_HOSTS
     )
 
+    selected_checks = parse_check_selection(
+        checks,
+        allowed_checks=ALLOWED_CHECKS,
+        default_checks=default_checks,
+    )
+    if intake_context is not None:
+        validation = validate_intake_selected_checks(
+            selected_checks,
+            intake_context=intake_context,
+        )
+        selected_checks = list(validation.selected_checks)
+
     return DiagnosticsRunOptions(
-        selected_checks=parse_check_selection(
-            checks,
-            allowed_checks=ALLOWED_CHECKS,
-            default_checks=default_checks,
-        ),
+        selected_checks=selected_checks,
         targets=resolve_tcp_targets(
             list(targets or []),
             target_file,
