@@ -17,7 +17,7 @@ MODE_OPTIONS = (
         "id": SELF_SERVE_MODE,
         "label": "Check My Device",
         "description": (
-            "Run a quick diagnostic check and gather more information to share with support."
+            "Run a diagnostic check and prepare results for support if needed."
         ),
         "badge": "Self Service",
     },
@@ -25,8 +25,8 @@ MODE_OPTIONS = (
         "id": SUPPORT_MODE,
         "label": "Work With Support",
         "description": (
-            "Use this when IT support asks for deeper testing, a specific "
-            "profile, or a support-ready bundle."
+            "Use this path when support requests deeper testing, a specific "
+            "profile, or a support bundle."
         ),
         "badge": "Advanced mode",
     },
@@ -37,9 +37,9 @@ SYMPTOM_OPTIONS = (
         "id": "internet-not-working",
         "label": "Internet not working",
         "description": (
-            "Websites and online apps are not connecting, or everything looks offline."
+            "Websites and online apps are not connecting, or the device appears offline."
         ),
-        "hint": "Start with a broad connectivity check.",
+        "hint": "Checks baseline connectivity across the network path.",
     },
     {
         "id": "apps-sites-not-loading",
@@ -47,7 +47,7 @@ SYMPTOM_OPTIONS = (
         "description": (
             "Some apps, sites, or sign-in pages stall, fail, or only partly load."
         ),
-        "hint": "Great for partial failures and login loops.",
+        "hint": "Checks partial failures, access interruptions, and sign-in loops.",
     },
     {
         "id": "vpn-or-company-resource-issue",
@@ -55,7 +55,7 @@ SYMPTOM_OPTIONS = (
         "description": (
             "A VPN, internal app, file share, or company-only service is not working."
         ),
-        "hint": "Focus on company access and private resources.",
+        "hint": "Checks VPN paths, DNS resolution, and private resource access.",
     },
     {
         "id": "device-feels-slow",
@@ -63,7 +63,7 @@ SYMPTOM_OPTIONS = (
         "description": (
             "The device feels unusually slow, overloaded, or unstable while you work."
         ),
-        "hint": "Prioritizes local device health checks.",
+        "hint": "Checks local system state and resource pressure.",
     },
     {
         "id": "something-else",
@@ -71,7 +71,7 @@ SYMPTOM_OPTIONS = (
         "description": (
             "You need a general local check before deciding what kind of help you need."
         ),
-        "hint": "Safe fallback when you are not sure yet.",
+        "hint": "Runs the default baseline diagnostic set.",
     },
 )
 

@@ -3,8 +3,7 @@
 {% block content %}
   <section class="entry-shell stack-md">
     <div class="stack-sm">
-      <p class="eyebrow">Use the Self Service path for an unassisted troubleshooting experience, or open the
-        support path when asked for a deeper guided run and a support-ready handoff.</p>
+      <p class="eyebrow">Select Self Service for independent diagnostics. Select Work With Support when support requests a directed run.</p>
     </div>
     <div class="door-grid">
       {% for option in mode_options %}
@@ -60,15 +59,13 @@
 
         <article class="card experience-card stack-lg">
           <div class="section-heading">
-            <div>
-              <p class="eyebrow">Step 1</p>
-              <h2>Choose the symptom that best describes your issue.</h2>
-            </div>
-            <a class="ghost-button" href="{{ url_for('index') }}">Choose a Different Path</a>
+          <div>
+            <p class="eyebrow">Step 1</p>
+            <h2>Select the issue you are seeing.</h2>
           </div>
-          <p class="muted">
-            Selecting a symptom loads a recommended troubleshooting plan.
-          </p>
+          <a class="ghost-button" href="{{ url_for('index') }}">Choose a Different Path</a>
+        </div>
+          <p class="muted">Selecting an issue loads the recommended check plan.</p>
           <div class="choice-grid" role="radiogroup" aria-label="Symptoms">
             {% for symptom in symptom_options %}
               <label class="choice-card {% if form_state.symptom_id == symptom.id %}choice-card-active{% endif %}">
@@ -90,7 +87,7 @@
           </div>
 
           <div class="actions">
-            <button type="submit" class="ghost-button">Load Recommended Plan</button>
+            <button type="submit" class="ghost-button">Review Recommended Plan</button>
           </div>
         </article>
       </form>
@@ -105,7 +102,7 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">Work With Support</p>
-            <h2>Follow the guided plan your technician asked you to run.</h2>
+            <h2>Run the plan provided by support.</h2>
           </div>
           <a class="ghost-button" href="{{ url_for('index') }}">Choose a Different Path</a>
         </div>
@@ -113,17 +110,17 @@
           <article class="info-panel stack-sm">
             <h3>When to use this</h3>
             <ul class="result-list">
-              <li>You already tried the self-serve path and still need help.</li>
-              <li>Support asked for a specific plan, deeper probes, or a support bundle.</li>
-              <li>You need a cleaner handoff than screenshots or ad hoc notes.</li>
+              <li>Self Service did not resolve the issue.</li>
+              <li>Support requested a specific plan, deeper probes, or a support bundle.</li>
+              <li>A structured handoff is required.</li>
             </ul>
           </article>
           <article class="info-panel stack-sm">
             <h3>Consent and privacy</h3>
             <ul class="result-list">
-              <li>You can review the plan before you run it.</li>
+              <li>Review the plan before running it.</li>
               <li>Some guided plans create outbound network traffic.</li>
-              <li>Raw command capture stays opt-in and local unless you export it.</li>
+              <li>Raw command capture is optional and remains local unless exported.</li>
             </ul>
           </article>
         </div>
@@ -132,7 +129,7 @@
       {% if form_state.bridge %}
         <article class="card bridge-card stack-sm">
           <p class="eyebrow">Continue From Earlier Results</p>
-          <h3>You do not need to start from scratch.</h3>
+          <h3>Reuse existing run results.</h3>
           <p>{{ form_state.bridge.headline }}</p>
           <div class="actions">
             <a class="ghost-button" href="{{ form_state.bridge.results_url }}">View Earlier {{ form_state.bridge.mode_label }} Results</a>
@@ -210,15 +207,15 @@
             <ul class="result-list">
               <li>{{ form_state.plan.network_activity_summary }}</li>
               <li>{{ form_state.plan.raw_capture_summary }}</li>
-              <li>Keep this plan locked unless support told you to switch plans or edit the details.</li>
+              <li>Keep this plan locked unless support requests changes.</li>
             </ul>
           </article>
           <article class="info-panel stack-sm">
             <h3>What support will receive later</h3>
             <ul class="result-list">
-              <li>A support bundle becomes the main handoff after the run.</li>
+              <li>A support bundle is the handoff artifact after the run.</li>
               <li>The bundle includes the findings summary, selected technical evidence, and run metadata.</li>
-              <li>Raw command output is only included if this plan collected it and you choose to export it.</li>
+              <li>Raw command output is included only if this plan collected it and export is selected.</li>
             </ul>
           </article>
         </div>
@@ -228,7 +225,7 @@
         <summary>Support gave me a different plan</summary>
         <div class="advanced-panel-body stack-lg">
           <p class="field-help">
-            Use this only if your technician asked you to switch to a different local plan before the run.
+            Use this only when support requests a different local plan before the run.
           </p>
           <form method="get" action="{{ url_for('index') }}" class="plan-picker">
             <input type="hidden" name="mode" value="support">
@@ -237,7 +234,7 @@
             {% endif %}
             <div class="stack-xs">
               <label class="field-label" for="profile">Support plan</label>
-              <p class="field-help">Choose the troubleshooting plan your technician asked you to follow.</p>
+              <p class="field-help">Select the troubleshooting plan requested by support.</p>
               <select id="profile" name="profile">
                 {% for profile in profiles %}
                   <option value="{{ profile.profile_id }}" {% if form_state.profile_id == profile.profile_id %}selected{% endif %}>
@@ -262,7 +259,7 @@
           <summary>Technician asked me to edit the plan details</summary>
           <div class="advanced-panel-body stack-lg">
             <p class="field-help">
-              Leave these settings alone unless your technician asked you to edit the plan details directly.
+              Keep default settings unless support requests direct plan edits.
             </p>
 
             <fieldset class="stack-sm form-fieldset">
