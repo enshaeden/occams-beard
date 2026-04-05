@@ -496,7 +496,7 @@ FINDING_GUIDANCE: dict[str, dict[str, object]] = {
             "Capture a support bundle before cleanup if the condition is still present.",
         ],
         "escalation_triggers": [
-            "Escalate if critical free-space pressure remains on a monitored operational volume.",
+            "Escalate if critical free-space pressure remains on a primary writable volume.",
         ],
         "uncertainty_notes": [
             (
@@ -514,7 +514,7 @@ FINDING_GUIDANCE: dict[str, dict[str, object]] = {
             "Capture a support bundle while the low-space state is still present.",
         ],
         "escalation_triggers": [
-            "Escalate if low free space persists on a monitored operational volume.",
+            "Escalate if low free space persists on a primary writable volume.",
         ],
         "uncertainty_notes": [
             (

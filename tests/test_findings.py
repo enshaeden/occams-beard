@@ -532,6 +532,106 @@ class FindingsTests(unittest.TestCase):
         self.assertEqual(probable_fault_domain, "healthy")
         self.assertIn("no-significant-storage-pressure", identifiers)
 
+    def test_storage_profile_ignores_auxiliary_pressure_when_primary_storage_is_healthy(
+        self,
+    ) -> None:
+        facts = build_base_facts()
+        facts.host.operating_system = "macOS"
+        facts.resources.disks = [
+            DiskVolume(
+                path="/",
+                total_bytes=500 * 1024**3,
+                used_bytes=152 * 1024**3,
+                free_bytes=348 * 1024**3,
+                percent_used=30.4,
+                free_percent=69.6,
+                pressure_level="normal",
+                role_hint="system",
+            ),
+            DiskVolume(
+                path="/System/Volumes/Data",
+                total_bytes=500 * 1024**3,
+                used_bytes=152 * 1024**3,
+                free_bytes=348 * 1024**3,
+                percent_used=30.4,
+                free_percent=69.6,
+                pressure_level="normal",
+                role_hint="user_data",
+            ),
+            DiskVolume(
+                path="/System/Volumes/Hardware",
+                total_bytes=512 * 1024**2,
+                used_bytes=492 * 1024**2,
+                free_bytes=20 * 1024**2,
+                percent_used=96.0,
+                free_percent=4.0,
+                pressure_level="critical",
+                role_hint="auxiliary",
+            ),
+        ]
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["storage"],
+            issue_category="low disk space",
+        )
+
+        identifiers = [finding.identifier for finding in findings]
+        self.assertEqual(probable_fault_domain, "healthy")
+        self.assertIn("no-significant-storage-pressure", identifiers)
+        self.assertNotIn("critical-disk-space-exhaustion", identifiers)
+        absence_finding = next(
+            finding
+            for finding in findings
+            if finding.identifier == "no-significant-storage-pressure"
+        )
+        self.assertTrue(
+            any(
+                item.startswith("Primary writable volumes: / (69.6% free, normal pressure)")
+                for item in absence_finding.evidence
+            )
+        )
+        self.assertTrue(
+            any(
+                item
+                == "Additional auxiliary or ephemeral mounts were collected for diagnostics only."
+                for item in absence_finding.evidence
+            )
+        )
+
+    def test_critical_primary_writable_data_volume_still_generates_storage_incident(self) -> None:
+        facts = build_base_facts()
+        facts.host.operating_system = "macOS"
+        facts.resources.disks = [
+            DiskVolume(
+                path="/System/Volumes/Data",
+                total_bytes=500 * 1024**3,
+                used_bytes=480 * 1024**3,
+                free_bytes=20 * 1024**3,
+                percent_used=96.0,
+                free_percent=4.0,
+                pressure_level="critical",
+                role_hint="user_data",
+            )
+        ]
+
+        findings, probable_fault_domain = evaluate_selected_findings(
+            facts,
+            ["storage"],
+        )
+
+        self.assertEqual(probable_fault_domain, "local_host")
+        self.assertEqual(findings[0].identifier, "critical-disk-space-exhaustion")
+        self.assertEqual(
+            findings[0].title,
+            "Critical disk-space exhaustion on /System/Volumes/Data",
+        )
+        self.assertIn("Filesystem /System/Volumes/Data is 96.0% utilized.", findings[0].evidence)
+        self.assertIn(
+            "Storage pressure classification for this volume is critical.",
+            findings[0].evidence,
+        )
+
     def test_device_slow_profile_correlates_strong_host_pressure_to_reported_slowness(self) -> None:
         facts = build_base_facts()
         facts.resources.cpu = CpuState(

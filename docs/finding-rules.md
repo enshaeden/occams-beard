@@ -70,6 +70,8 @@ It still does not infer hardware failure from cycle counts, generic low charge, 
 
 - Storage findings stay deterministic and snapshot-based. They only use current filesystem capacity plus the non-privileged storage-health signals already exposed by the platform collectors.
 - Low-space findings are split between warning and critical severity so the report can distinguish operational risk from likely application-stability impact.
+- Storage pressure classification is role-aware. It treats low free percentage as the main danger signal, combines it with role-specific free-byte floors, and does not let tiny helper volumes become critical solely because they have small absolute capacity.
+- macOS APFS helper and ephemeral mounts remain visible in collected facts, but they are diagnostic context by default. Primary writable volumes such as `/` and `/System/Volumes/Data` are the default basis for storage-space incidents and guided cleanup/escalation advice.
 - Storage-device health findings remain bounded to explicit healthy, warning, degraded, failing, or unhealthy states surfaced by the operating system. They do not infer device failure from generic slowness alone.
 - When selected network checks look healthy, storage findings can explicitly note that the current evidence makes a network-only explanation less likely.
 - Absence findings such as `no-significant-storage-pressure` stay narrow. They mean the current snapshot did not expose strong local storage pressure, not that historical or intermittent storage issues are impossible.

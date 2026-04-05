@@ -37,8 +37,8 @@ Schema `1.4.0` adds optional host-pressure, storage-pressure, and clock-state fi
   - `process_snapshot`: bounded process-load category summaries derived from one local snapshot, not a persistent process inventory
 - Under `facts.resources.disks[*]`:
   - `free_percent`: operator-friendly free-space percentage for the current filesystem snapshot
-  - `pressure_level`: deterministic storage-pressure classification for that volume: `critical`, `low`, `normal`, or `unknown`
-  - `role_hint`: coarse operational role for the monitored volume, used only to explain likely impact areas such as system writes or user-data writes
+  - `pressure_level`: deterministic storage-pressure classification for that volume: `critical`, `low`, `normal`, or `unknown`; classification is role-aware and is not driven by one global absolute free-bytes threshold
+  - `role_hint`: coarse operational role for the monitored volume, used to distinguish primary writable volumes from auxiliary or ephemeral diagnostic mounts when explaining storage impact
 - Under `facts.time`:
   - `local_time_iso` and `utc_time_iso`: the current local and UTC clock snapshot captured on the endpoint
   - `timezone_name`, optional `timezone_identifier`, and optional `timezone_identifier_source`: bounded local timezone state when the platform exposes it

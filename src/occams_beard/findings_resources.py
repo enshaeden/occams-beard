@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from occams_beard.findings_common import (
     dedupe_preserve_order,
     format_bytes,
@@ -12,7 +14,14 @@ from occams_beard.findings_common import (
     network_health_evidence,
 )
 from occams_beard.models import CollectedFacts, Finding, StorageDeviceHealth
+from occams_beard.storage_policy import (
+    classify_disk_pressure,
+    is_actionable_volume_role,
+    is_diagnostic_only_volume_role,
+)
 from occams_beard.utils.validation import is_private_or_loopback_host
+
+LOGGER = logging.getLogger(__name__)
 
 
 def evaluate_resource_pressure(
@@ -202,7 +211,10 @@ def evaluate_resource_pressure(
             Finding(
                 identifier="no-significant-storage-pressure",
                 severity="info",
-                title="Current storage evidence does not support a strong local storage explanation",
+                title=(
+                    "Current storage evidence does not support a strong local storage "
+                    "explanation"
+                ),
                 summary=(
                     "This run did not capture critically low free space or a device-health state "
                     "that would strongly explain the reported issue."
@@ -330,6 +342,13 @@ def storage_space_findings(
         enabled_checks=enabled_checks,
     )
     for disk in facts.resources.disks:
+        if not storage_finding_eligible(disk):
+            LOGGER.debug(
+                "Suppressing storage finding for non-actionable volume: path=%s role=%s",
+                disk.path,
+                disk.role_hint,
+            )
+            continue
         pressure_level = disk_pressure_level(disk)
         if pressure_level not in {"critical", "low"}:
             continue
@@ -367,10 +386,16 @@ def storage_space_findings(
                             "Remove or archive only known non-essential local files if that is "
                             "already part of the documented operator process."
                         ),
-                        "Capture a support bundle before cleanup if the storage pressure is current.",
+                        (
+                            "Capture a support bundle before cleanup if the storage pressure "
+                            "is current."
+                        ),
                     ],
                     escalation_triggers=[
-                        "Escalate if critical free-space pressure remains on an operational volume.",
+                        (
+                            "Escalate if critical free-space pressure remains on a primary "
+                            "writable volume."
+                        ),
                     ],
                     uncertainty_notes=[
                         (
@@ -408,7 +433,10 @@ def storage_space_findings(
                         "Capture a support bundle while the low-space condition is still present.",
                     ],
                     escalation_triggers=[
-                        "Escalate if low free space persists on a system or user-data volume.",
+                        (
+                            "Escalate if low free space persists on a primary writable "
+                            "volume."
+                        ),
                     ],
                     uncertainty_notes=[
                         (
@@ -460,7 +488,7 @@ def storage_device_status(device: StorageDeviceHealth) -> str | None:
 
 
 def storage_issue_present(resources) -> bool:
-    if any(disk_pressure_level(disk) in {"critical", "low"} for disk in resources.disks):
+    if any(storage_finding_eligible(disk) for disk in resources.disks):
         return True
     return any(
         storage_device_status(device) in {"failure", "warning"}
@@ -471,14 +499,11 @@ def storage_issue_present(resources) -> bool:
 def disk_pressure_level(disk) -> str:
     if disk.pressure_level in {"critical", "low", "normal"}:
         return str(disk.pressure_level)
-    if disk.total_bytes <= 0:
-        return "unknown"
-    free_ratio = disk.free_bytes / disk.total_bytes
-    if free_ratio <= 0.05 or disk.free_bytes <= 2 * 1024**3:
-        return "critical"
-    if free_ratio <= 0.10 or disk.free_bytes <= 10 * 1024**3:
-        return "low"
-    return "normal"
+    return classify_disk_pressure(
+        total_bytes=disk.total_bytes,
+        free_bytes=disk.free_bytes,
+        role_hint=disk.role_hint,
+    )
 
 
 def disk_pressure_evidence(disk) -> list[str]:
@@ -506,6 +531,16 @@ def storage_operational_impact(disk) -> str | None:
             "This appears to be a user-data volume, so low space can affect profile data, "
             "downloads, caches, and application writes."
         )
+    if role_hint == "auxiliary":
+        return (
+            "This appears to be an auxiliary system helper volume, so it is retained as "
+            "diagnostic context rather than a default incident target."
+        )
+    if role_hint == "ephemeral":
+        return (
+            "This appears to be an ephemeral or auto-mounted volume, so it is retained as "
+            "diagnostic context rather than a default incident target."
+        )
     return (
         "Low space on this monitored volume may still affect local writes for applications that "
         "store data there."
@@ -514,6 +549,13 @@ def storage_operational_impact(disk) -> str | None:
 
 def is_operational_volume(disk) -> bool:
     return disk.role_hint in {"system", "user_data"}
+
+
+def storage_finding_eligible(disk) -> bool:
+    pressure_level = disk_pressure_level(disk)
+    if pressure_level not in {"critical", "low"}:
+        return False
+    return is_actionable_volume_role(disk.role_hint)
 
 
 def storage_device_evidence(devices: list[StorageDeviceHealth]) -> list[str]:
@@ -545,17 +587,31 @@ def no_storage_pressure_evidence(resources) -> list[str]:
         return ["No disk-capacity or storage-device health facts were collected in this run."]
 
     evidence: list[str] = []
-    if resources.disks:
+    actionable_disks = [
+        disk for disk in resources.disks if is_actionable_volume_role(disk.role_hint)
+    ]
+    diagnostic_disks = [
+        disk for disk in resources.disks if is_diagnostic_only_volume_role(disk.role_hint)
+    ]
+
+    if actionable_disks:
         healthiest = [
             (
                 f"{disk.path} ({disk.free_percent:.1f}% free, "
                 f"{disk_pressure_level(disk)} pressure)"
             )
-            for disk in resources.disks[:3]
+            for disk in actionable_disks[:3]
             if disk.free_percent is not None
         ]
         if healthiest:
-            evidence.append(f"Monitored volumes: {', '.join(healthiest)}.")
+            evidence.append(f"Primary writable volumes: {', '.join(healthiest)}.")
+    elif resources.disks:
+        evidence.append("No primary writable volumes were identified in the collected snapshot.")
+
+    if diagnostic_disks:
+        evidence.append(
+            "Additional auxiliary or ephemeral mounts were collected for diagnostics only."
+        )
     healthy_devices = [
         device
         for device in resources.storage_devices

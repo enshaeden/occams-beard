@@ -10,14 +10,10 @@ from collections.abc import Callable
 
 from occams_beard.models import DiagnosticWarning, DiskVolume, StorageDeviceHealth
 from occams_beard.platform import current_platform, linux, macos, windows
+from occams_beard.storage_policy import classify_disk_pressure, classify_volume_role
 from occams_beard.utils.subprocess import run_command
 
 LOGGER = logging.getLogger(__name__)
-
-_CRITICAL_FREE_RATIO = 0.05
-_LOW_FREE_RATIO = 0.10
-_CRITICAL_FREE_BYTES = 2 * 1024**3
-_LOW_FREE_BYTES = 10 * 1024**3
 
 _MACOS_IGNORED_MOUNT_POINTS = frozenset(
     {
@@ -68,7 +64,7 @@ def collect_storage_state(
 
         percent_used = round((usage.used / usage.total) * 100, 1) if usage.total else 0.0
         free_percent = round((usage.free / usage.total) * 100, 1) if usage.total else None
-        role_hint = _volume_role_hint(path=path, platform_name=platform_name)
+        role_hint = classify_volume_role(path=path, platform_name=platform_name)
         disks.append(
             DiskVolume(
                 path=path,
@@ -77,9 +73,10 @@ def collect_storage_state(
                 free_bytes=usage.free,
                 percent_used=percent_used,
                 free_percent=free_percent,
-                pressure_level=_classify_disk_pressure(
+                pressure_level=classify_disk_pressure(
                     total_bytes=usage.total,
                     free_bytes=usage.free,
+                    role_hint=role_hint,
                 ),
                 role_hint=role_hint,
             )
@@ -193,35 +190,18 @@ def _coerce_string(value: object) -> str | None:
     return None
 
 
-def _classify_disk_pressure(*, total_bytes: int, free_bytes: int) -> str:
-    if total_bytes <= 0:
-        return "unknown"
-
-    free_ratio = free_bytes / total_bytes
-    if free_ratio <= _CRITICAL_FREE_RATIO or free_bytes <= _CRITICAL_FREE_BYTES:
-        return "critical"
-    if free_ratio <= _LOW_FREE_RATIO or free_bytes <= _LOW_FREE_BYTES:
-        return "low"
-    return "normal"
-
-
-def _volume_role_hint(*, path: str, platform_name: str) -> str:
-    if platform_name == "windows":
-        return "system" if path.upper() == "C:\\" else "other"
-
-    normalized = path.rstrip("/") or "/"
-    if normalized in {"/", "/System/Volumes/Data", "/var", "/tmp", "/usr", "/opt"}:
-        return "system"
-    if normalized in {"/home", "/Users"}:
-        return "user_data"
-    return "other"
-
-
 def _disk_sort_key(disk: DiskVolume) -> tuple[int, int, float]:
     pressure_rank = {"critical": 0, "low": 1, "normal": 2, None: 3, "unknown": 3}
-    role_rank = {"system": 0, "user_data": 1, "other": 2, None: 3}
+    role_rank = {
+        "system": 0,
+        "user_data": 1,
+        "other": 2,
+        "auxiliary": 3,
+        "ephemeral": 4,
+        None: 5,
+    }
     return (
-        pressure_rank.get(disk.pressure_level, 3),
         role_rank.get(disk.role_hint, 3),
+        pressure_rank.get(disk.pressure_level, 3),
         disk.free_percent if disk.free_percent is not None else 100.0,
     )
