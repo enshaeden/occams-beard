@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Any, cast
 
 from flask import request, url_for
@@ -12,6 +13,9 @@ from occams_beard.models import DiagnosticProfile, EndpointDiagnosticResult, Red
 from occams_beard.profile_catalog import ProfileCatalogIssue, get_profile, get_profile_catalog
 from occams_beard.intake import (
     DecisionContext,
+    DomainMappingResult,
+    IntakeContext,
+    IntakeResolution,
     get_intake_contract,
     map_intake_to_scope,
     resolve_intake_interpretation,
@@ -52,15 +56,17 @@ def query_form_state() -> dict[str, object]:
 
     if mode == SELF_SERVE_MODE:
         symptom = get_symptom_option(request.args.get("symptom"))
-        scope = (
-            self_serve_scope(
+        intake_state = (
+            resolve_self_serve_intake_state(
                 symptom["id"],
+                symptom_label=symptom["label"],
                 refined_domains=request.args.get("refined_domains"),
                 profile_fallback_id=request.args.get("profile_fallback_id"),
             )
             if symptom is not None
             else None
         )
+        scope = intake_state.scope if intake_state is not None else None
         profile = (
             get_profile(scope.suggested_profile_id)
             if scope is not None and scope.suggested_profile_id
@@ -110,6 +116,9 @@ def query_form_state() -> dict[str, object]:
         enable_trace=request.args.get("enable_trace") == "1",
         enable_time_skew_check=request.args.get("enable_time_skew_check") == "1",
         capture_raw_commands=request.args.get("capture_raw_commands") == "1",
+        intake_context=(
+            intake_state.intake_context if mode == SELF_SERVE_MODE and intake_state else None
+        ),
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
         error_message=None,
@@ -133,13 +142,16 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         symptom = get_symptom_option(request.form.get("symptom_id"))
         if symptom is None:
             raise ValueError("Choose the option that best matches the problem first.")
-        scope = self_serve_scope(
+        intake_state = resolve_self_serve_intake_state(
             symptom["id"],
+            symptom_label=symptom["label"],
             refined_domains=request.form.get("refined_domains"),
             profile_fallback_id=request.form.get("profile_fallback_id"),
         )
+        scope = intake_state.scope
         profile = get_profile(scope.suggested_profile_id) if scope.suggested_profile_id else None
     else:
+        intake_state = None
         scope = None
         symptom = None
         profile = get_profile(request.form.get("profile_id") or "custom-profile")
@@ -173,6 +185,7 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         enable_trace=request.form.get("enable_trace") == "on",
         enable_time_skew_check=request.form.get("enable_time_skew_check") == "on",
         capture_raw_commands=request.form.get("capture_raw_commands") == "on",
+        intake_context=intake_state.intake_context if intake_state is not None else None,
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
         error_message=error_message,
@@ -212,21 +225,24 @@ def request_error_form_state(error_message: str) -> dict[str, object]:
             symptom = get_symptom_option(request.form.get("symptom_id"))
         except ValueError:
             symptom = None
-        scope = (
-            self_serve_scope(
+        intake_state = (
+            resolve_self_serve_intake_state(
                 symptom["id"],
+                symptom_label=symptom["label"],
                 refined_domains=request.form.get("refined_domains"),
                 profile_fallback_id=request.form.get("profile_fallback_id"),
             )
             if symptom is not None
             else None
         )
+        scope = intake_state.scope if intake_state is not None else None
         profile = (
             get_profile(scope.suggested_profile_id)
             if scope is not None and scope.suggested_profile_id
             else None
         )
     else:
+        intake_state = None
         scope = None
         profile_id = request.form.get("profile_id") or "custom-profile"
         try:
@@ -254,6 +270,7 @@ def request_error_form_state(error_message: str) -> dict[str, object]:
         enable_trace=request.form.get("enable_trace") == "on",
         enable_time_skew_check=request.form.get("enable_time_skew_check") == "on",
         capture_raw_commands=request.form.get("capture_raw_commands") == "on",
+        intake_context=intake_state.intake_context if intake_state is not None else None,
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
         error_message=error_message,
@@ -273,6 +290,7 @@ def build_form_state(
     enable_trace: bool,
     enable_time_skew_check: bool,
     capture_raw_commands: bool,
+    intake_context: IntakeContext | None,
     from_run_id: str | None,
     bridge: dict[str, str] | None,
     error_message: str | None,
@@ -305,6 +323,7 @@ def build_form_state(
         "enable_trace": enable_trace,
         "enable_time_skew_check": enable_time_skew_check,
         "capture_raw_commands": capture_raw_commands,
+        "intake_context": intake_context,
         "plan": plan,
         "from_run_id": from_run_id,
         "bridge": bridge,
@@ -332,6 +351,7 @@ def default_form_state() -> dict[str, object]:
         "enable_trace": False,
         "enable_time_skew_check": False,
         "capture_raw_commands": False,
+        "intake_context": None,
         "plan": build_collection_plan(
             selected_checks=[],
             targets=[],
@@ -373,13 +393,14 @@ def optional_record(run_id: str | None) -> RunSession | None:
     return record
 
 
-def self_serve_scope(
+def resolve_self_serve_intake_state(
     symptom_id: str | None,
     *,
+    symptom_label: str | None = None,
     refined_domains: str | None = None,
     profile_fallback_id: str | None = None,
 ):
-    """Resolve intent-driven self-serve check scope from symptom and optional refinements."""
+    """Resolve intake scope and preserve the rationale context for execution."""
 
     resolution = resolve_intake_interpretation(symptom_id)
     context = clarification_context_from_refinement(
@@ -387,11 +408,59 @@ def self_serve_scope(
         refined_domains=refined_domains,
         profile_fallback_id=profile_fallback_id,
     )
-    return map_intake_to_scope(
+    scope = map_intake_to_scope(
         resolution=resolution,
         contract=get_intake_contract(),
         context=context,
     )
+    return SelfServeIntakeState(
+        scope=scope,
+        intake_context=build_intake_context(
+            symptom_id=symptom_id,
+            symptom_label=symptom_label,
+            resolution=resolution,
+            context=context,
+        ),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class SelfServeIntakeState:
+    """Resolved self-serve scope plus stable intake context."""
+
+    scope: DomainMappingResult
+    intake_context: IntakeContext
+
+
+def build_intake_context(
+    *,
+    symptom_id: str | None,
+    symptom_label: str | None,
+    resolution: IntakeResolution,
+    context: DecisionContext | None,
+) -> IntakeContext:
+    """Build the typed run-context payload describing intake decisions."""
+
+    return IntakeContext(
+        selected_symptom_key=symptom_id,
+        selected_symptom_label=symptom_label,
+        resolved_intent_key=resolution.primary_intent,
+        clarification_answers=context.answered if context is not None else (),
+        scope_rationale=intake_scope_rationale(resolution, context),
+    )
+
+
+def intake_scope_rationale(
+    resolution: IntakeResolution,
+    context: DecisionContext | None,
+) -> str:
+    """Return a compact machine-readable rationale for the chosen scope."""
+
+    if context is not None and context.reason:
+        return context.reason
+    if not resolution.primary_intent:
+        return "fallback_general_triage"
+    return "intent_default_scope"
 
 
 def clarification_context_from_refinement(
