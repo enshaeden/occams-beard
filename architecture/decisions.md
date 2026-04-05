@@ -12,6 +12,7 @@
 - Keep reusable scenarios local and file-backed through profiles instead of a config service.
 - Keep support-ready bundle export and validation as a defined core surface; raw command capture stays opt-in.
 - Keep the local web layer thin by separating route composition, form parsing, run-session orchestration, progress shaping, and result presentation.
+- Keep symptom-to-execution translation in a dedicated intake layer so UI wording can evolve without scattering profile mapping logic across route and form modules.
 
 ## Consequences
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from occams_beard.models import EndpointDiagnosticResult
+from occams_beard.intake import resolve_self_serve_profile_id, suggest_support_profile_id
 
 SELF_SERVE_MODE = "self-serve"
 SUPPORT_MODE = "support"
@@ -34,8 +34,6 @@ SYMPTOM_OPTIONS = (
         "description": (
             "Websites and online apps are not connecting, or everything looks offline."
         ),
-        "profile_id": "no-internet",
-        "support_profile_id": "no-internet",
     },
     {
         "id": "apps-sites-not-loading",
@@ -43,8 +41,6 @@ SYMPTOM_OPTIONS = (
         "description": (
             "Some apps, sites, or sign-in pages stall, fail, or only partly load."
         ),
-        "profile_id": "dns-issue",
-        "support_profile_id": "internal-service-unreachable",
     },
     {
         "id": "vpn-or-company-resource-issue",
@@ -52,8 +48,6 @@ SYMPTOM_OPTIONS = (
         "description": (
             "A VPN, internal app, file share, or company-only service is not working."
         ),
-        "profile_id": "vpn-issue",
-        "support_profile_id": "vpn-issue",
     },
     {
         "id": "device-feels-slow",
@@ -61,8 +55,6 @@ SYMPTOM_OPTIONS = (
         "description": (
             "The device feels unusually slow, overloaded, or unstable while you work."
         ),
-        "profile_id": "device-slow",
-        "support_profile_id": "device-slow",
     },
     {
         "id": "something-else",
@@ -70,8 +62,6 @@ SYMPTOM_OPTIONS = (
         "description": (
             "You need a general local check before deciding what kind of help you need."
         ),
-        "profile_id": "custom-profile",
-        "support_profile_id": "custom-profile",
     },
 )
 
@@ -118,37 +108,3 @@ def get_symptom_option(symptom_id: str | None) -> dict[str, str] | None:
         if option["id"] == symptom_id:
             return dict(option)
     raise ValueError("Unknown symptom choice.")
-
-
-def resolve_self_serve_profile_id(symptom_id: str | None) -> str | None:
-    """Map a self-serve symptom choice to a backing local profile."""
-
-    option = get_symptom_option(symptom_id)
-    return option["profile_id"] if option else None
-
-
-def suggest_support_profile_id(
-    result: EndpointDiagnosticResult,
-    *,
-    symptom_id: str | None = None,
-    current_profile_id: str | None = None,
-) -> str:
-    """Choose the most relevant guided-support starting profile."""
-
-    if result.probable_fault_domain == "dns":
-        return "dns-issue"
-    if result.probable_fault_domain == "vpn":
-        return "vpn-issue"
-    if result.probable_fault_domain == "local_host":
-        return "device-slow"
-    if result.probable_fault_domain in {"upstream_network"}:
-        return "internal-service-unreachable"
-    if result.probable_fault_domain in {"local_network", "internet_edge"}:
-        return "no-internet"
-
-    symptom = get_symptom_option(symptom_id)
-    if symptom is not None:
-        return symptom["support_profile_id"]
-    if current_profile_id:
-        return current_profile_id
-    return "custom-profile"
