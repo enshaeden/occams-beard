@@ -9,8 +9,6 @@ from typing import Any, cast
 from flask import request, url_for
 
 from occams_beard.defaults import DEFAULT_DNS_HOSTS, DEFAULT_TCP_TARGETS
-from occams_beard.models import DiagnosticProfile, EndpointDiagnosticResult, RedactionLevel, TcpTarget
-from occams_beard.profile_catalog import ProfileCatalogIssue, get_profile, get_profile_catalog
 from occams_beard.intake import (
     ClarificationPrompt,
     DecisionContext,
@@ -24,6 +22,13 @@ from occams_beard.intake import (
     resolve_intake_interpretation,
     suggest_support_profile_id,
 )
+from occams_beard.models import (
+    DiagnosticProfile,
+    EndpointDiagnosticResult,
+    RedactionLevel,
+    TcpTarget,
+)
+from occams_beard.profile_catalog import ProfileCatalogIssue, get_profile, get_profile_catalog
 from occams_beard.web.presentation.catalog import (
     SELF_SERVE_MODE,
     SUPPORT_MODE,
@@ -438,6 +443,7 @@ def resolve_self_serve_intake_state(
             symptom_label=symptom_label,
             resolution=resolution,
             context=context,
+            scope=scope,
         ),
     )
 
@@ -458,6 +464,7 @@ def build_intake_context(
     symptom_label: str | None,
     resolution: IntakeResolution,
     context: DecisionContext | None,
+    scope: DomainMappingResult,
 ) -> IntakeContext:
     """Build the typed run-context payload describing intake decisions."""
 
@@ -466,16 +473,45 @@ def build_intake_context(
         selected_symptom_label=symptom_label,
         resolved_intent_key=resolution.primary_intent,
         clarification_answers=context.answered if context is not None else (),
-        scope_rationale=intake_scope_rationale(resolution, context),
+        scope_rationale=intake_scope_rationale(resolution, context, scope),
+        trace_metadata={
+            "resolved_intent": {
+                "intent_key": resolution.primary_intent,
+                "confidence_score": resolution.confidence_score,
+                "alternative_intents": list(resolution.alternative_intents),
+                "match_rule": resolution.trace.get("match_rule"),
+            },
+            "clarification_path": {
+                "asked_questions": [prompt.key for prompt in context.asked_questions]
+                if context is not None
+                else [],
+                "answers": list(context.answered) if context is not None else [],
+                "selected_pathway_key": (
+                    context.selected_pathway_key if context is not None else None
+                ),
+                "status": context.status if context is not None else None,
+                "reason": context.reason if context is not None else None,
+            },
+            "domain_mapping": {
+                "selected_domains": list(scope.selected_domains),
+                "selected_checks": list(scope.selected_checks),
+                "suggested_profile_id": scope.suggested_profile_id,
+                "fallback_mode": scope.fallback_mode,
+                "rationale": scope.rationale,
+            },
+        },
     )
 
 
 def intake_scope_rationale(
     resolution: IntakeResolution,
     context: DecisionContext | None,
+    scope: DomainMappingResult,
 ) -> str:
     """Return a compact machine-readable rationale for the chosen scope."""
 
+    if scope.rationale and scope.rationale != "unspecified":
+        return scope.rationale
     if context is not None and context.reason:
         return context.reason
     if not resolution.primary_intent:

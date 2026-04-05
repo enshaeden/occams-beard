@@ -212,7 +212,7 @@ class AppTests(unittest.TestCase):
         )
         self.assertEqual(
             self.captured_options.intake_context.scope_rationale,
-            "intent_default_scope",
+            "intent_primary_pathway_domains",
         )
         self.assertIn("vpn", self.captured_options.selected_checks)
         self.assertIn("services", self.captured_options.selected_checks)
@@ -253,6 +253,86 @@ class AppTests(unittest.TestCase):
             ),
             results_text,
         )
+
+    def test_self_serve_full_path_emits_trace_metadata_without_ui_pollution(self) -> None:
+        captured_options: DiagnosticsRunOptions | None = None
+
+        def fake_executor(options: DiagnosticsRunOptions):
+            nonlocal captured_options
+            captured_options = options
+            result = build_degraded_partial_result()
+            result.metadata.intake_debug = (
+                {
+                    "selected_symptom_key": options.intake_context.selected_symptom_key,
+                    "resolved_intent_key": options.intake_context.resolved_intent_key,
+                    **options.intake_context.trace_metadata,
+                }
+                if options.intake_context is not None
+                else None
+            )
+            return result
+
+        app = create_app(
+            {
+                "TESTING": True,
+                "RUN_EXECUTOR": fake_executor,
+            }
+        )
+        client = app.test_client()
+        response = client.post(
+            "/run",
+            data={
+                "mode": "self-serve",
+                "symptom_id": "apps-sites-not-loading",
+                "clar_dns_error_surface": "dns_or_name_error",
+                "checks": ["dns"],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run_id = response.headers["Location"].rsplit("/", 1)[-1]
+        self.wait_for_run_completion(run_id, client=client)
+        self.assertIsNotNone(captured_options)
+        assert captured_options is not None
+        self.assertIsNotNone(captured_options.intake_context)
+        assert captured_options.intake_context is not None
+        self.assertEqual(
+            captured_options.intake_context.resolved_intent_key,
+            "partial_access_or_dns",
+        )
+        self.assertEqual(
+            captured_options.intake_context.trace_metadata["clarification_path"][
+                "selected_pathway_key"
+            ],
+            "resolver_and_routing",
+        )
+        self.assertEqual(
+            captured_options.intake_context.trace_metadata["domain_mapping"]["rationale"],
+            "clarification_pathway_domains",
+        )
+        self.assertEqual(
+            captured_options.intake_context.trace_metadata["validation_adjustments"]["decision"],
+            "adjusted_conservative",
+        )
+        self.assertEqual(captured_options.selected_checks, ["dns", "routing"])
+
+        json_response = client.get(f"/results/{run_id}/result.json")
+        self.assertEqual(json_response.status_code, 200)
+        self.assertIn('"intake_debug"', json_response.get_data(as_text=True))
+        self.assertIn(
+            '"resolved_intent_key": "partial_access_or_dns"',
+            json_response.get_data(as_text=True),
+        )
+        self.assertIn('"clarification_path"', json_response.get_data(as_text=True))
+        self.assertIn('"domain_mapping"', json_response.get_data(as_text=True))
+        self.assertIn('"validation_adjustments"', json_response.get_data(as_text=True))
+
+        results_response = client.get(f"/results/{run_id}")
+        self.assertEqual(results_response.status_code, 200)
+        results_text = results_response.get_data(as_text=True)
+        self.assertIn("What we know", results_text)
+        self.assertNotIn("validation_adjustments", results_text)
+        self.assertNotIn("clarification_path", results_text)
 
     def test_support_submission_preserves_selected_profile_and_capture_options(self) -> None:
         response = self.client.post(

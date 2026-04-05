@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from occams_beard.defaults import (
     ALLOWED_CHECKS,
@@ -71,11 +71,24 @@ def build_run_options(
         default_checks=default_checks,
     )
     if intake_context is not None:
+        before_validation = list(selected_checks)
         validation = validate_intake_selected_checks(
             selected_checks,
             intake_context=intake_context,
         )
         selected_checks = list(validation.selected_checks)
+        intake_context = replace(
+            intake_context,
+            trace_metadata={
+                **intake_context.trace_metadata,
+                "validation_adjustments": {
+                    "decision": validation.decision,
+                    "rationale": validation.rationale,
+                    "checks_before": before_validation,
+                    "checks_after": selected_checks,
+                },
+            },
+        )
 
     return DiagnosticsRunOptions(
         selected_checks=selected_checks,

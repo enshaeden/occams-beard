@@ -52,3 +52,12 @@
 - Runtime and route rewiring can happen incrementally while preserving existing behavior.
 - Future intake extensions can be reviewed in one contract location rather than spread across
   web presentation and route code.
+
+### Contributor Extension Rules
+
+- Add or change symptom entries in `src/occams_beard/intake/catalog.py`.
+- Keep deterministic intent resolution in `src/occams_beard/intake/resolver.py`.
+- Keep clarification transitions in `src/occams_beard/intake/clarification.py`.
+- Keep intent/pathway domain mapping in `src/occams_beard/intake/domain_mapper.py`.
+- Keep safety validation and adjustment policy in `src/occams_beard/intake/validator.py`.
+- Do not reintroduce intake mapping logic in `src/occams_beard/web/presentation/catalog.py` or Flask route handlers.
