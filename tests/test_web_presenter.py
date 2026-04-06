@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import unittest
 
+from occams_beard.execution import build_execution_records
+from occams_beard.models import Finding, StorageDeviceHealth
 from occams_beard.web_presenter import (
     SELF_SERVE_MODE,
     SUPPORT_MODE,
@@ -75,6 +77,81 @@ class WebPresenterTests(unittest.TestCase):
         self.assertEqual(view["bundle_raw_capture_label"], "Raw command capture available")
         self.assertIn("Download the support bundle", view["primary_next_step"])
         self.assertIn("best reviewed with support", view["uncertainty_notes"][1])
+
+    def test_storage_inventory_only_health_limit_stays_calm_in_results_view(self) -> None:
+        result = build_default_run_result()
+        result.facts.resources.storage_devices = [
+            StorageDeviceHealth(
+                device_id="disk0",
+                model="Demo SSD",
+                protocol="NVMe",
+                medium="SSD",
+                health_status=None,
+                operational_status=None,
+            )
+        ]
+        result.execution = build_execution_records(
+            result.facts,
+            result_to_options(result),
+            result.warnings,
+            {
+                record.domain: record.duration_ms
+                for record in result.execution
+                if record.duration_ms is not None
+            },
+        )
+
+        view = build_results_view(
+            result=result,
+            options=result_to_options(result),
+            mode=SELF_SERVE_MODE,
+            continue_with_support_url="/support",
+        )
+        storage_domain = next(
+            domain for domain in view["selected_domains"] if domain["label"] == "Storage snapshot"
+        )
+
+        self.assertEqual(view["status_tone"], "clear")
+        self.assertEqual(storage_domain["badge_label"], "Completed")
+        self.assertIn("Capacity checked successfully", storage_domain["summary"])
+        self.assertTrue(
+            any(
+                "device-health detail was not exposed by this os" in item.lower()
+                for item in view["technical_context"]
+            )
+        )
+
+    def test_storage_pressure_finding_still_surfaces_attention(self) -> None:
+        result = build_default_run_result()
+        result.facts.resources.disks[0].used_bytes = 495_000_000_000
+        result.facts.resources.disks[0].free_bytes = 5_107_862_016
+        result.facts.resources.disks[0].percent_used = 99.0
+        result.facts.resources.disks[0].free_percent = 1.0
+        result.facts.resources.disks[0].pressure_level = "critical"
+        result.findings = [
+            Finding(
+                identifier="critical-disk-space-exhaustion",
+                severity="high",
+                title="Critical disk-space exhaustion on /",
+                summary="Available disk space is critically low.",
+                evidence=["Filesystem / is at 99.0% utilization with 1.0% free."],
+                probable_cause="Local storage pressure is likely affecting writes.",
+                fault_domain="local_host",
+                confidence=0.97,
+                plain_language="Available disk space is critically low.",
+            )
+        ]
+        result.probable_fault_domain = "local_host"
+
+        view = build_results_view(
+            result=result,
+            options=result_to_options(result),
+            mode=SELF_SERVE_MODE,
+            continue_with_support_url="/support",
+        )
+
+        self.assertEqual(view["status_tone"], "attention")
+        self.assertEqual(view["top_takeaway"], "Available disk space is critically low.")
 
 
 def result_to_options(result):

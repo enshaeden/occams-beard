@@ -344,6 +344,11 @@ def _storage_execution(
     disk_status: ExecutionStatus = "passed" if facts.resources.disks else "failed"
     if disk_warnings and facts.resources.disks:
         disk_status = "partial"
+    device_probe = _storage_device_probe(
+        facts,
+        duration_ms=duration_ms,
+        warnings=health_warnings,
+    )
     probes = [
         ExecutionProbe(
             probe_id="disk-usage",
@@ -359,23 +364,39 @@ def _storage_execution(
             ],
             warnings=disk_warnings,
         ),
-        _storage_device_probe(
-            facts,
-            duration_ms=duration_ms,
-            warnings=health_warnings,
-        ),
+        device_probe,
     ]
-    status = _aggregate_probe_statuses(probe.status for probe in probes)
+    inventory_only_health_limit = (
+        disk_status == "passed"
+        and device_probe.status == "partial"
+        and not health_warnings
+        and bool(facts.resources.storage_devices)
+        and not any(
+            device.health_status or device.operational_status
+            for device in facts.resources.storage_devices
+        )
+    )
+    status = (
+        "passed"
+        if inventory_only_health_limit
+        else _aggregate_probe_statuses(probe.status for probe in probes)
+    )
+    summary = (
+        "Capacity checked successfully. Device-health detail was not exposed by this OS "
+        "on this endpoint."
+        if inventory_only_health_limit
+        else (
+            "Collected filesystem capacity and storage-device inventory, with explicit "
+            "low-space pressure classification and health assessment when exposed."
+        )
+    )
     return DomainExecution(
         domain="storage",
         label=DOMAIN_LABELS["storage"],
         status=status,
         selected=True,
         duration_ms=duration_ms,
-        summary=(
-            "Collected filesystem capacity and storage-device inventory, with explicit "
-            "low-space pressure classification and health assessment when exposed."
-        ),
+        summary=summary,
         warnings=warnings,
         probes=probes,
     )
@@ -932,8 +953,8 @@ def _storage_device_probe(
         else:
             status = "partial"
             details = [
+                "Device-health detail was not exposed by this OS on this endpoint.",
                 f"Storage-device inventory collected: {len(storage_devices)}.",
-                "Storage-device health was unavailable even though inventory was collected.",
             ]
     else:
         status = "skipped"

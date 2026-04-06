@@ -38,6 +38,7 @@ from occams_beard.models import (
     VpnState,
 )
 from occams_beard.report import render_report
+from support import build_default_run_result
 
 
 class ReportOutputTests(unittest.TestCase):
@@ -429,6 +430,29 @@ class ReportOutputTests(unittest.TestCase):
         self.assertIn("Storage Snapshot", text)
         self.assertIn("Monitored volumes: / (98.0% used, 2.0% free, critical pressure)", text)
         self.assertIn("Storage device health: disk0=Verified", text)
+
+    def test_render_report_describes_inventory_only_storage_health_as_os_limit(self) -> None:
+        result = build_default_run_result()
+        result.facts.resources.storage_devices = [
+            StorageDeviceHealth(
+                device_id="disk0",
+                model="Demo SSD",
+                protocol="NVMe",
+                medium="SSD",
+                health_status=None,
+                operational_status=None,
+            )
+        ]
+
+        text = render_report(result)
+
+        self.assertIn(
+            (
+                "Storage device health: inventory collected for 1 device, but "
+                "device-health detail was not exposed by this OS"
+            ),
+            text,
+        )
 
 
 if __name__ == "__main__":

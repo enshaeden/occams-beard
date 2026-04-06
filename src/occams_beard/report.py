@@ -509,7 +509,12 @@ def _storage_device_summary(*, collected: bool, resources) -> str:
         device.health_status or device.operational_status
         for device in resources.storage_devices
     ):
-        return "inventory only (no health state exposed)"
+        device_count = len(resources.storage_devices)
+        return (
+            f"inventory collected for {device_count} device"
+            f"{'s' if device_count != 1 else ''}, but device-health detail was not exposed "
+            "by this OS"
+        )
     return ", ".join(
         (
             f"{device.device_id}="

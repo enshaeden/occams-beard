@@ -42,7 +42,7 @@ Schema `1.4.0` adds optional host-pressure, storage-pressure, and clock-state fi
   - `pressure_level`: deterministic storage-pressure classification for that volume: `critical`, `low`, `normal`, or `unknown`; classification is role-aware and is not driven by one global absolute free-bytes threshold
   - `role_hint`: coarse operational role for the monitored volume, used to distinguish primary writable volumes from auxiliary or ephemeral diagnostic mounts when explaining storage impact
 
-Execution output now distinguishes storage-device inventory collection from actual health assessment. A storage-device probe can report inventory-only partial results when the platform enumerates devices but does not expose health-state strings.
+Execution output now distinguishes storage-device inventory collection from actual health assessment. The `storage-device-health` probe can report an inventory-only `partial` result when the platform enumerates devices but does not expose health-state strings. When filesystem capacity succeeded and that missing health string is the only gap, the storage domain can still remain overall `passed` so the operator-facing rollup does not imply a storage fault.
 - Under `facts.time`:
   - `local_time_iso` and `utc_time_iso`: the current local and UTC clock snapshot captured on the endpoint
   - `timezone_name`, optional `timezone_identifier`, and optional `timezone_identifier_source`: bounded local timezone state when the platform exposes it

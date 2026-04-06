@@ -207,7 +207,7 @@ class ExecutionModelTests(unittest.TestCase):
             ["host", "time", "network", "routing", "dns", "connectivity"],
         )
 
-    def test_storage_execution_marks_inventory_only_device_health_as_partial(self) -> None:
+    def test_storage_execution_softens_inventory_only_device_health_at_domain_level(self) -> None:
         fixture = build_default_run_result()
         fixture.facts.resources.storage_devices = [
             StorageDeviceHealth(
@@ -236,9 +236,77 @@ class ExecutionModelTests(unittest.TestCase):
         device_probe = next(
             probe for probe in storage_record.probes if probe.probe_id == "storage-device-health"
         )
+        self.assertEqual(storage_record.status, "passed")
+        self.assertIn("Capacity checked successfully", storage_record.summary or "")
         self.assertEqual(device_probe.status, "partial")
+        self.assertIn("device-health detail was not exposed", " ".join(device_probe.details).lower())
         self.assertIn("inventory collected", " ".join(device_probe.details).lower())
-        self.assertIn("health was unavailable", " ".join(device_probe.details).lower())
+
+    def test_storage_execution_stays_partial_when_disk_usage_is_degraded(self) -> None:
+        fixture = build_default_run_result()
+        fixture.facts.resources.storage_devices = [
+            StorageDeviceHealth(
+                device_id="disk0",
+                model="Demo SSD",
+                protocol="NVMe",
+                medium="SSD",
+                health_status=None,
+                operational_status=None,
+            )
+        ]
+        options = DiagnosticsRunOptions(
+            selected_checks=["storage"],
+            targets=[],
+            dns_hosts=[],
+        )
+
+        execution = build_execution_records(
+            fixture.facts,
+            options,
+            warnings=[
+                DiagnosticWarning(
+                    domain="storage",
+                    code="disk-usage-failed",
+                    message="Disk usage could not be collected for path: /Volumes/External",
+                )
+            ],
+            durations_ms={"storage": 10},
+        )
+
+        storage_record = next(record for record in execution if record.domain == "storage")
+        disk_probe = next(probe for probe in storage_record.probes if probe.probe_id == "disk-usage")
+        device_probe = next(
+            probe for probe in storage_record.probes if probe.probe_id == "storage-device-health"
+        )
+
+        self.assertEqual(storage_record.status, "partial")
+        self.assertEqual(disk_probe.status, "partial")
+        self.assertEqual(device_probe.status, "partial")
+
+    def test_storage_execution_keeps_no_device_facts_truthful_and_non_alarming(self) -> None:
+        fixture = build_default_run_result()
+        fixture.facts.resources.storage_devices = []
+        options = DiagnosticsRunOptions(
+            selected_checks=["storage"],
+            targets=[],
+            dns_hosts=[],
+        )
+
+        execution = build_execution_records(
+            fixture.facts,
+            options,
+            warnings=[],
+            durations_ms={"storage": 10},
+        )
+
+        storage_record = next(record for record in execution if record.domain == "storage")
+        device_probe = next(
+            probe for probe in storage_record.probes if probe.probe_id == "storage-device-health"
+        )
+
+        self.assertEqual(storage_record.status, "passed")
+        self.assertEqual(device_probe.status, "skipped")
+        self.assertIn("no storage-device health facts", " ".join(device_probe.details).lower())
 
     def test_registry_execution_order_is_explicit_and_deterministic(self) -> None:
         registered_order = [definition.domain for definition in iter_registered_domains()]

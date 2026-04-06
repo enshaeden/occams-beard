@@ -743,6 +743,13 @@ def _storage_device_context(result: EndpointDiagnosticResult) -> str:
     devices = result.facts.resources.storage_devices
     if not devices:
         return "none exposed"
+    if not any(device.health_status or device.operational_status for device in devices):
+        device_count = len(devices)
+        return (
+            f"inventory collected for {device_count} device"
+            f"{'s' if device_count != 1 else ''}, but device-health detail was not exposed "
+            "by this OS"
+        )
     return ", ".join(
         f"{device.device_id}={device.health_status or device.operational_status or 'unknown'}"
         for device in devices[:3]
