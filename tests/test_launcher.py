@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import unittest
+import webbrowser
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from occams_beard.launcher import (
+    BrowserLaunchResult,
     BrowserPresenceTracker,
     LauncherDependencyError,
     OperatorLauncherConfig,
     _build_browser_url,
     _load_web_dependencies,
     _make_server_with_fallback,
+    _open_browser,
     _probe_runtime_metadata,
     _write_ready_file,
     launch_operator_interface,
@@ -149,6 +152,122 @@ class LauncherTests(unittest.TestCase):
     def test_probe_runtime_metadata_returns_none_for_unreachable_server(self) -> None:
         self.assertIsNone(_probe_runtime_metadata("http://127.0.0.1:59999"))
 
+    @patch("occams_beard.launcher._open_browser_with_system_default")
+    @patch("occams_beard.launcher.webbrowser.open", return_value=True)
+    def test_open_browser_returns_webbrowser_result_when_primary_launcher_succeeds(
+        self,
+        mock_webbrowser_open,
+        mock_system_default,
+    ) -> None:
+        result = _open_browser("http://127.0.0.1:5010")
+
+        self.assertEqual(
+            result,
+            BrowserLaunchResult(launched=True, launcher="webbrowser"),
+        )
+        mock_webbrowser_open.assert_called_once_with("http://127.0.0.1:5010", new=2)
+        mock_system_default.assert_not_called()
+
+    @patch(
+        "occams_beard.launcher._launch_url_with_windows_shell",
+        return_value=BrowserLaunchResult(
+            launched=True,
+            launcher="windows-shell",
+            used_fallback=True,
+        ),
+    )
+    @patch("occams_beard.launcher.webbrowser.open", return_value=False)
+    def test_open_browser_uses_windows_fallback_for_cold_launch_failure(
+        self,
+        mock_webbrowser_open,
+        mock_windows_fallback,
+    ) -> None:
+        # This models a cold-launch failure where Python cannot start the default
+        # browser itself. A warm browser session might still accept a tab handoff,
+        # but the OS-native launcher must cover machines with no running browser.
+        with patch("occams_beard.launcher.os.name", "nt"):
+            result = _open_browser("http://127.0.0.1:5011")
+
+        self.assertEqual(
+            result,
+            BrowserLaunchResult(
+                launched=True,
+                launcher="windows-shell",
+                used_fallback=True,
+            ),
+        )
+        mock_webbrowser_open.assert_called_once_with("http://127.0.0.1:5011", new=2)
+        mock_windows_fallback.assert_called_once_with("http://127.0.0.1:5011")
+
+    @patch(
+        "occams_beard.launcher._open_browser_with_system_default",
+        return_value=BrowserLaunchResult(
+            launched=True,
+            launcher="xdg-open",
+            used_fallback=True,
+        ),
+    )
+    @patch(
+        "occams_beard.launcher.webbrowser.open",
+        side_effect=webbrowser.Error("no runnable browser"),
+    )
+    def test_open_browser_uses_fallback_when_webbrowser_raises(
+        self,
+        mock_webbrowser_open,
+        mock_system_default,
+    ) -> None:
+        result = _open_browser("http://127.0.0.1:5012")
+
+        self.assertEqual(
+            result,
+            BrowserLaunchResult(
+                launched=True,
+                launcher="xdg-open",
+                used_fallback=True,
+            ),
+        )
+        mock_webbrowser_open.assert_called_once_with("http://127.0.0.1:5012", new=2)
+        mock_system_default.assert_called_once_with("http://127.0.0.1:5012")
+
+    @patch("occams_beard.launcher.LOGGER")
+    @patch(
+        "occams_beard.launcher._open_browser_with_system_default",
+        return_value=BrowserLaunchResult(
+            launched=False,
+            launcher="xdg-open",
+            used_fallback=True,
+            error="FileNotFoundError: [Errno 2] No such file or directory: 'xdg-open'",
+        ),
+    )
+    @patch("occams_beard.launcher.webbrowser.open", return_value=False)
+    def test_open_browser_logs_cleanly_when_fallback_fails(
+        self,
+        mock_webbrowser_open,
+        mock_system_default,
+        mock_logger,
+    ) -> None:
+        result = _open_browser("http://127.0.0.1:5013")
+
+        self.assertEqual(
+            result,
+            BrowserLaunchResult(
+                launched=False,
+                launcher="xdg-open",
+                used_fallback=True,
+                error="FileNotFoundError: [Errno 2] No such file or directory: 'xdg-open'",
+            ),
+        )
+        mock_webbrowser_open.assert_called_once_with("http://127.0.0.1:5013", new=2)
+        mock_system_default.assert_called_once_with("http://127.0.0.1:5013")
+        mock_logger.warning.assert_called_once_with(
+            "Browser launch failed: url=%s primary_launcher=webbrowser "
+            "primary_error=%s fallback_launcher=%s fallback_error=%s",
+            "http://127.0.0.1:5013",
+            "webbrowser.open returned False",
+            "xdg-open",
+            "FileNotFoundError: [Errno 2] No such file or directory: 'xdg-open'",
+        )
+
     @patch("occams_beard.launcher.importlib.import_module")
     def test_load_web_dependencies_raises_clear_error_when_dependency_missing(
         self,
@@ -161,7 +280,10 @@ class LauncherTests(unittest.TestCase):
 
         self.assertIn("dependencies are missing", str(context.exception))
 
-    @patch("occams_beard.launcher._open_browser")
+    @patch(
+        "occams_beard.launcher._open_browser",
+        return_value=BrowserLaunchResult(launched=True, launcher="webbrowser"),
+    )
     @patch("occams_beard.launcher._wait_for_server", return_value=True)
     @patch("occams_beard.launcher._load_web_dependencies")
     @patch("builtins.print")
@@ -194,7 +316,10 @@ class LauncherTests(unittest.TestCase):
         server.shutdown.assert_called_once()
         thread.join.assert_called_once_with(timeout=5)
 
-    @patch("occams_beard.launcher._open_browser")
+    @patch(
+        "occams_beard.launcher._open_browser",
+        return_value=BrowserLaunchResult(launched=True, launcher="webbrowser"),
+    )
     @patch("occams_beard.launcher._wait_for_server", return_value=True)
     @patch("occams_beard.launcher._load_web_dependencies")
     @patch("builtins.print")
@@ -230,7 +355,10 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(ready_text, "http://127.0.0.1:5012\n")
         mock_open_browser.assert_called_once_with("http://127.0.0.1:5012")
 
-    @patch("occams_beard.launcher._open_browser")
+    @patch(
+        "occams_beard.launcher._open_browser",
+        return_value=BrowserLaunchResult(launched=True, launcher="webbrowser"),
+    )
     @patch("occams_beard.launcher._wait_for_server", return_value=True)
     @patch("occams_beard.launcher._load_web_dependencies")
     @patch("builtins.print")

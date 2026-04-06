@@ -6,7 +6,10 @@ import argparse
 import importlib
 import json
 import logging
+import os
 import socket
+import subprocess
+import sys
 import threading
 import time
 import urllib.error
@@ -93,6 +96,16 @@ class PortConflictDetails:
 
     preferred_url: str
     existing_runtime: dict[str, object] | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class BrowserLaunchResult:
+    """Describe how browser launch was attempted and whether it was accepted."""
+
+    launched: bool
+    launcher: str
+    used_fallback: bool = False
+    error: str | None = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -202,7 +215,14 @@ def launch_operator_interface(config: OperatorLauncherConfig) -> int:
     LOGGER.info("Operator interface ready: url=%s", browser_url)
     _write_ready_file(config.ready_file, browser_url)
     if config.open_browser:
-        _open_browser(browser_url)
+        browser_launch = _open_browser(browser_url)
+        LOGGER.info(
+            "Browser launch result: url=%s launcher=%s used_fallback=%s launched=%s",
+            browser_url,
+            browser_launch.launcher,
+            browser_launch.used_fallback,
+            browser_launch.launched,
+        )
 
     if port_conflict is not None:
         print(f"Preferred local URL {port_conflict.preferred_url} was already in use.")
@@ -319,15 +339,105 @@ def _parse_url_target(url: str) -> tuple[str, int]:
     return host, int(port_text)
 
 
-def _open_browser(url: str) -> None:
+def _open_browser(url: str) -> BrowserLaunchResult:
+    primary_error: str | None = None
     try:
         opened = webbrowser.open(url, new=2)
-    except webbrowser.Error as exc:
-        LOGGER.warning("Browser launch failed: url=%s error=%s", url, exc)
-        return
+    except Exception as exc:
+        primary_error = _format_exception(exc)
+    else:
+        if opened:
+            return BrowserLaunchResult(launched=True, launcher="webbrowser")
+        primary_error = "webbrowser.open returned False"
 
-    if not opened:
-        LOGGER.warning("Browser launch was not accepted by the desktop environment: url=%s", url)
+    fallback_result = _open_browser_with_system_default(url)
+    if fallback_result.launched:
+        LOGGER.warning(
+            "Browser launch fell back to OS-native launcher: "
+            "url=%s primary_launcher=webbrowser primary_error=%s fallback_launcher=%s",
+            url,
+            primary_error,
+            fallback_result.launcher,
+        )
+        return fallback_result
+
+    LOGGER.warning(
+        "Browser launch failed: url=%s primary_launcher=webbrowser "
+        "primary_error=%s fallback_launcher=%s fallback_error=%s",
+        url,
+        primary_error,
+        fallback_result.launcher,
+        fallback_result.error,
+    )
+    return fallback_result
+
+
+def _open_browser_with_system_default(url: str) -> BrowserLaunchResult:
+    """Dispatch a URL through the platform-default launcher."""
+
+    if os.name == "nt":
+        return _launch_url_with_windows_shell(url)
+    if sys.platform == "darwin":
+        return _launch_url_with_command(["open", url], launcher="open")
+    return _launch_url_with_command(["xdg-open", url], launcher="xdg-open")
+
+
+def _launch_url_with_windows_shell(url: str) -> BrowserLaunchResult:
+    """Use the Windows shell to open the URL in the default browser."""
+
+    startfile = getattr(os, "startfile", None)
+    if startfile is None:
+        return BrowserLaunchResult(
+            launched=False,
+            launcher="windows-shell",
+            used_fallback=True,
+            error="os.startfile is unavailable",
+        )
+
+    try:
+        startfile(url)
+    except Exception as exc:
+        return BrowserLaunchResult(
+            launched=False,
+            launcher="windows-shell",
+            used_fallback=True,
+            error=_format_exception(exc),
+        )
+
+    return BrowserLaunchResult(
+        launched=True,
+        launcher="windows-shell",
+        used_fallback=True,
+    )
+
+
+def _launch_url_with_command(command: list[str], *, launcher: str) -> BrowserLaunchResult:
+    """Spawn a platform launcher command without blocking the server process."""
+
+    try:
+        subprocess.Popen(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=(os.name != "nt"),
+        )
+    except Exception as exc:
+        return BrowserLaunchResult(
+            launched=False,
+            launcher=launcher,
+            used_fallback=True,
+            error=_format_exception(exc),
+        )
+
+    return BrowserLaunchResult(
+        launched=True,
+        launcher=launcher,
+        used_fallback=True,
+    )
+
+
+def _format_exception(exc: Exception) -> str:
+    return f"{type(exc).__name__}: {exc}"
 
 
 def _write_ready_file(path: str | None, url: str) -> None:

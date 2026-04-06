@@ -243,7 +243,11 @@ On Windows, use [`Open Device Check.cmd`](<Open Device Check.cmd>) from the
 repo root. The root `.command` and `.cmd` files delegate to the same shared
 Python bootstrap so the environment bootstrap and operator launch behavior stay
 aligned across platforms, while the macOS wrapper retains its Terminal-hiding
-behavior.
+behavior. The shared Python launcher keeps `webbrowser.open(..., new=2)` as
+its first attempt and falls back to the OS default URL launcher when Python's
+browser registration path declines or fails, so the localhost UI still opens on
+clean target devices and on machines where no browser process is already
+running, without adding browser-specific path logic.
 
 ## Support-ready artifacts
 
