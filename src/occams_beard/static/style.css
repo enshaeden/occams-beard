@@ -233,6 +233,18 @@ code {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.answer-hero-grid > *,
+.door-grid > *,
+.choice-grid > *,
+.info-grid > *,
+.two-column > *,
+.decision-grid > *,
+.result-grid > *,
+.summary-list > *,
+.summary-list-wide > * {
+  min-width: 0;
+}
+
 .flow-shell,
 .entry-shell,
 .progress-page,
@@ -492,7 +504,9 @@ legend {
 textarea,
 select {
   width: 100%;
+  max-width: 100%;
   min-height: 3rem;
+  min-width: 0;
   padding: 0.85rem 0.95rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -504,6 +518,14 @@ select {
 textarea {
   min-height: 8rem;
   resize: vertical;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+select {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 a:focus-visible,
@@ -650,6 +672,11 @@ button[disabled],
 
 .plan-picker {
   align-items: flex-end;
+}
+
+.plan-picker > .stack-xs {
+  flex: 1 1 18rem;
+  min-width: 0;
 }
 
 .summary-meta {
@@ -845,6 +872,16 @@ dd {
   border: 1px solid rgba(13, 95, 115, 0.12);
 }
 
+.decision-section,
+.info-panel,
+.answer-next-step,
+.finding-card,
+.domain-row,
+.signal-row,
+.progress-domain-row {
+  min-width: 0;
+}
+
 .decision-card,
 .bundle-priority-card {
   overflow: hidden;
@@ -974,6 +1011,21 @@ dd {
 .choice-body,
 .redaction-title,
 .redaction-description {
+  overflow-wrap: anywhere;
+}
+
+.decision-section p,
+.decision-section li,
+.info-panel p,
+.info-panel li,
+.answer-card p,
+.answer-card li,
+.finding-card p,
+.finding-card li,
+.domain-row p,
+.signal-row p,
+.progress-domain-row p,
+dd {
   overflow-wrap: anywhere;
 }
 
