@@ -8,7 +8,7 @@ from typing import Any, cast
 
 from flask import request, url_for
 
-from occams_beard.defaults import DEFAULT_DNS_HOSTS, DEFAULT_TCP_TARGETS
+from occams_beard.defaults import ALLOWED_CHECKS, DEFAULT_DNS_HOSTS, DEFAULT_TCP_TARGETS
 from occams_beard.intake import (
     ClarificationPrompt,
     DecisionContext,
@@ -36,6 +36,7 @@ from occams_beard.web.presentation.catalog import (
     get_symptom_option,
     normalize_mode,
 )
+from occams_beard.web.presentation.plans import build_check_catalog
 from occams_beard.web.presentation.plans import build_collection_plan
 from occams_beard.web.sessions import RunSession, get_store
 
@@ -86,15 +87,12 @@ def query_form_state() -> dict[str, object]:
             request.args.get("profile") or default_support_profile_id(source_record)
         )
 
+    base_checks = default_plan_checks(scope, profile)
     checks_csv = request.args.get("checks")
     selected_checks = (
-        [item for item in checks_csv.split(",") if item]
+        merge_checks(base_checks, [item for item in checks_csv.split(",") if item])
         if checks_csv
-        else (
-            list(scope.selected_checks)
-            if scope is not None
-            else list(profile.recommended_checks if profile is not None else [])
-        )
+        else list(base_checks)
     )
     targets_text = request.args.get("targets")
     dns_hosts_text = request.args.get("dns_hosts")
@@ -114,6 +112,7 @@ def query_form_state() -> dict[str, object]:
         mode_option=mode_option,
         selected_symptom=symptom,
         selected_profile=profile,
+        base_checks=base_checks,
         selected_checks=selected_checks,
         targets_text=targets_text if targets_text is not None else "\n".join(effective_targets),
         dns_hosts_text=(
@@ -168,7 +167,8 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         symptom = None
         profile = get_profile(request.form.get("profile_id") or "custom-profile")
 
-    selected_checks = request.form.getlist("checks")
+    base_checks = default_plan_checks(scope, profile)
+    selected_checks = submitted_check_selection(base_checks=base_checks, source=request.form)
     targets_text = request.form.get("targets")
     dns_hosts_text = request.form.get("dns_hosts")
     effective_targets = (
@@ -179,18 +179,21 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         if dns_hosts_text
         else default_dns_lines(profile)
     )
-    effective_checks = selected_checks or (
-        list(scope.selected_checks)
-        if scope is not None
-        else list(profile.recommended_checks if profile else [])
+    has_explicit_additions = bool(request.form.getlist("extra_checks")) or (
+        request.form.get("select_all_extra_checks") == "1"
     )
-
+    enforce_intake_scope = (
+        mode != SELF_SERVE_MODE
+        or not has_explicit_additions
+        or not has_check_selection_changes(base_checks, selected_checks)
+    )
     return build_form_state(
         mode=mode,
         mode_option=mode_option,
         selected_symptom=symptom,
         selected_profile=profile,
-        selected_checks=effective_checks,
+        base_checks=base_checks,
+        selected_checks=selected_checks,
         targets_text=targets_text or "\n".join(effective_targets),
         dns_hosts_text=dns_hosts_text or "\n".join(effective_dns_hosts),
         enable_ping=request.form.get("enable_ping") == "on",
@@ -202,6 +205,7 @@ def form_state_from_request(*, error_message: str | None = None) -> dict[str, ob
         plan_preview=intake_state.plan_preview if intake_state is not None else None,
         from_run_id=source_record.run_id if source_record is not None else None,
         bridge=bridge_context(source_record, profile.profile_id if profile else None),
+        enforce_intake_scope=enforce_intake_scope,
         error_message=error_message,
     )
 
@@ -263,11 +267,8 @@ def request_error_form_state(error_message: str) -> dict[str, object]:
         except ValueError:
             profile = None
 
-    selected_checks = request.form.getlist("checks") or (
-        list(scope.selected_checks)
-        if scope is not None
-        else list(profile.recommended_checks if profile is not None else [])
-    )
+    base_checks = default_plan_checks(scope, profile)
+    selected_checks = submitted_check_selection(base_checks=base_checks, source=request.form)
     targets_text = request.form.get("targets") or "\n".join(default_target_lines(profile))
     dns_hosts_text = request.form.get("dns_hosts") or "\n".join(default_dns_lines(profile))
 
@@ -276,6 +277,7 @@ def request_error_form_state(error_message: str) -> dict[str, object]:
         mode_option=mode_option,
         selected_symptom=symptom,
         selected_profile=profile,
+        base_checks=base_checks,
         selected_checks=selected_checks,
         targets_text=targets_text,
         dns_hosts_text=dns_hosts_text,
@@ -298,6 +300,7 @@ def build_form_state(
     mode_option: dict[str, str],
     selected_symptom: dict[str, str] | None,
     selected_profile: DiagnosticProfile | None,
+    base_checks: list[str],
     selected_checks: list[str],
     targets_text: str,
     dns_hosts_text: str,
@@ -311,18 +314,38 @@ def build_form_state(
     from_run_id: str | None,
     bridge: dict[str, str] | None,
     error_message: str | None,
+    enforce_intake_scope: bool | None = None,
 ) -> dict[str, object]:
     """Build the single template state object used by the web UI."""
 
+    normalized_base_checks = ordered_supported_checks(base_checks)
+    normalized_selected_checks = ordered_supported_checks(selected_checks)
+    effective_targets = split_multiline_entries(targets_text)
+    effective_dns_hosts = split_multiline_entries(dns_hosts_text)
     plan = build_collection_plan(
-        selected_checks=selected_checks,
-        targets=split_multiline_entries(targets_text),
-        dns_hosts=split_multiline_entries(dns_hosts_text),
+        selected_checks=normalized_base_checks,
+        targets=effective_targets,
+        dns_hosts=effective_dns_hosts,
         enable_ping=enable_ping,
         enable_trace=enable_trace,
         enable_time_skew_check=enable_time_skew_check,
         capture_raw_commands=capture_raw_commands,
     )
+    effective_plan = build_collection_plan(
+        selected_checks=normalized_selected_checks,
+        targets=effective_targets,
+        dns_hosts=effective_dns_hosts,
+        enable_ping=enable_ping,
+        enable_trace=enable_trace,
+        enable_time_skew_check=enable_time_skew_check,
+        capture_raw_commands=capture_raw_commands,
+    )
+    customization = build_customization_state(
+        mode=mode,
+        included_checks=normalized_base_checks,
+        selected_checks=normalized_selected_checks,
+    )
+    normalized_raw_selected_checks = dedupe_checks(selected_checks)
     return {
         "mode": mode,
         "mode_option": mode_option,
@@ -330,10 +353,15 @@ def build_form_state(
         "selected_profile": selected_profile,
         "selected_symptom": selected_symptom,
         "symptom_id": selected_symptom["id"] if selected_symptom is not None else None,
-        "selected_checks": selected_checks,
-        "checks_csv": ",".join(selected_checks) if selected_checks else None,
-        "targets": split_multiline_entries(targets_text),
-        "dns_hosts": split_multiline_entries(dns_hosts_text),
+        "base_checks": normalized_base_checks,
+        "selected_checks": normalized_raw_selected_checks,
+        "checks_csv": (
+            ",".join(normalized_raw_selected_checks)
+            if normalized_raw_selected_checks
+            else None
+        ),
+        "targets": effective_targets,
+        "dns_hosts": effective_dns_hosts,
         "targets_text": targets_text,
         "dns_hosts_text": dns_hosts_text,
         "enable_ping": enable_ping,
@@ -344,6 +372,13 @@ def build_form_state(
         "clarification": clarification,
         "plan_preview": plan_preview,
         "plan": plan,
+        "effective_plan": effective_plan,
+        "customization": customization,
+        "enforce_intake_scope": (
+            enforce_intake_scope
+            if enforce_intake_scope is not None
+            else mode != SELF_SERVE_MODE or not customization["has_changes"]
+        ),
         "from_run_id": from_run_id,
         "bridge": bridge,
         "error": error_message,
@@ -360,6 +395,7 @@ def default_form_state() -> dict[str, object]:
         "selected_profile": None,
         "selected_symptom": None,
         "symptom_id": None,
+        "base_checks": [],
         "selected_checks": [],
         "checks_csv": None,
         "targets": [],
@@ -382,10 +418,154 @@ def default_form_state() -> dict[str, object]:
             enable_time_skew_check=False,
             capture_raw_commands=False,
         ),
+        "effective_plan": build_collection_plan(
+            selected_checks=[],
+            targets=[],
+            dns_hosts=[],
+            enable_ping=False,
+            enable_trace=False,
+            enable_time_skew_check=False,
+            capture_raw_commands=False,
+        ),
+        "customization": build_customization_state(
+            mode=SELF_SERVE_MODE,
+            included_checks=[],
+            selected_checks=[],
+        ),
+        "enforce_intake_scope": True,
         "from_run_id": None,
         "bridge": None,
         "error": None,
     }
+
+
+def default_plan_checks(
+    scope: DomainMappingResult | None,
+    profile: DiagnosticProfile | None,
+) -> list[str]:
+    """Return the base guided plan checks for the current mode context."""
+
+    if scope is not None:
+        return list(scope.selected_checks)
+    if profile is not None:
+        return list(profile.recommended_checks)
+    return []
+
+
+def submitted_check_selection(
+    *,
+    base_checks: list[str],
+    source: Any,
+) -> list[str]:
+    """Resolve submitted advanced check additions while preserving legacy posts."""
+
+    if source.get("select_all_extra_checks") == "1":
+        return list(ALLOWED_CHECKS)
+    extra_checks = source.getlist("extra_checks")
+    if extra_checks:
+        return merge_checks(base_checks, extra_checks)
+    legacy_checks = source.getlist("checks")
+    if legacy_checks:
+        return dedupe_checks(legacy_checks)
+    return list(base_checks)
+
+
+def dedupe_checks(checks: list[str]) -> list[str]:
+    """De-duplicate submitted check identifiers while preserving order."""
+
+    return list(OrderedDict.fromkeys(checks))
+
+
+def ordered_supported_checks(checks: list[str]) -> list[str]:
+    """Return supported checks in canonical UI order."""
+
+    selected = set(checks)
+    return [check for check in ALLOWED_CHECKS if check in selected]
+
+
+def additional_check_options(base_checks: list[str]) -> list[str]:
+    """Return checks that can be added on top of the guided plan."""
+
+    base_set = set(ordered_supported_checks(base_checks))
+    return [check for check in ALLOWED_CHECKS if check not in base_set]
+
+
+def has_check_selection_changes(base_checks: list[str], selected_checks: list[str]) -> bool:
+    """Return True when the current selection differs from the guided plan."""
+
+    return set(ordered_supported_checks(base_checks)) != set(ordered_supported_checks(selected_checks))
+
+
+def build_customization_state(
+    *,
+    mode: str,
+    included_checks: list[str],
+    selected_checks: list[str],
+) -> dict[str, object]:
+    """Build the advanced customization view model for the form."""
+
+    base_label = "recommended plan" if mode == SELF_SERVE_MODE else "support plan"
+    catalog = build_check_catalog(
+        included_checks=included_checks,
+        selected_checks=selected_checks,
+        included_badge_label=(
+            "Included by recommended plan"
+            if mode == SELF_SERVE_MODE
+            else "Included by support plan"
+        ),
+    )
+    manual_additions = cast(int, catalog["manual_addition_count"])
+    omitted_included = cast(int, catalog["omitted_included_count"])
+    kept_included = cast(int, catalog["kept_included_count"])
+    available_addition_count = len(additional_check_options(included_checks))
+    all_extra_checks_selected = (
+        available_addition_count > 0 and manual_additions == available_addition_count
+    )
+    has_changes = manual_additions > 0 or omitted_included > 0
+
+    if all_extra_checks_selected:
+        summary_title = "All test areas selected"
+        summary_body = f"Current run keeps the {base_label} and adds every remaining test area."
+    elif manual_additions > 0:
+        summary_title = "Plan plus added test areas"
+        summary_body = (
+            f"Current run keeps the {base_label} and adds "
+            f"{count_label(manual_additions, 'additional test area')}."
+        )
+    elif omitted_included > 0:
+        summary_title = "Customized plan"
+        summary_body = f"Current run differs from the {base_label}."
+    else:
+        summary_title = "Guided plan"
+        summary_body = f"Current run uses the {base_label} as-is."
+
+    summary_parts = [
+        f"{count_label(kept_included, 'check area')} kept from the {base_label}",
+    ]
+    if manual_additions > 0:
+        summary_parts.append(f"{count_label(manual_additions, 'check area')} added manually")
+    if omitted_included > 0:
+        summary_parts.append(
+            f"{count_label(omitted_included, 'check area')} removed from the {base_label}"
+        )
+
+    return {
+        **catalog,
+        "base_label": base_label,
+        "has_changes": has_changes,
+        "all_extra_checks_selected": all_extra_checks_selected,
+        "available_addition_count": available_addition_count,
+        "summary_title": summary_title,
+        "summary_body": summary_body,
+        "summary_detail": "; ".join(summary_parts) + ".",
+    }
+
+
+def count_label(count: int, label: str) -> str:
+    """Return a compact count label with pluralization."""
+
+    suffix = "" if count == 1 else "s"
+    return f"{count} {label}{suffix}"
 
 
 def query_previous_record() -> RunSession | None:

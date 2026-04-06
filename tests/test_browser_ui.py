@@ -342,6 +342,113 @@ class BrowserUiTests(unittest.TestCase):
             release_run.set()
             server.stop()
 
+    def test_select_all_additional_checks_updates_tiles_immediately(self) -> None:
+        self.driver.navigate(f"{self.base_url}/?mode=support&profile=dns-issue")
+        self.driver.wait_until(
+            lambda: self.driver.execute("return document.readyState;") == "complete"
+        )
+        self.driver.execute(
+            """
+            const details = document.querySelector('[data-support-plan-edit]');
+            details.open = true;
+            return true;
+            """
+        )
+
+        self.assertEqual(
+            self.driver.execute(
+                """
+                const input = document.querySelector('input[name="extra_checks"][value="vpn"]');
+                const badge = input.closest('label').querySelector('[data-check-selection-badge]');
+                return badge.textContent.trim();
+                """
+            ),
+            "Not selected",
+        )
+
+        self.driver.execute(
+            """
+            const input = document.querySelector('input[name="extra_checks"][value="vpn"]');
+            input.checked = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+            """
+        )
+        self.driver.wait_until(
+            lambda: self.driver.execute(
+                """
+                const input = document.querySelector('input[name="extra_checks"][value="vpn"]');
+                const badge = input.closest('label').querySelector('[data-check-selection-badge]');
+                const selectAll = document.querySelector('input[name="select_all_extra_checks"]');
+                return {
+                  badge: badge.textContent.trim(),
+                  selectAllChecked: selectAll.checked,
+                  selectAllIndeterminate: selectAll.indeterminate,
+                };
+                """
+            )["badge"]
+            == "Added manually"
+        )
+
+        after_single_select = self.driver.execute(
+            """
+            const selectAll = document.querySelector('input[name="select_all_extra_checks"]');
+            return {
+              checked: selectAll.checked,
+              indeterminate: selectAll.indeterminate,
+            };
+            """
+        )
+        self.assertFalse(after_single_select["checked"])
+        self.assertTrue(after_single_select["indeterminate"])
+
+        self.driver.execute(
+            """
+            const input = document.querySelector('input[name="select_all_extra_checks"]');
+            input.checked = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+            """
+        )
+        self.driver.wait_until(
+            lambda: self.driver.execute(
+                """
+                const extraChecks = Array.from(document.querySelectorAll('input[name="extra_checks"]'));
+                const badges = extraChecks.map((input) => (
+                  input.closest('label').querySelector('[data-check-selection-badge]').textContent.trim()
+                ));
+                const selectAll = document.querySelector('input[name="select_all_extra_checks"]');
+                return {
+                  allChecked: extraChecks.every((input) => input.checked),
+                  allBadgesSelected: badges.every((text) => text === 'Added manually'),
+                  selectAllChecked: selectAll.checked,
+                  selectAllIndeterminate: selectAll.indeterminate,
+                };
+                """
+            )["allChecked"]
+            is True
+        )
+
+        after_select_all = self.driver.execute(
+            """
+            const extraChecks = Array.from(document.querySelectorAll('input[name="extra_checks"]'));
+            const badges = extraChecks.map((input) => (
+              input.closest('label').querySelector('[data-check-selection-badge]').textContent.trim()
+            ));
+            const selectAll = document.querySelector('input[name="select_all_extra_checks"]');
+            return {
+              allChecked: extraChecks.every((input) => input.checked),
+              allBadgesSelected: badges.every((text) => text === 'Added manually'),
+              selectAllChecked: selectAll.checked,
+              selectAllIndeterminate: selectAll.indeterminate,
+            };
+            """
+        )
+        self.assertTrue(after_select_all["allChecked"])
+        self.assertTrue(after_select_all["allBadgesSelected"])
+        self.assertTrue(after_select_all["selectAllChecked"])
+        self.assertFalse(after_select_all["selectAllIndeterminate"])
+
     def _start_run(self, data: dict[str, str]) -> str:
         response = _request(
             f"{self.base_url}/run",

@@ -137,6 +137,7 @@ def register_web_routes(app: Flask) -> None:
                 enable_trace=form_state["enable_trace"],
                 enable_time_skew_check=form_state["enable_time_skew_check"],
                 capture_raw_commands=form_state["capture_raw_commands"],
+                enforce_intake_scope=form_state["enforce_intake_scope"],
             )
         except ValueError as exc:
             form_state["error"] = str(exc)

@@ -75,6 +75,27 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("validation_adjustments", options.intake_context.trace_metadata)
         self.assertIn("decision", options.intake_context.trace_metadata["validation_adjustments"])
 
+    def test_build_run_options_can_skip_intake_scope_validation_for_explicit_added_checks(
+        self,
+    ) -> None:
+        intake_context = IntakeContext(
+            selected_symptom_key="vpn-or-company-resource-issue",
+            selected_symptom_label="VPN or company resource issue",
+            resolved_intent_key="vpn_or_private_resource_access",
+            scope_rationale="intent_primary_pathway_domains",
+        )
+
+        options = build_run_options(
+            checks="storage,services",
+            intake_context=intake_context,
+            enforce_intake_scope=False,
+        )
+
+        self.assertEqual(options.selected_checks, ["storage", "services"])
+        self.assertIsNotNone(options.intake_context)
+        assert options.intake_context is not None
+        self.assertNotIn("validation_adjustments", options.intake_context.trace_metadata)
+
     def test_run_diagnostics_returns_result_and_skips_unselected_collectors(self) -> None:
         options = DiagnosticsRunOptions(
             selected_checks=["dns"],

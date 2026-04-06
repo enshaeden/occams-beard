@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from occams_beard.defaults import ALLOWED_CHECKS
 from occams_beard.execution import DOMAIN_LABELS
 
 DOMAIN_SUMMARIES = {
@@ -82,6 +83,65 @@ def build_collection_plan(
             if capture_raw_commands
             else "Raw command output stays off unless support asks for it."
         ),
+    }
+
+
+def build_check_catalog(
+    *,
+    included_checks: list[str],
+    selected_checks: list[str],
+    included_badge_label: str,
+) -> dict[str, object]:
+    """Build the full available check catalog plus selection deltas."""
+
+    included_set = set(included_checks)
+    selected_set = set(selected_checks)
+    catalog: list[dict[str, object]] = []
+    manual_additions = 0
+    omitted_included = 0
+    kept_included = 0
+
+    for check in ALLOWED_CHECKS:
+        included_by_plan = check in included_set
+        selected = check in selected_set
+        added_manually = selected and not included_by_plan
+        omitted_from_plan = included_by_plan and not selected
+
+        if added_manually:
+            manual_additions += 1
+        if omitted_from_plan:
+            omitted_included += 1
+        if included_by_plan and selected:
+            kept_included += 1
+
+        catalog.append(
+            {
+                "id": check,
+                "label": DOMAIN_LABELS.get(check, check.replace("-", " ").title()),
+                "description": DOMAIN_SUMMARIES.get(
+                    check,
+                    "Collect local diagnostic evidence.",
+                ),
+                "included_by_plan": included_by_plan,
+                "selected": selected,
+                "added_manually": added_manually,
+                "omitted_from_plan": omitted_from_plan,
+                "included_badge_label": included_badge_label if included_by_plan else None,
+                "selection_badge_label": (
+                    "Added manually"
+                    if added_manually
+                    else "Not selected" if not selected else None
+                ),
+            }
+        )
+
+    return {
+        "catalog": catalog,
+        "included_count": len(included_checks),
+        "selected_count": len(selected_checks),
+        "manual_addition_count": manual_additions,
+        "omitted_included_count": omitted_included,
+        "kept_included_count": kept_included,
     }
 
 

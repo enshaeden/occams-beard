@@ -1,3 +1,5 @@
+{% from "_check_catalog.html" import render_check_catalog %}
+
 {% if form_state.selected_profile %}
   {% set clarification_question = form_state.clarification.question if form_state.clarification and form_state.clarification.question else None %}
   <form method="post" action="{{ url_for('run') }}" class="stack-lg">
@@ -20,8 +22,14 @@
     >
       <div class="result-status-line">
         <span class="mode-chip">Recommended plan</span>
-        <span class="status-pill status-{{ 'running' if clarification_question else 'clear' }}">
-          {{ "Question first" if clarification_question else "Ready to review" }}
+        <span class="status-pill status-{{ 'running' if clarification_question and not form_state.customization.has_changes else 'clear' }}">
+          {% if form_state.customization.has_changes %}
+            Customized
+          {% elif clarification_question %}
+            Question first
+          {% else %}
+            Ready to review
+          {% endif %}
         </span>
       </div>
 
@@ -83,33 +91,53 @@
         <span class="tag">{{ form_state.plan.selected_domain_count }} check area(s)</span>
         <span class="tag">Runs locally on this device</span>
       </div>
+      {% if form_state.customization.has_changes %}
+        <p class="field-help">{{ form_state.customization.summary_body }}</p>
+      {% endif %}
     </article>
 
     <details class="advanced-panel" data-self-serve-advanced>
-      <summary>Support asked me to change this plan</summary>
+      <summary>Advanced plan options</summary>
       <div class="advanced-panel-body stack-lg">
         {% if form_state.profile_id %}
           <input type="hidden" name="profile_id" value="{{ form_state.profile_id }}">
         {% endif %}
 
         <fieldset class="stack-sm form-fieldset">
-          <legend>Select check areas</legend>
-          <div class="check-grid">
-            {% for item in form_state.plan.collection_items %}
-              <label class="selectable-option selectable-option-checkbox check-tile">
+          <legend>Add additional test areas</legend>
+          <p class="field-help">
+            The recommended plan stays selected. Choose any extra checks to add from the full catalog.
+          </p>
+          <p class="field-help">
+            Checks marked Included by recommended plan stay selected.
+          </p>
+          <section class="stack-sm">
+            <h3>Full test catalog for recommended plan plus extras</h3>
+            {{ render_check_catalog(form_state.customization.catalog, "extra_checks", True) }}
+            <div class="check-catalog-actions">
+              <label class="selectable-option selectable-option-checkbox toggle" for="self_serve_select_all_extra_checks">
                 <input
                   class="selectable-option-input"
+                  id="self_serve_select_all_extra_checks"
                   type="checkbox"
-                  name="checks"
-                  value="{{ item.id }}"
-                  {% if item.id in form_state.selected_checks %}checked{% endif %}
+                  name="select_all_extra_checks"
+                  value="1"
+                  {% if form_state.customization.all_extra_checks_selected %}checked{% endif %}
                 >
                 <span class="selectable-option-control check-control" aria-hidden="true"></span>
                 <span class="selectable-option-content">
-                  <span class="choice-title">{{ item.label }}</span>
+                  <span class="choice-title">Select all additional test areas</span>
+                  <span class="choice-body">
+                    Add every remaining test area below the guided plan.
+                  </span>
                 </span>
               </label>
-            {% endfor %}
+            </div>
+          </section>
+          <div class="info-panel stack-xs">
+            <h3>{{ form_state.customization.summary_title }}</h3>
+            <p>{{ form_state.customization.summary_body }}</p>
+            <p class="field-help">{{ form_state.customization.summary_detail }}</p>
           </div>
         </fieldset>
 

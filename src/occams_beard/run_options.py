@@ -53,6 +53,7 @@ def build_run_options(
     enable_trace: bool = False,
     enable_time_skew_check: bool = False,
     capture_raw_commands: bool = False,
+    enforce_intake_scope: bool = True,
 ) -> DiagnosticsRunOptions:
     """Build validated run options from operator-facing input values."""
 
@@ -70,7 +71,7 @@ def build_run_options(
         allowed_checks=ALLOWED_CHECKS,
         default_checks=default_checks,
     )
-    if intake_context is not None:
+    if intake_context is not None and enforce_intake_scope:
         before_validation = list(selected_checks)
         validation = validate_intake_selected_checks(
             selected_checks,

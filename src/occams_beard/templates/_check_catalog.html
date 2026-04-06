@@ -1,0 +1,38 @@
+{% macro render_check_catalog(catalog, input_name, lock_included_by_plan=False) -%}
+  <div class="check-grid check-grid-detailed">
+    {% for item in catalog %}
+      {% set checked = True if lock_included_by_plan and item.included_by_plan else (item.added_manually if lock_included_by_plan else item.selected) %}
+      {% set locked = lock_included_by_plan and item.included_by_plan %}
+      <label class="selectable-option selectable-option-checkbox check-tile check-tile-detailed {% if locked %}check-tile-locked{% endif %}">
+        <input
+          class="selectable-option-input"
+          type="checkbox"
+          {% if not locked %}name="{{ input_name }}"{% endif %}
+          value="{{ item.id }}"
+          {% if checked %}checked{% endif %}
+          {% if locked %}disabled{% endif %}
+        >
+        <span class="selectable-option-control check-control" aria-hidden="true"></span>
+        <span class="selectable-option-content">
+          <span class="choice-title">{{ item.label }}</span>
+          <span class="choice-body">{{ item.description }}</span>
+          <span class="check-tile-badges" aria-label="{{ item.label }} selection state">
+            {% if item.included_badge_label %}
+              <span class="tag check-tag check-tag-plan">{{ item.included_badge_label }}</span>
+            {% endif %}
+            {% if item.selection_badge_label and not (lock_included_by_plan and item.included_by_plan) %}
+              <span
+                class="tag check-tag {% if item.added_manually %}check-tag-added{% else %}check-tag-unselected{% endif %}"
+                data-check-selection-badge
+                data-selected-label="Added manually"
+                data-unselected-label="Not selected"
+              >
+                {{ item.selection_badge_label }}
+              </span>
+            {% endif %}
+          </span>
+        </span>
+      </label>
+    {% endfor %}
+  </div>
+{%- endmacro %}

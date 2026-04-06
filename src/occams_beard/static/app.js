@@ -35,7 +35,22 @@ function syncSelectableOptionStates(scope = document) {
     if (option.classList.contains("choice-card")) {
       option.classList.toggle("choice-card-active", isSelected);
     }
+    syncSelectableOptionBadge(option, isSelected);
   }
+  syncSelectAllAdditionalCheckControls(scope);
+}
+
+function syncSelectableOptionBadge(option, isSelected) {
+  const badge = option.querySelector("[data-check-selection-badge]");
+  if (!(badge instanceof HTMLElement)) {
+    return;
+  }
+
+  const selectedLabel = badge.dataset.selectedLabel || "Added manually";
+  const unselectedLabel = badge.dataset.unselectedLabel || "Not selected";
+  badge.textContent = isSelected ? selectedLabel : unselectedLabel;
+  badge.classList.toggle("check-tag-added", isSelected);
+  badge.classList.toggle("check-tag-unselected", !isSelected);
 }
 
 function setupSelectableOptionStates() {
@@ -48,8 +63,51 @@ function setupSelectableOptionStates() {
     if (!target.matches(".selectable-option-input, .redaction-input")) {
       return;
     }
+    if (target.name === "select_all_extra_checks" && target.form instanceof HTMLFormElement) {
+      setAllAdditionalChecks(target.form, target.checked);
+    }
     syncSelectableOptionStates(target.form || document);
   });
+}
+
+function syncSelectAllAdditionalCheckControls(scope = document) {
+  const forms = collectFormsInScope(scope);
+  for (const form of forms) {
+    const selectAllInput = form.querySelector('input[name="select_all_extra_checks"]');
+    if (!(selectAllInput instanceof HTMLInputElement)) {
+      continue;
+    }
+
+    const extraChecks = listAdditionalCheckInputs(form);
+    const checkedCount = extraChecks.filter((input) => input.checked).length;
+    selectAllInput.checked = extraChecks.length > 0 && checkedCount === extraChecks.length;
+    selectAllInput.indeterminate = checkedCount > 0 && checkedCount < extraChecks.length;
+  }
+}
+
+function setAllAdditionalChecks(form, isSelected) {
+  const extraChecks = listAdditionalCheckInputs(form);
+  for (const input of extraChecks) {
+    input.checked = isSelected;
+  }
+}
+
+function listAdditionalCheckInputs(form) {
+  return Array.from(form.querySelectorAll('input[name="extra_checks"]')).filter(
+    (input) => input instanceof HTMLInputElement
+  );
+}
+
+function collectFormsInScope(scope) {
+  if (scope instanceof HTMLFormElement) {
+    return [scope];
+  }
+  if (scope instanceof Document || scope instanceof HTMLElement) {
+    return Array.from(scope.querySelectorAll("form")).filter(
+      (form) => form instanceof HTMLFormElement
+    );
+  }
+  return [];
 }
 
 function setupSupportBundleForms(scope = document) {

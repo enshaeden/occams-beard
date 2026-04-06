@@ -159,7 +159,10 @@ class AppTests(unittest.TestCase):
         self.assertIn('type="hidden" name="clar_scope_of_failure" value="all_sites_and_apps"', text)
         self.assertIn('id="self-serve-plan-step"', text)
         self.assertIn("Recommended run", text)
-        self.assertIn("Support asked me to change this plan", text)
+        self.assertIn("Advanced plan options", text)
+        self.assertIn("Add additional test areas", text)
+        self.assertIn("Select all additional test areas", text)
+        self.assertNotIn("Use a fully custom run", text)
         self.assertIn("Start Device Check", text)
 
     def test_self_serve_plan_fragment_renders_without_full_page_shell(self) -> None:
@@ -189,6 +192,24 @@ class AppTests(unittest.TestCase):
         self.assertNotIn("Answer one quick question, then review the recommended run.", text)
         self.assertIn("Recommended plan: DNS Issue", text)
 
+    def test_self_serve_advanced_options_show_full_catalog(self) -> None:
+        response = self.client.get(
+            (
+                "/self-serve/plan?mode=self-serve&symptom=apps-sites-not-loading"
+                "&clar_scope_of_failure=some_sites_or_apps"
+                "&clar_dns_error_surface=no_explicit_error"
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        text = response.get_data(as_text=True)
+        self.assertIn("Storage snapshot", text)
+        self.assertIn("VPN heuristics", text)
+        self.assertIn("Included by recommended plan", text)
+        self.assertIn("Not selected", text)
+        self.assertIn("data-check-selection-badge", text)
+        self.assertIn('data-selected-label="Added manually"', text)
+
     def test_guided_support_mode_shows_deeper_plan_controls(self) -> None:
         response = self.client.get("/?mode=support")
 
@@ -198,10 +219,23 @@ class AppTests(unittest.TestCase):
         self.assertIn("Confirm the technician-directed plan", text)
         self.assertIn("Locked by default", text)
         self.assertIn("Review consent and handoff", text)
-        self.assertIn("Support gave me a different plan", text)
-        self.assertIn("Technician asked me to edit the plan details", text)
+        self.assertIn("Choose a different support plan", text)
+        self.assertIn("Support customizations", text)
+        self.assertIn("Add additional test areas", text)
+        self.assertIn("Select all additional test areas", text)
+        self.assertNotIn("Use full custom selection", text)
         self.assertIn("Run Support-Guided Check", text)
         self.assertNotIn("Choose the symptom that best describes your issue.", text)
+
+    def test_support_advanced_options_show_full_catalog(self) -> None:
+        response = self.client.get("/?mode=support&profile=dns-issue")
+
+        self.assertEqual(response.status_code, 200)
+        text = response.get_data(as_text=True)
+        self.assertIn("Storage snapshot", text)
+        self.assertIn("VPN heuristics", text)
+        self.assertIn("Included by support plan", text)
+        self.assertIn("Not selected", text)
 
     def test_self_serve_submission_maps_symptom_to_profile(self) -> None:
         response = self.client.post(
@@ -237,6 +271,60 @@ class AppTests(unittest.TestCase):
         )
         self.assertIn("vpn", self.captured_options.selected_checks)
         self.assertIn("services", self.captured_options.selected_checks)
+
+    def test_self_serve_can_add_extra_checks_without_replacing_the_recommended_plan(
+        self,
+    ) -> None:
+        response = self.client.post(
+            "/run",
+            data={
+                "mode": "self-serve",
+                "symptom_id": "vpn-or-company-resource-issue",
+                "extra_checks": ["storage"],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run_id = response.headers["Location"].rsplit("/", 1)[-1]
+        self.wait_for_run_completion(run_id)
+        self.assertIsNotNone(self.captured_options)
+        assert self.captured_options is not None
+        self.assertIn("vpn", self.captured_options.selected_checks)
+        self.assertIn("services", self.captured_options.selected_checks)
+        self.assertIn("storage", self.captured_options.selected_checks)
+
+    def test_self_serve_select_all_additional_checks_runs_every_remaining_test_area(
+        self,
+    ) -> None:
+        response = self.client.post(
+            "/run",
+            data={
+                "mode": "self-serve",
+                "symptom_id": "vpn-or-company-resource-issue",
+                "select_all_extra_checks": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run_id = response.headers["Location"].rsplit("/", 1)[-1]
+        self.wait_for_run_completion(run_id)
+        self.assertIsNotNone(self.captured_options)
+        assert self.captured_options is not None
+        self.assertEqual(
+            self.captured_options.selected_checks,
+            [
+                "host",
+                "time",
+                "resources",
+                "storage",
+                "network",
+                "routing",
+                "dns",
+                "connectivity",
+                "vpn",
+                "services",
+            ],
+        )
 
     def test_self_serve_submission_uses_intake_scope_over_profile_defaults(self) -> None:
         response = self.client.post(
@@ -386,6 +474,56 @@ class AppTests(unittest.TestCase):
         self.assertEqual(
             [(target.host, target.port) for target in self.captured_options.targets],
             [("github.com", 443), ("10.0.0.10", 443)],
+        )
+
+    def test_support_can_add_extra_checks_without_replacing_the_support_plan(self) -> None:
+        response = self.client.post(
+            "/run",
+            data={
+                "mode": "support",
+                "profile_id": "dns-issue",
+                "extra_checks": ["vpn"],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run_id = response.headers["Location"].rsplit("/", 1)[-1]
+        self.wait_for_run_completion(run_id)
+        self.assertIsNotNone(self.captured_options)
+        assert self.captured_options is not None
+        self.assertIn("dns", self.captured_options.selected_checks)
+        self.assertIn("routing", self.captured_options.selected_checks)
+        self.assertIn("vpn", self.captured_options.selected_checks)
+
+    def test_support_select_all_additional_checks_runs_every_remaining_test_area(self) -> None:
+        response = self.client.post(
+            "/run",
+            data={
+                "mode": "support",
+                "profile_id": "dns-issue",
+                "select_all_extra_checks": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run_id = response.headers["Location"].rsplit("/", 1)[-1]
+        self.wait_for_run_completion(run_id)
+        self.assertIsNotNone(self.captured_options)
+        assert self.captured_options is not None
+        self.assertEqual(
+            self.captured_options.selected_checks,
+            [
+                "host",
+                "time",
+                "resources",
+                "storage",
+                "network",
+                "routing",
+                "dns",
+                "connectivity",
+                "vpn",
+                "services",
+            ],
         )
 
     def test_self_serve_requires_symptom_selection(self) -> None:

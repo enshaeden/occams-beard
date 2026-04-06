@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "_check_catalog.html" import render_check_catalog %}
 
 {% block content %}
   <section class="entry-shell stack-md">
@@ -166,7 +167,9 @@
       <article class="card support-plan-locked stack-lg" data-support-plan-summary>
         <div class="result-status-line">
           <span class="mode-chip">Technician-directed</span>
-          <span class="status-pill status-running">Locked by default</span>
+          <span class="status-pill status-{{ 'clear' if form_state.customization.has_changes else 'running' }}">
+            {{ "Customized" if form_state.customization.has_changes else "Locked by default" }}
+          </span>
         </div>
 
         <div class="section-heading">
@@ -190,7 +193,7 @@
           </div>
           <div>
             <dt>Deeper probes</dt>
-            <dd>{{ form_state.plan.probe_summary }}</dd>
+            <dd>{{ form_state.effective_plan.probe_summary }}</dd>
           </div>
           <div>
             <dt>Raw command capture</dt>
@@ -198,7 +201,7 @@
           </div>
           <div>
             <dt>Network traffic</dt>
-            <dd>{{ "Expected" if form_state.plan.has_network_activity else "Local only" }}</dd>
+            <dd>{{ "Expected" if form_state.effective_plan.has_network_activity else "Local only" }}</dd>
           </div>
           <div>
             <dt>Handoff</dt>
@@ -211,6 +214,9 @@
           <span class="tag">{{ form_state.plan.selected_domain_count }} check area(s)</span>
           <span class="tag">Review before you run</span>
         </div>
+        {% if form_state.customization.has_changes %}
+          <p class="field-help">{{ form_state.customization.summary_body }}</p>
+        {% endif %}
       </article>
 
       <article class="card support-consent-card stack-lg" data-support-consent>
@@ -226,9 +232,9 @@
           <article class="info-panel stack-sm">
             <h3>Before you run</h3>
             <ul class="result-list">
-              <li>{{ form_state.plan.network_activity_summary }}</li>
-              <li>{{ form_state.plan.raw_capture_summary }}</li>
-              <li>Keep this plan locked unless support requests changes.</li>
+              <li>{{ form_state.effective_plan.network_activity_summary }}</li>
+              <li>{{ form_state.effective_plan.raw_capture_summary }}</li>
+              <li>Keep the default support plan unless support requests changes.</li>
             </ul>
           </article>
           <article class="info-panel stack-sm">
@@ -243,7 +249,7 @@
       </article>
 
       <details class="advanced-panel support-plan-picker-panel" data-support-plan-picker>
-        <summary>Support gave me a different plan</summary>
+        <summary>Choose a different support plan</summary>
         <div class="advanced-panel-body stack-lg">
           <p class="field-help">
             Use this only when support requests a different local plan before the run.
@@ -277,30 +283,48 @@
         {% endif %}
 
         <details class="advanced-panel" data-support-plan-edit>
-          <summary>Technician asked me to edit the plan details</summary>
+          <summary>Support customizations</summary>
           <div class="advanced-panel-body stack-lg">
             <p class="field-help">
-              Keep default settings unless support requests direct plan edits.
+              Keep the support plan as the default. Use these options only when support asks you
+              to add more test areas from the full catalog.
             </p>
 
             <fieldset class="stack-sm form-fieldset">
-              <legend>Check areas</legend>
-              <div class="check-grid">
-                {% for item in form_state.plan.collection_items %}
-                  <label class="selectable-option selectable-option-checkbox check-tile">
+              <legend>Add additional test areas</legend>
+              <p class="field-help">
+                The support plan stays selected. Choose any extra checks to add from the full catalog.
+              </p>
+              <p class="field-help">
+                Checks marked Included by support plan stay selected.
+              </p>
+              <section class="stack-sm">
+                <h3>Full test catalog for support plan plus extras</h3>
+                {{ render_check_catalog(form_state.customization.catalog, "extra_checks", True) }}
+                <div class="check-catalog-actions">
+                  <label class="selectable-option selectable-option-checkbox toggle" for="support_select_all_extra_checks">
                     <input
                       class="selectable-option-input"
+                      id="support_select_all_extra_checks"
                       type="checkbox"
-                      name="checks"
-                      value="{{ item.id }}"
-                      {% if item.id in form_state.selected_checks %}checked{% endif %}
+                      name="select_all_extra_checks"
+                      value="1"
+                      {% if form_state.customization.all_extra_checks_selected %}checked{% endif %}
                     >
                     <span class="selectable-option-control check-control" aria-hidden="true"></span>
                     <span class="selectable-option-content">
-                      <span class="choice-title">{{ item.label }}</span>
+                      <span class="choice-title">Select all additional test areas</span>
+                      <span class="choice-body">
+                        Add every remaining test area below the support plan.
+                      </span>
                     </span>
                   </label>
-                {% endfor %}
+                </div>
+              </section>
+              <div class="info-panel stack-xs">
+                <h3>{{ form_state.customization.summary_title }}</h3>
+                <p>{{ form_state.customization.summary_body }}</p>
+                <p class="field-help">{{ form_state.customization.summary_detail }}</p>
               </div>
             </fieldset>
 
@@ -358,7 +382,7 @@
           <div class="stack-xs">
             <h3>Step 3</h3>
             <p class="field-help">
-              Run the locked plan exactly as support requested. Review the support bundle at the end before you share it.
+              Run the plan after you confirm the check selection. Review the support bundle at the end before you share it.
             </p>
           </div>
           <button type="submit" class="primary-button">Run Support-Guided Check</button>
