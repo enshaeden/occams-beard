@@ -234,20 +234,13 @@ occams-beard-operator
 On macOS, you can also double-click
 [`Open Device Check.command`](<Open Device Check.command>) from the repo root.
 It starts the local interface without leaving a Terminal window on screen and
-stops the local server after the browser page is closed.
-The repo-root launcher now skips an existing `.venv` interpreter when that
-interpreter is older than the supported Python baseline and falls back to a
-compatible bootstrap Python instead of failing before browser launch.
+can stop the local server after the browser page is closed.
 
 On Windows, use [`Open Device Check.cmd`](<Open Device Check.cmd>) from the
 repo root. The root `.command` and `.cmd` files delegate to the same shared
-Python bootstrap so the environment bootstrap and operator launch behavior stay
-aligned across platforms, while the macOS wrapper retains its Terminal-hiding
-behavior. The shared Python launcher keeps `webbrowser.open(..., new=2)` as
-its first attempt and falls back to the OS default URL launcher when Python's
-browser registration path declines or fails, so the localhost UI still opens on
-clean target devices and on machines where no browser process is already
-running, without adding browser-specific path logic.
+Python bootstrap so operator launch behavior stays aligned across platforms.
+See [`docs/platform-notes.md`](docs/platform-notes.md) for platform-specific
+launcher details and collection limits.
 
 ## Support-ready artifacts
 
@@ -330,8 +323,8 @@ For one polished interview-grade path through the current feature set, see
   incident-style walkthroughs grounded in committed deterministic artifacts
 - [`docs/demo-scenario.md`](docs/demo-scenario.md): one focused,
   deterministic walkthrough that shows the system at its strongest
-- [`docs/diagnostic-model.md`](docs/diagnostic-model.md): execution flow and
-  model boundaries
+- [`docs/diagnostic-model.md`](docs/diagnostic-model.md): execution and intake
+  model
 - [`docs/finding-rules.md`](docs/finding-rules.md): deterministic findings
   boundary and finding output
 - [`docs/result-schema.md`](docs/result-schema.md): machine-readable result
@@ -343,7 +336,7 @@ For one polished interview-grade path through the current feature set, see
   collection notes
 - [`docs/support-workflow.md`](docs/support-workflow.md): support-ready handoff
   and bundle export flow
-- [`docs/roadmap.md`](docs/roadmap.md): current posture, blockers, and next
+- [`docs/roadmap.md`](docs/roadmap.md): future work, blockers, and next
   milestones
 - [`docs/ACCESSIBILITY_NOTES.md`](docs/ACCESSIBILITY_NOTES.md): completed UI
   accessibility work and remaining validation gaps
@@ -363,7 +356,7 @@ Static analysis:
 .venv/bin/mypy src tests/support.py scripts/refresh_sample_output.py scripts/live_smoke_validate.py
 ```
 
-Check documentation structure:
+Check documentation and repository hygiene:
 
 ```bash
 python3 scripts/check_docs.py
@@ -387,8 +380,9 @@ Validate a committed or operator-supplied support bundle:
 .venv/bin/python -m occams_beard.bundle_validator sample_output/support-bundle-safe
 ```
 
-CI blocks on documentation structure, unit tests, `ruff`, `mypy`, and bounded
-live smoke validation on GitHub-hosted Ubuntu, macOS, and Windows runners.
+CI blocks on documentation and repository hygiene, unit tests, `ruff`, `mypy`,
+and bounded live smoke validation on GitHub-hosted Ubuntu, macOS, and Windows
+runners.
 Committed artifacts under [`sample_output/`](sample_output/) are deterministic
 review fixtures generated from the current code. They are useful for contract
 review and regression testing, but they are not live captures from a production

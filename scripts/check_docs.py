@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ROOT_DOC_ALLOWLIST = {"README.md", "CHANGELOG.md", "CONTRIBUTING.md"}
@@ -35,6 +36,8 @@ BANNED_MARKDOWN_PATHS = {
     ),
 }
 LINK_PATTERN = re.compile(r"!?\[[^\]]+\]\(([^)]+)\)")
+GENERATED_ARTIFACT_ROOTS = ("build", "dist")
+PRIMARY_PACKAGE_ROOT = PurePosixPath("src/occams_beard")
 
 
 def repo_relative(path: Path) -> str:
@@ -71,6 +74,51 @@ def resolve_link(source: Path, target: str) -> Path:
     if target.startswith("/"):
         return (REPO_ROOT / target.lstrip("/")).resolve()
     return (source.parent / target).resolve()
+
+
+def preview_paths(paths: list[str], *, limit: int = 5) -> str:
+    preview = paths[:limit]
+    suffix = " ..." if len(paths) > limit else ""
+    return ", ".join(preview) + suffix
+
+
+def tracked_repo_paths(errors: list[str]) -> set[str]:
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            check=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        errors.append(f"Unable to enumerate tracked files for repo hygiene checks: {exc}")
+        return set()
+
+    tracked_paths: set[str] = set()
+    for path in result.stdout.split(b"\0"):
+        if not path:
+            continue
+        relative_path = path.decode("utf-8")
+        if (REPO_ROOT / relative_path).exists():
+            tracked_paths.add(relative_path)
+    return tracked_paths
+
+
+def is_under_root(relative_path: str, root_name: str) -> bool:
+    return relative_path == root_name or relative_path.startswith(f"{root_name}/")
+
+
+def duplicate_package_roots(tracked_paths: set[str]) -> list[str]:
+    duplicates: set[str] = set()
+    for relative_path in tracked_paths:
+        path = PurePosixPath(relative_path)
+        if "occams_beard" not in path.parts:
+            continue
+        package_index = path.parts.index("occams_beard")
+        package_root = PurePosixPath(*path.parts[: package_index + 1])
+        if package_root != PRIMARY_PACKAGE_ROOT:
+            duplicates.add(package_root.as_posix())
+    return sorted(duplicates)
 
 
 def check_root_markdown(errors: list[str]) -> None:
@@ -129,19 +177,52 @@ def check_relative_links(errors: list[str]) -> None:
                 errors.append(f"{repo_relative(source)} has a broken relative link: {target}")
 
 
+def check_repo_hygiene(errors: list[str], tracked_paths: set[str]) -> None:
+    for artifact_root in GENERATED_ARTIFACT_ROOTS:
+        tracked_artifacts = sorted(
+            path for path in tracked_paths if is_under_root(path, artifact_root)
+        )
+        if tracked_artifacts:
+            errors.append(
+                f"Tracked generated artifacts are present under {artifact_root}/: "
+                f"{preview_paths(tracked_artifacts)}"
+            )
+
+    duplicate_roots = duplicate_package_roots(tracked_paths)
+    if duplicate_roots:
+        errors.append(
+            "Duplicate tracked occams_beard package tree outside src/: "
+            + ", ".join(duplicate_roots)
+        )
+
+    tracked_generated_python = sorted(
+        path
+        for path in tracked_paths
+        if path.endswith(".py")
+        and any(is_under_root(path, root_name) for root_name in GENERATED_ARTIFACT_ROOTS)
+    )
+    if tracked_generated_python:
+        errors.append(
+            "Tracked Python files were found in generated artifact directories: "
+            + preview_paths(tracked_generated_python)
+        )
+
+
 def main() -> int:
     errors: list[str] = []
+    tracked_paths = tracked_repo_paths(errors)
     check_root_markdown(errors)
     check_banned_markdown(errors)
     check_readme_documentation_map(errors)
     check_relative_links(errors)
+    check_repo_hygiene(errors, tracked_paths)
 
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
-    print("Documentation checks passed.")
+    print("Documentation and repository hygiene checks passed.")
     return 0
 
 

@@ -1,54 +1,46 @@
 # Roadmap
 
-## Target Product
+This document tracks future work and blockers. Current architecture and runtime
+behavior belong in [`docs/diagnostic-model.md`](diagnostic-model.md),
+[`docs/support-workflow.md`](support-workflow.md), and
+[`architecture/decisions.md`](../architecture/decisions.md).
 
-Occam's Beard is a local-first troubleshooting assistant with deterministic diagnostics and support-ready export. It safely collects local diagnostic evidence, interprets it deterministically, explains likely fault domains in plain language, guides the user through safe next steps, and produces support-ready artifacts without requiring a cloud dependency.
+## Current Blockers
 
-## Product Boundaries
+- Fixture coverage is stronger, but it still does not represent every platform,
+  OS version, and localization variant that the collectors may encounter.
+- Repository accessibility artifacts cover semantics, focus states, and limited
+  browser behavior, but real assistive-technology validation is still missing.
+- Live smoke validation covers GitHub-hosted Ubuntu, macOS, and Windows
+  runners, but it does not yet represent every enterprise image, self-hosted
+  runner baseline, or non-English local runtime.
+- Support-bundle trust is stronger with the validator, but hostname redaction
+  still depends on deterministic known-value registration and broader edge-case
+  coverage.
+- Non-privileged storage-device health coverage remains thin on Linux and still
+  depends on what the host exposes on macOS and Windows.
 
-The operating model remains:
+## Next Milestones
 
-- local-first
-- read-mostly diagnostics
-- deterministic findings
-- one shared runner
-- bounded explanation layer
-- support-ready bundle export and validation
-- no background agent
-- no cloud dependency by default
-- no automatic remediation
+1. Run manual assistive-technology validation in desktop Chrome and Safari with
+   VoiceOver, and add Windows NVDA validation if a Windows desktop path is
+   available.
+2. Add more reviewed fixtures from non-English Windows and Linux hosts plus
+   additional macOS resolver, routing, and hardware-output variants collected
+   from real systems.
+3. Use the bundle validator in release preparation and strengthen automated
+   redaction-verification coverage around remaining hostname and mixed-text edge
+   cases.
 
-## Solid Today
+## Intake Follow-Up
 
-- shared runner behavior across CLI, web, and launcher
-- deterministic findings over normalized models
-- bounded subprocess and hostname-resolution execution with explicit warning and execution-status reporting
-- schema-versioned result output and local support-bundle export
-- additive hardware-health facts under the existing `resources` and `storage` domains
-- local profiles, guided self-service summaries, and support-ready artifacts
-- no-JavaScript self-serve symptom selection fallback, with JavaScript limited to progressive enhancement
-- optional local profile overrides that are skipped cleanly when malformed while built-ins stay strict
-- standalone support-bundle validation for directory and zip exports
-- CI gates for documentation structure, unit tests, `ruff` including `E501`, `mypy`, and bounded live smoke validation on GitHub-hosted Ubuntu, macOS, and Windows runners
-- canonical committed sample artifacts that match schema `1.4.0` and current support-bundle output
-- broader parser coverage for Linux, macOS, and Windows split-tunnel, resolver, VPN, malformed-route, legacy-netstat, localized route-print, and traceroute/routing variants
-- documented accessibility hardening in the existing server-rendered UI, plus optional browser-level coverage for key flows
+- Decide whether the intent-driven self-serve intake flow should also become the
+  default intake model for CLI or support-directed runs.
+- If that work is taken on, keep the existing `intake/` contract as the single
+  source of truth instead of duplicating mapping rules in route or presentation
+  layers.
 
-## Current Adoption Blockers
-
-- fixture coverage is stronger, but still not broad enough to represent every platform, OS version, and localization variant
-- repository artifacts cover semantics, focus states, and limited browser behavior, but real assistive-technology validation is still missing
-- live smoke validation now covers GitHub-hosted runner images, but it does not yet represent every enterprise endpoint build or non-English local runtime
-- support-bundle trust is better with the validator, but hostname redaction still depends on deterministic known-value registration
-- non-privileged storage-device health coverage is still thin on Linux and depends on what the host exposes on macOS and Windows
-
-## Next 3 Milestones
-
-1. Run manual assistive-technology validation in desktop Chrome and Safari with VoiceOver, and add Windows NVDA validation if a Windows desktop path is available.
-2. Add more reviewed fixtures from non-English Windows and Linux hosts plus additional macOS resolver, routing, and hardware-output variants collected from real systems.
-3. Use the bundle validator in release prep and strengthen automated redaction-verification coverage around remaining hostname and mixed-text edge cases.
-
-## Explicitly Out of Scope
+## Explicitly Out Of Scope
 
 - persistent management systems
 - RMM or fleet-control behavior
@@ -58,11 +50,3 @@ The operating model remains:
 - dashboards
 - mandatory cloud services
 - automatic remediation
-
-## Intake Modernization (In Progress)
-
-- Introduce a canonical intent-driven intake contract in `src/occams_beard/intake/` as the
-  top-level intake control plane.
-- Preserve current runtime execution behavior while contract adoption proceeds in phases.
-- Transition from profile-first intake to intent-first intake, with profiles retained as
-  fallback execution presets for compatibility and operator workflows.

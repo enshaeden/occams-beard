@@ -5,6 +5,8 @@
 ### Added
 
 - Schema-versioned result output with execution-status records.
+- Tracked-repo hygiene checks that fail when generated `build/` or `dist/`
+  artifacts, or duplicate tracked `occams_beard` package trees, are committed.
 - Shared Python bootstrap for the repo-root operator launcher plus a Windows `Open Device Check.cmd` shim, so the local operator UI can be launched from the repo root on both macOS and Windows.
 - Narrow hardware-health facts under the existing `resources` and `storage` domains, starting with read-only battery state and storage-device health where the OS exposes it without elevation.
 - Local profile/scenario support for common troubleshooting issue types.
@@ -24,6 +26,10 @@
 
 ### Changed
 
+- Removed the stale committed `build/lib/occams_beard` package copy and now
+  ignore regenerated packaging output.
+- Canonical docs now describe the current execution, intake, and support
+  workflow directly instead of preserving phased implementation framing.
 - The repo-root launcher now rejects an existing `.venv` interpreter when it is older than the supported Python baseline, so stale local virtualenv state does not block the macOS `.command` launcher before browser open.
 - The shared operator launcher now keeps `webbrowser.open(..., new=2)` as the primary browser path but falls back to the OS-native default URL launcher on Windows, macOS, and Linux when Python browser dispatch is unavailable or rejected, including cold-start cases where no browser process is already running.
 - Windows host/resource collection now avoids privileged CIM for uptime, memory, and basic battery facts, suppresses the non-actionable `load-average-unsupported` warning on Windows, and falls back to `ipconfig /all` when PowerShell DNS enumeration is denied.

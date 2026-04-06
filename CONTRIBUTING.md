@@ -31,7 +31,7 @@ Run static analysis locally:
 .venv/bin/mypy src tests/support.py scripts/refresh_sample_output.py scripts/live_smoke_validate.py
 ```
 
-Check documentation structure:
+Check documentation and repository hygiene:
 
 ```bash
 python scripts/check_docs.py
@@ -78,6 +78,14 @@ When this scope changes, update [README.md](README.md) and [CONTRIBUTING.md](CON
 - Delete absorbed docs instead of archiving them unless they still have distinct ongoing value.
 - Delete run-specific assessment docs once their durable content has been absorbed into canonical docs.
 - Do not commit transient planning, audit, or implementation-pass markdown as permanent repo documentation.
+
+## Repository Hygiene
+
+- Do not commit generated packaging output or duplicate package trees.
+- `build/`, `dist/`, wheels, sdists, and any tracked `occams_beard` package tree
+  outside `src/` are treated as generated artifacts.
+- `python scripts/check_docs.py` enforces both the documentation rules above and
+  the tracked-artifact hygiene guard.
 
 ## Contribution Rules
 
