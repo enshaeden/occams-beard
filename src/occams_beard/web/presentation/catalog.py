@@ -17,18 +17,23 @@ MODE_OPTIONS = (
         "id": SELF_SERVE_MODE,
         "label": "Check My Device",
         "description": (
-            "Run a diagnostic check and prepare results for support if needed."
+            "Use the recommended local check plan when you are troubleshooting "
+            "the issue yourself."
         ),
         "badge": "Self Service",
+        "action_label": "Start Self-Check",
+        "selected_action_label": "Self-Check Selected",
     },
     {
         "id": SUPPORT_MODE,
         "label": "Work With Support",
         "description": (
-            "Use this path when support requests deeper testing, a specific "
-            "profile, or a support bundle."
+            "Use the plan support asked you to run when they need a directed "
+            "check or a support bundle handoff."
         ),
-        "badge": "Advanced mode",
+        "badge": "Support-guided",
+        "action_label": "Use Support Path",
+        "selected_action_label": "Support Path Selected",
     },
 )
 

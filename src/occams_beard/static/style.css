@@ -1,16 +1,16 @@
 :root {
   --bg: #f3f5f7;
-  --surface: rgba(255, 255, 255, 0.96);
+  --surface: rgba(255, 255, 255, 0.98);
   --surface-strong: #ffffff;
-  --surface-muted: #eef3f5;
-  --surface-accent: #e7f0f2;
+  --surface-muted: #f4f7f8;
+  --surface-accent: #edf4f6;
   --border: rgba(27, 56, 66, 0.14);
   --border-strong: rgba(27, 56, 66, 0.22);
   --text: #162129;
   --text-muted: #5b6872;
   --accent: #0d5f73;
   --accent-strong: #084556;
-  --accent-soft: #cde7ee;
+  --accent-soft: #d9eaef;
   --good: #1f6a40;
   --good-soft: #e4f3e8;
   --warn: #9a640f;
@@ -18,7 +18,8 @@
   --bad: #9a2e2d;
   --bad-soft: #fde6e5;
   --clear-soft: #e2eef7;
-  --shadow: 0 24px 60px rgba(20, 34, 42, 0.09);
+  --focus-ring: rgba(13, 95, 115, 0.42);
+  --shadow: 0 14px 32px rgba(20, 34, 42, 0.06);
   --radius-lg: 24px;
   --radius-md: 18px;
   --radius-sm: 14px;
@@ -37,9 +38,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(13, 95, 115, 0.12), transparent 28%),
-    radial-gradient(circle at top right, rgba(245, 189, 89, 0.16), transparent 24%),
-    linear-gradient(180deg, #fbfcfd 0%, var(--bg) 56%, #edf2f5 100%);
+    radial-gradient(circle at top left, rgba(13, 95, 115, 0.08), transparent 24%),
+    radial-gradient(circle at top right, rgba(245, 189, 89, 0.1), transparent 18%),
+    linear-gradient(180deg, #fbfcfd 0%, var(--bg) 56%, #eef3f5 100%);
   color: var(--text);
   font-family: var(--font-sans);
   line-height: 1.55;
@@ -54,8 +55,8 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.48), transparent 40%),
-    radial-gradient(circle at 15% 10%, rgba(13, 95, 115, 0.08), transparent 18%);
+    linear-gradient(120deg, rgba(255, 255, 255, 0.32), transparent 40%),
+    radial-gradient(circle at 15% 10%, rgba(13, 95, 115, 0.05), transparent 16%);
 }
 
 .skip-link {
@@ -72,6 +73,18 @@ body {
 
 .skip-link:focus {
   top: 1rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 h1,
@@ -144,7 +157,7 @@ code {
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(4px);
 }
 
 .card {
@@ -180,6 +193,7 @@ code {
 
 .hero-layout,
 .hero-points,
+.answer-hero-grid,
 .door-grid,
 .choice-grid,
 .info-grid,
@@ -199,6 +213,7 @@ code {
 }
 
 .hero-points,
+.answer-hero-grid,
 .info-grid,
 .two-column,
 .result-grid {
@@ -245,9 +260,8 @@ code {
 }
 
 .door-card-active {
-  border-color: rgba(13, 95, 115, 0.35);
-  background:
-    linear-gradient(180deg, rgba(13, 95, 115, 0.07), rgba(255, 255, 255, 0.98));
+  border-color: rgba(13, 95, 115, 0.45);
+  background: #f6fbfc;
 }
 
 .choice-card {
@@ -265,7 +279,7 @@ code {
 .door-card:hover,
 .details-card:hover {
   border-color: rgba(13, 95, 115, 0.35);
-  box-shadow: 0 20px 40px rgba(13, 95, 115, 0.11);
+  box-shadow: 0 10px 24px rgba(13, 95, 115, 0.08);
 }
 
 .selectable-option-input,
@@ -278,7 +292,7 @@ code {
 
 .selectable-option-input:focus-visible ~ .selectable-option-content,
 .redaction-input:focus-visible ~ .selectable-option-content {
-  outline: 3px solid rgba(13, 95, 115, 0.48);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 4px;
   border-radius: 12px;
 }
@@ -296,10 +310,9 @@ code {
   background: #f7fafb;
   cursor: pointer;
   transition:
-    transform 150ms ease,
     border-color 150ms ease,
     box-shadow 150ms ease,
-    background 150ms ease;
+    background-color 150ms ease;
 }
 
 .selectable-option-control {
@@ -386,7 +399,7 @@ code {
 .selectable-option-input:checked ~ .selectable-option-control,
 .redaction-input:checked ~ .selectable-option-control {
   border-color: var(--accent);
-  box-shadow: 0 0 0 0.28rem rgba(13, 95, 115, 0.14);
+  box-shadow: 0 0 0 0.2rem rgba(13, 95, 115, 0.12);
 }
 
 .selectable-option-input:checked ~ .selectable-option-control::after,
@@ -407,10 +420,11 @@ code {
 .selectable-option:has(.selectable-option-input:checked),
 .selectable-option:has(.redaction-input:checked),
 .redaction-option:has(.redaction-input:checked),
+.selectable-option-selected,
 .choice-card-active {
-  border-color: rgba(13, 95, 115, 0.65);
-  background: linear-gradient(180deg, rgba(13, 95, 115, 0.08), #fff);
-  box-shadow: 0 18px 36px rgba(13, 95, 115, 0.12);
+  border-color: rgba(13, 95, 115, 0.58);
+  background: #f8fcfd;
+  box-shadow: inset 0 0 0 1px rgba(13, 95, 115, 0.08);
 }
 
 .choice-badge,
@@ -498,7 +512,7 @@ input:focus-visible,
 select:focus-visible,
 summary:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid rgba(13, 95, 115, 0.48);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
 }
 
@@ -531,8 +545,7 @@ button {
   transition:
     background 150ms ease,
     border-color 150ms ease,
-    color 150ms ease,
-    transform 150ms ease;
+    color 150ms ease;
 }
 
 .primary-button,
@@ -544,7 +557,6 @@ button {
 .primary-button:hover,
 button:hover {
   background: var(--accent-strong);
-  transform: translateY(-1px);
 }
 
 .ghost-button {
@@ -596,7 +608,7 @@ button[disabled],
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .advanced-panel[open] {
@@ -699,7 +711,19 @@ dd {
 
 .domain-row-subdued,
 .progress-domain-row-subdued {
-  opacity: 0.62;
+  opacity: 0.74;
+}
+
+.progress-domain-row-active {
+  margin: 0 -0.45rem;
+  padding: 1rem 0.85rem;
+  border: 1px solid rgba(13, 95, 115, 0.28);
+  border-radius: var(--radius-md);
+  background: #f8fbfc;
+}
+
+.progress-domain-row-active strong {
+  color: var(--accent-strong);
 }
 
 .domain-meta {
@@ -782,6 +806,7 @@ dd {
 
 .details-card {
   overflow: hidden;
+  background: #ffffff;
 }
 
 .details-card + .details-card {
@@ -790,19 +815,17 @@ dd {
 
 .bridge-card {
   border-color: rgba(13, 95, 115, 0.2);
-  background:
-    linear-gradient(180deg, rgba(13, 95, 115, 0.07), rgba(255, 255, 255, 0.96));
+  background: #f6fbfc;
 }
 
 .support-plan-locked {
   border-color: rgba(13, 95, 115, 0.26);
-  background:
-    linear-gradient(180deg, rgba(13, 95, 115, 0.1), rgba(255, 255, 255, 0.98));
+  background: #f5fafb;
 }
 
 .support-consent-card {
   border-color: rgba(27, 56, 66, 0.08);
-  background: #f8fbfc;
+  background: #f7fafb;
 }
 
 .support-plan-picker-panel {
@@ -812,12 +835,14 @@ dd {
 .answer-next-step,
 .decision-section,
 .bundle-status-panel,
-.progress-guidance {
+.progress-guidance,
+.inline-status-card {
   border-radius: var(--radius-md);
 }
 
 .answer-next-step {
   background: var(--surface-accent);
+  border: 1px solid rgba(13, 95, 115, 0.12);
 }
 
 .decision-card,
@@ -829,20 +854,42 @@ dd {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.decision-grid-primary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.decision-grid-secondary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .decision-section {
   padding: 1rem;
   border: 1px solid rgba(27, 56, 66, 0.08);
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .bundle-priority-card {
   border-color: rgba(13, 95, 115, 0.22);
-  background:
-    linear-gradient(180deg, rgba(13, 95, 115, 0.08), rgba(255, 255, 255, 0.98));
+  background: #f6fbfc;
 }
 
 .bundle-status-panel {
   background: #f6fafb;
+}
+
+.inline-status-card {
+  padding: 1rem 1.1rem;
+  border-color: rgba(13, 95, 115, 0.18);
+  background: #f4fafb;
+}
+
+.support-bundle-warning {
+  margin: 0;
+}
+
+[data-selected-redaction="none"] label[for="redaction-level-none"] {
+  border-color: rgba(154, 46, 45, 0.42);
+  background: #fff7f6;
 }
 
 .redaction-grid {
@@ -884,6 +931,7 @@ dd {
 
 .progress-summary-card {
   overflow: hidden;
+  border-color: rgba(13, 95, 115, 0.18);
 }
 
 .progress-guidance {
@@ -896,13 +944,14 @@ dd {
   height: 0.95rem;
   overflow: hidden;
   border-radius: 999px;
-  background: #e6eef2;
+  border: 1px solid rgba(27, 56, 66, 0.08);
+  background: #e8eff2;
 }
 
 .progress-meter-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), #2d8095);
+  background: var(--accent);
   transition: width 220ms ease;
 }
 
@@ -928,9 +977,24 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.answer-card,
+.decision-card {
+  gap: 1.25rem;
+}
+
+.answer-meta-list {
+  padding-top: 0.25rem;
+}
+
+.decision-divider {
+  height: 1px;
+  background: rgba(27, 56, 66, 0.08);
+}
+
 @media (max-width: 980px) {
   .hero-layout,
   .hero-points,
+  .answer-hero-grid,
   .door-grid,
   .choice-grid,
   .info-grid,
@@ -948,7 +1012,8 @@ dd {
   .cta-strip,
   .plan-picker,
   .domain-row,
-  .progress-domain-row {
+  .progress-domain-row,
+  .progress-domain-row-active {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -976,5 +1041,150 @@ dd {
   .details-card summary {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .progress-meter-fill {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  body,
+  .page-backdrop {
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  code,
+  .card,
+  .info-panel,
+  .door-card,
+  .details-card,
+  .advanced-panel,
+  .decision-section,
+  .empty-state,
+  .inline-status-card,
+  .progress-guidance,
+  .progress-domain-row-active {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    box-shadow: none;
+    color: CanvasText;
+    backdrop-filter: none;
+  }
+
+  .primary-button,
+  button {
+    border: 2px solid Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .ghost-button,
+  select,
+  textarea {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  .status-pill,
+  .severity-badge,
+  .tag,
+  .mode-chip {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .status-running {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .status-attention,
+  .status-failed,
+  .severity-high {
+    border-width: 2px;
+  }
+
+  .status-partial,
+  .status-skipped,
+  .status-unsupported {
+    border-style: dashed;
+  }
+
+  .selectable-option,
+  .redaction-option {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .selectable-option-control,
+  .redaction-indicator {
+    border-color: CanvasText;
+    background: Canvas;
+    box-shadow: none;
+  }
+
+  .selectable-option-input:checked ~ .selectable-option-control,
+  .redaction-input:checked ~ .selectable-option-control {
+    border-color: Highlight;
+    background: Highlight;
+    box-shadow: none;
+  }
+
+  .selectable-option-radio .selectable-option-control::after,
+  .redaction-option .selectable-option-control::after {
+    background: HighlightText;
+  }
+
+  .selectable-option-checkbox .selectable-option-control::after {
+    border-left-color: HighlightText;
+    border-bottom-color: HighlightText;
+  }
+
+  .selectable-option-selected,
+  .choice-card-active,
+  .progress-domain-row-active,
+  [data-selected-redaction="none"] label[for="redaction-level-none"] {
+    border: 2px solid Highlight;
+    outline: 2px solid Highlight;
+    outline-offset: 0;
+    background: Canvas;
+  }
+
+  .progress-meter {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+
+  .progress-meter-fill {
+    background: Highlight;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  summary:focus-visible,
+  textarea:focus-visible,
+  .selectable-option-input:focus-visible ~ .selectable-option-content,
+  .redaction-input:focus-visible ~ .selectable-option-content {
+    outline: 2px solid Highlight;
+    outline-offset: 3px;
   }
 }

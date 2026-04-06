@@ -1,4 +1,5 @@
 {% if form_state.selected_profile %}
+  {% set clarification_question = form_state.clarification.question if form_state.clarification and form_state.clarification.question else None %}
   <form method="post" action="{{ url_for('run') }}" class="stack-lg">
     <input type="hidden" name="mode" value="self-serve">
     <input type="hidden" name="symptom_id" value="{{ form_state.symptom_id }}">
@@ -17,23 +18,36 @@
       data-self-serve-plan-summary
       tabindex="-1"
     >
+      <div class="result-status-line">
+        <span class="mode-chip">Recommended plan</span>
+        <span class="status-pill status-{{ 'running' if clarification_question else 'clear' }}">
+          {{ "Question first" if clarification_question else "Ready to review" }}
+        </span>
+      </div>
+
       <div class="section-heading">
         <div>
           <p class="eyebrow">Step 2</p>
-          <h2>Answer the clarification question and review the planned run.</h2>
+          <h2>
+            {{ "Answer one quick question, then review the recommended run." if clarification_question else "Review the recommended run before you start." }}
+          </h2>
         </div>
       </div>
 
-      {% if form_state.clarification and form_state.clarification.question %}
+      <p class="muted">
+        {{ "Your answer narrows the local checks before the run starts." if clarification_question else "The recommended plan is ready. Review it locally, then start when you are ready." }}
+      </p>
+
+      {% if clarification_question %}
         <fieldset class="stack-sm form-fieldset">
-          <legend>{{ form_state.clarification.question.prompt }}</legend>
+          <legend>{{ clarification_question.prompt }}</legend>
           <div class="check-grid">
-            {% for option in form_state.clarification.question.options %}
+            {% for option in clarification_question.options %}
               <label class="selectable-option selectable-option-radio check-tile">
                 <input
                   class="selectable-option-input"
                   type="radio"
-                  name="clar_{{ form_state.clarification.question.key }}"
+                  name="clar_{{ clarification_question.key }}"
                   value="{{ option.value }}"
                   required
                 >
@@ -49,7 +63,7 @@
       {% endif %}
 
       <div class="info-panel stack-sm">
-        <h3>Planned run</h3>
+        <h3>Recommended run</h3>
         <p>The run collects diagnostics on this device and prepares results for review.</p>
         <p>
           Planned checks: <strong>{{ form_state.plan_preview.check_areas }}</strong>
@@ -67,7 +81,7 @@
       <div class="tag-row" aria-label="Current plan">
         <span class="tag">Recommended plan: {{ form_state.selected_profile.name }}</span>
         <span class="tag">{{ form_state.plan.selected_domain_count }} check area(s)</span>
-        <span class="tag">No background agent</span>
+        <span class="tag">Runs locally on this device</span>
       </div>
     </article>
 
@@ -164,7 +178,7 @@
 {% else %}
   <article class="card">
     <div class="empty-state">
-      <h3>Select an issue to load the check plan.</h3>
+      <h3>Select an issue above to load the recommended plan.</h3>
     </div>
   </article>
 {% endif %}

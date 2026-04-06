@@ -6,7 +6,12 @@
     data-run-progress
     data-status-url="{{ url_for('run_status', run_id=session.run_id) }}"
     data-results-url="{{ url_for('results', run_id=session.run_id) }}"
+    data-live-key="{{ view.status }}:{{ view.current_domain_label or '' }}:{{ view.error or '' }}"
   >
+    <p class="visually-hidden" aria-live="polite" aria-atomic="true" data-run-live-region>
+      {{ view.live_status_message }}
+    </p>
+
     <article class="card progress-summary-card stack-lg">
       <div class="result-status-line">
         <span class="mode-chip">{{ view.mode_label }}</span>
@@ -31,14 +36,18 @@
         <div class="progress-meter-fill" data-progress-fill style="width: {{ view.progress_percent }}%;"></div>
       </div>
 
-      <dl class="summary-list">
+      <dl class="summary-list-wide progress-summary-list">
         <div>
           <dt>Progress</dt>
           <dd data-progress-count>{{ view.completed_count }} of {{ view.total_count }}</dd>
         </div>
         <div>
-          <dt>Current step</dt>
+          <dt>Active area</dt>
           <dd data-current-domain>{{ view.current_domain_label or "Preparing the next step" }}</dd>
+        </div>
+        <div>
+          <dt>Elapsed</dt>
+          <dd data-run-elapsed>{{ view.elapsed_label }}</dd>
         </div>
       </dl>
 
@@ -67,7 +76,10 @@
       </div>
       <ul class="progress-domain-list" data-progress-rows>
         {% for row in view.rows %}
-          <li class="progress-domain-row {% if row.subdued %}progress-domain-row-subdued{% endif %}">
+          <li
+            class="progress-domain-row {% if row.subdued %}progress-domain-row-subdued{% endif %} {% if row.active %}progress-domain-row-active{% endif %}"
+            {% if row.active %}aria-current="step"{% endif %}
+          >
             <div class="stack-xs">
               <div class="row-inline">
                 <strong>{{ row.label }}</strong>

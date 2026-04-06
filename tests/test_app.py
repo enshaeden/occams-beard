@@ -139,41 +139,62 @@ class AppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
-        self.assertIn("Choose the symptom that best describes your issue.", text)
+        self.assertIn("Choose the issue you want to check.", text)
         self.assertIn("Internet not working", text)
         self.assertIn("VPN or company resource issue", text)
         self.assertIn("data-self-serve-symptom-form", text)
+        self.assertIn("data-self-serve-plan-loading", text)
         self.assertIn("Load Recommended Plan", text)
         self.assertNotIn("Start Device Check", text)
 
     def test_self_serve_query_selection_renders_no_js_run_form(self) -> None:
-        response = self.client.get("/?mode=self-serve&symptom=internet-not-working")
+        response = self.client.get(
+            "/?mode=self-serve&symptom=internet-not-working&clar_scope_of_failure=all_sites_and_apps"
+        )
 
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
-        self.assertIn("Answer one quick question, then review your plan.", text)
+        self.assertIn("Answer one quick question, then review the recommended run.", text)
         self.assertIn('type="hidden" name="symptom_id" value="internet-not-working"', text)
+        self.assertIn('type="hidden" name="clar_scope_of_failure" value="all_sites_and_apps"', text)
         self.assertIn('id="self-serve-plan-step"', text)
-        self.assertIn("We are going to check", text)
+        self.assertIn("Recommended run", text)
         self.assertIn("Support asked me to change this plan", text)
         self.assertIn("Start Device Check", text)
 
     def test_self_serve_plan_fragment_renders_without_full_page_shell(self) -> None:
-        response = self.client.get("/self-serve/plan?mode=self-serve&symptom=internet-not-working")
+        response = self.client.get(
+            "/self-serve/plan?mode=self-serve&symptom=internet-not-working&clar_scope_of_failure=all_sites_and_apps"
+        )
 
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
         self.assertIn('id="self-serve-plan-step"', text)
-        self.assertIn("Answer one quick question, then review your plan.", text)
+        self.assertIn("Answer one quick question, then review the recommended run.", text)
         self.assertIn("Start Device Check", text)
         self.assertNotIn("Choose a Check Path", text)
+
+    def test_self_serve_plan_copy_stops_implying_question_once_answers_are_complete(self) -> None:
+        response = self.client.get(
+            (
+                "/self-serve/plan?mode=self-serve&symptom=apps-sites-not-loading"
+                "&clar_scope_of_failure=some_sites_or_apps"
+                "&clar_dns_error_surface=no_explicit_error"
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        text = response.get_data(as_text=True)
+        self.assertIn("Review the recommended run before you start.", text)
+        self.assertNotIn("Answer one quick question, then review the recommended run.", text)
+        self.assertIn("Recommended plan: DNS Issue", text)
 
     def test_guided_support_mode_shows_deeper_plan_controls(self) -> None:
         response = self.client.get("/?mode=support")
 
         self.assertEqual(response.status_code, 200)
         text = response.get_data(as_text=True)
-        self.assertIn("Follow the guided plan your technician asked you to run.", text)
+        self.assertIn("Run the plan provided by support.", text)
         self.assertIn("Confirm the technician-directed plan", text)
         self.assertIn("Locked by default", text)
         self.assertIn("Review consent and handoff", text)
@@ -396,7 +417,7 @@ class AppTests(unittest.TestCase):
 
         self.assertEqual(bridge_response.status_code, 200)
         text = bridge_response.get_data(as_text=True)
-        self.assertIn("You do not need to start from scratch.", text)
+        self.assertIn("Reuse existing run results.", text)
         self.assertIn("View Earlier Check My Device Results", text)
         self.assertIn("Switch to Suggested Plan:", text)
 
@@ -520,9 +541,11 @@ class AppTests(unittest.TestCase):
             payload["rows"][2]["summary"],
             f"{next_execution_step_label(self.captured_options, 'dns', 1)}.",
         )
+        self.assertRegex(cast(str, payload["elapsed_label"]), r"^\d+s$")
         self.assertEqual(payload["update_notice"], "This page updates automatically.")
         self.assertIn("do not need to refresh", payload["mode_notice"])
         self.assertIn("planned probe steps", payload["progress_text"])
+        self.assertIn("DNS checks is active.", payload["live_status_message"])
 
         release_run.set()
         final_payload = self.wait_for_run_completion(run_id, client=client)
@@ -559,6 +582,8 @@ class AppTests(unittest.TestCase):
         self.assertIn('for="redaction-level-none"', text)
         self.assertIn('class="redaction-input"', text)
         self.assertIn('class="redaction-option"', text)
+        self.assertIn("data-support-bundle-warning", text)
+        self.assertIn("Unredacted export selected.", text)
 
     def test_mode_specific_results_cta_ordering_is_stable(self) -> None:
         self_serve_response = self.client.post(

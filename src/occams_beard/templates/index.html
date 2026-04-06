@@ -3,9 +3,14 @@
 {% block content %}
   <section class="entry-shell stack-md">
     <div class="stack-sm">
-      <p class="eyebrow">Select Self Service for independent diagnostics. Select Work With Support when support requests a directed run.</p>
+      <p class="eyebrow">Start Here</p>
+      <h2>Choose the task that matches how you want to start.</h2>
+      <p class="muted">
+        Use Self Service when you want the app to recommend a local check plan.
+        Use Work With Support when support asked for a directed run or a support bundle handoff.
+      </p>
     </div>
-    <div class="door-grid">
+    <div class="door-grid" aria-label="Diagnostic entry paths">
       {% for option in mode_options %}
         <article class="door-card {% if form_state.mode == option.id %}door-card-active{% endif %}">
           <p class="eyebrow">{{ option.badge }}</p>
@@ -16,7 +21,7 @@
             href="{{ url_for('index', mode=option.id) }}"
             data-mode-link="{{ option.id }}"
           >
-            {{ "Customise tests" if form_state.mode != option.id else "Selected mode" }}
+            {{ option.selected_action_label if form_state.mode == option.id else option.action_label }}
           </a>
         </article>
       {% endfor %}
@@ -59,13 +64,13 @@
 
         <article class="card experience-card stack-lg">
           <div class="section-heading">
-          <div>
-            <p class="eyebrow">Step 1</p>
-            <h2>Select the issue you are seeing.</h2>
+            <div>
+              <p class="eyebrow">Step 1</p>
+              <h2>Choose the issue you want to check.</h2>
+            </div>
+            <a class="ghost-button" href="{{ url_for('index') }}">Choose a Different Path</a>
           </div>
-          <a class="ghost-button" href="{{ url_for('index') }}">Choose a Different Path</a>
-        </div>
-          <p class="muted">Selecting an issue loads the recommended check plan.</p>
+          <p class="muted">Selecting an issue loads the recommended local plan below.</p>
           <div class="choice-grid" role="radiogroup" aria-label="Symptoms">
             {% for symptom in symptom_options %}
               <label class="selectable-option selectable-option-radio choice-card {% if form_state.symptom_id == symptom.id %}choice-card-active{% endif %}">
@@ -89,13 +94,27 @@
           </div>
 
           <div class="actions">
-            <button type="submit" class="ghost-button">Review Recommended Plan</button>
+            <button type="submit" class="ghost-button">Load Recommended Plan</button>
+            <p class="field-help">If the plan does not update automatically, use this button.</p>
           </div>
         </article>
       </form>
 
-      <div class="stack-lg" data-self-serve-plan-region aria-live="polite">
-        {% include "_self_serve_plan.html" %}
+      <div class="stack-sm self-serve-plan-region" data-self-serve-plan-region aria-live="polite">
+        <div class="card inline-status-card" data-self-serve-plan-loading role="status" aria-live="polite" hidden>
+          <div class="stack-xs">
+            <div class="row-inline">
+              <span class="status-pill status-running">Loading plan</span>
+              <strong data-self-serve-plan-loading-title>Preparing the recommended plan</strong>
+            </div>
+            <p class="field-help" data-self-serve-plan-loading-copy>
+              Reviewing your selection and loading the next step.
+            </p>
+          </div>
+        </div>
+        <div data-self-serve-plan-content>
+          {% include "_self_serve_plan.html" %}
+        </div>
       </div>
     </section>
   {% elif form_state.mode == "support" %}

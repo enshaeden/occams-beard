@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from threading import Lock, Thread
@@ -45,6 +46,7 @@ class RunSession:
     result: EndpointDiagnosticResult | None = None
     json_text: str | None = None
     error: str | None = None
+    started_at_monotonic: float = field(default_factory=time.monotonic)
 
 
 class RecentRunsStore:

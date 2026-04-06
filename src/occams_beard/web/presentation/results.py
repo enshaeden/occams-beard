@@ -338,7 +338,11 @@ def build_results_view(
                 "will include only the standard files."
             )
         ),
-        "bundle_redaction_note": "Safe redaction is selected by default for most support handoffs.",
+        "bundle_redaction_note": (
+            "Safe redaction is selected by default. Switch to stricter redaction "
+            "when support needs only broad evidence, or use no redaction only "
+            "when support explicitly asks for full values."
+        ),
         "support_actions_intro": (
             "Use the bundle above for the main handoff. These links are for follow-up review."
             if mode == SUPPORT_MODE
@@ -399,11 +403,20 @@ def _finding_view(finding: Finding) -> dict[str, object]:
         "conclusion_type": "Heuristic" if finding.heuristic else "Evidence-based",
         "probable_cause": finding.probable_cause,
         "confidence": f"{finding.confidence:.2f}",
+        "confidence_label": _confidence_label(finding.confidence),
         "fault_domain": FAULT_DOMAIN_LABELS.get(
             finding.fault_domain,
             finding.fault_domain.replace("_", " ").title(),
         ),
     }
+
+
+def _confidence_label(value: float) -> str:
+    if value >= 0.85:
+        return "Higher confidence"
+    if value >= 0.65:
+        return "Moderate confidence"
+    return "Lower confidence"
 
 
 def _build_check_section(

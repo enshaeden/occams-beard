@@ -1,8 +1,87 @@
 document.addEventListener("DOMContentLoaded", () => {
+  setupSelectableOptionStates();
+  setupSupportBundleForms();
   setupLauncherPresenceHeartbeat();
   setupSelfServeSymptomPicker();
   setupRunProgressPolling();
 });
+
+function prefersReducedMotion() {
+  return (
+    typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+function scrollIntoViewRespectingMotion(element) {
+  if (!(element instanceof HTMLElement)) {
+    return;
+  }
+  element.scrollIntoView({
+    behavior: prefersReducedMotion() ? "auto" : "smooth",
+    block: "start",
+  });
+}
+
+function syncSelectableOptionStates(scope = document) {
+  const options = scope.querySelectorAll(".selectable-option, .redaction-option");
+  for (const option of options) {
+    if (!(option instanceof HTMLElement)) {
+      continue;
+    }
+    const input = option.querySelector("input");
+    const isSelected = input instanceof HTMLInputElement && input.checked;
+    option.classList.toggle("selectable-option-selected", isSelected);
+    if (option.classList.contains("choice-card")) {
+      option.classList.toggle("choice-card-active", isSelected);
+    }
+  }
+}
+
+function setupSelectableOptionStates() {
+  syncSelectableOptionStates(document);
+  document.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) {
+      return;
+    }
+    if (!target.matches(".selectable-option-input, .redaction-input")) {
+      return;
+    }
+    syncSelectableOptionStates(target.form || document);
+  });
+}
+
+function setupSupportBundleForms(scope = document) {
+  const forms = scope.querySelectorAll("[data-support-bundle-form]");
+  for (const form of forms) {
+    if (!(form instanceof HTMLFormElement)) {
+      continue;
+    }
+    syncSupportBundleFormState(form);
+    if (form.dataset.bundleEnhancementBound === "true") {
+      continue;
+    }
+    form.dataset.bundleEnhancementBound = "true";
+    form.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || target.name !== "redaction_level") {
+        return;
+      }
+      syncSupportBundleFormState(form);
+    });
+  }
+}
+
+function syncSupportBundleFormState(form) {
+  const selectedInput = form.querySelector('input[name="redaction_level"]:checked');
+  const selectedLevel = selectedInput instanceof HTMLInputElement ? selectedInput.value : "safe";
+  form.dataset.selectedRedaction = selectedLevel;
+  const warning = form.querySelector("[data-support-bundle-warning]");
+  if (warning instanceof HTMLElement) {
+    warning.hidden = selectedLevel !== "none";
+  }
+}
 
 function setupLauncherPresenceHeartbeat() {
   const heartbeatMeta = document.querySelector(
@@ -78,6 +157,10 @@ function setupSelfServeSymptomPicker() {
   if (!(planRegion instanceof HTMLElement)) {
     return;
   }
+  const planContent = planRegion.querySelector("[data-self-serve-plan-content]");
+  if (!(planContent instanceof HTMLElement)) {
+    return;
+  }
   const planUrl = form.dataset.planUrl;
   let activePlanRequest = null;
   updateSelfServeChoiceState(form);
@@ -87,12 +170,24 @@ function setupSelfServeSymptomPicker() {
       if (!(input instanceof HTMLInputElement) || !input.checked) {
         return;
       }
-      activePlanRequest = refreshSelfServePlan(form, planRegion, planUrl, activePlanRequest);
+      activePlanRequest = refreshSelfServePlan(
+        form,
+        planRegion,
+        planContent,
+        planUrl,
+        activePlanRequest
+      );
     });
   }
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    activePlanRequest = refreshSelfServePlan(form, planRegion, planUrl, activePlanRequest);
+    activePlanRequest = refreshSelfServePlan(
+      form,
+      planRegion,
+      planContent,
+      planUrl,
+      activePlanRequest
+    );
   });
 }
 
@@ -111,7 +206,7 @@ function navigateSelfServeSymptomSelection(form) {
   return destination;
 }
 
-function refreshSelfServePlan(form, planRegion, planUrl, activePlanRequest) {
+function refreshSelfServePlan(form, planRegion, planContent, planUrl, activePlanRequest) {
   if (activePlanRequest instanceof AbortController) {
     activePlanRequest.abort();
   }
@@ -125,6 +220,12 @@ function refreshSelfServePlan(form, planRegion, planUrl, activePlanRequest) {
 
   planRegion.setAttribute("aria-busy", "true");
   planRegion.dataset.planRequestId = requestId;
+  delete planRegion.dataset.planNavigating;
+  setSelfServePlanLoadingState(planRegion, {
+    visible: true,
+    title: "Preparing the recommended plan",
+    copy: "Reviewing your selection and loading the next step.",
+  });
 
   fetch(requestUrl.toString(), {
     headers: {
@@ -140,24 +241,37 @@ function refreshSelfServePlan(form, planRegion, planUrl, activePlanRequest) {
       return response.text();
     })
     .then((html) => {
-      planRegion.innerHTML = html;
+      planContent.innerHTML = html;
+      syncSelectableOptionStates(planContent);
       window.history.replaceState({}, "", destination.toString());
-      const planStep = document.querySelector("#self-serve-plan-step");
+      const planStep = planContent.querySelector("#self-serve-plan-step");
       if (planStep instanceof HTMLElement) {
-        planStep.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollIntoViewRespectingMotion(planStep);
         planStep.focus({ preventScroll: true });
       }
+      setSelfServePlanLoadingState(planRegion, { visible: false });
     })
     .catch((error) => {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
-      window.location.assign(destination.toString());
+      planRegion.dataset.planNavigating = requestId;
+      setSelfServePlanLoadingState(planRegion, {
+        visible: true,
+        title: "Opening the full plan view",
+        copy: "The inline update did not finish, so the server-rendered page is loading instead.",
+      });
+      window.setTimeout(() => {
+        window.location.assign(destination.toString());
+      }, 180);
     })
     .finally(() => {
       if (planRegion.dataset.planRequestId === requestId) {
         planRegion.removeAttribute("aria-busy");
         delete planRegion.dataset.planRequestId;
+        if (planRegion.dataset.planNavigating !== requestId) {
+          setSelfServePlanLoadingState(planRegion, { visible: false });
+        }
       }
     });
 
@@ -165,23 +279,28 @@ function refreshSelfServePlan(form, planRegion, planUrl, activePlanRequest) {
 }
 
 function updateSelfServeChoiceState(form) {
-  const cards = form.querySelectorAll(".choice-card");
-  for (const card of cards) {
-    if (!(card instanceof HTMLElement)) {
-      continue;
-    }
-    const input = card.querySelector('input[name="symptom"]');
-    if (input instanceof HTMLInputElement && input.checked) {
-      card.classList.add("choice-card-active");
-      continue;
-    }
-    card.classList.remove("choice-card-active");
+  syncSelectableOptionStates(form);
+}
+
+function setSelfServePlanLoadingState(planRegion, { visible, title = "", copy = "" }) {
+  const loadingShell = planRegion.querySelector("[data-self-serve-plan-loading]");
+  if (!(loadingShell instanceof HTMLElement)) {
+    return;
   }
+  const titleElement = loadingShell.querySelector("[data-self-serve-plan-loading-title]");
+  const copyElement = loadingShell.querySelector("[data-self-serve-plan-loading-copy]");
+  if (titleElement instanceof HTMLElement && title) {
+    titleElement.textContent = title;
+  }
+  if (copyElement instanceof HTMLElement && copy) {
+    copyElement.textContent = copy;
+  }
+  loadingShell.hidden = !visible;
 }
 
 function setupRunProgressPolling() {
   const shell = document.querySelector("[data-run-progress]");
-  if (!shell) {
+  if (!(shell instanceof HTMLElement)) {
     return;
   }
 
@@ -203,9 +322,12 @@ function setupRunProgressPolling() {
   const errorShell = shell.querySelector("[data-run-error-shell]");
   const failureActions = shell.querySelector("[data-run-failure-actions]");
   const guidance = shell.querySelector("[data-run-guidance]");
+  const elapsed = shell.querySelector("[data-run-elapsed]");
   const updateNote = shell.querySelector("[data-run-update-note]");
   const presenceNote = shell.querySelector("[data-run-presence-note]");
   const modeNote = shell.querySelector("[data-run-mode-note]");
+  const liveRegion = shell.querySelector("[data-run-live-region]");
+  let lastLiveKey = shell.dataset.liveKey || "";
 
   const renderRows = (items) => {
     if (!rows) {
@@ -217,6 +339,10 @@ function setupRunProgressPolling() {
       row.className = item.subdued
         ? "progress-domain-row progress-domain-row-subdued"
         : "progress-domain-row";
+      if (item.active) {
+        row.classList.add("progress-domain-row-active");
+        row.setAttribute("aria-current", "step");
+      }
 
       const stack = document.createElement("div");
       stack.className = "stack-xs";
@@ -258,6 +384,19 @@ function setupRunProgressPolling() {
     }
   };
 
+  const announceMajorStatusChange = (payload) => {
+    if (!(liveRegion instanceof HTMLElement)) {
+      return;
+    }
+    const liveKey = `${payload.status}:${payload.current_domain_label || ""}:${payload.error || ""}`;
+    if (liveKey === lastLiveKey) {
+      return;
+    }
+    lastLiveKey = liveKey;
+    shell.dataset.liveKey = liveKey;
+    liveRegion.textContent = payload.live_status_message || payload.status_label;
+  };
+
   const applyPayload = (payload) => {
     if (statusLabel) {
       statusLabel.textContent = payload.status_label;
@@ -274,6 +413,9 @@ function setupRunProgressPolling() {
     }
     if (currentDomain) {
       currentDomain.textContent = payload.current_domain_label || "Preparing the next step";
+    }
+    if (elapsed) {
+      elapsed.textContent = payload.elapsed_label || "";
     }
     if (progressFill) {
       progressFill.style.width = `${payload.progress_percent}%`;
@@ -295,6 +437,7 @@ function setupRunProgressPolling() {
     if (Array.isArray(payload.rows)) {
       renderRows(payload.rows);
     }
+    announceMajorStatusChange(payload);
 
     if (payload.status === "failed") {
       if (guidance) {

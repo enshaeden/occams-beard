@@ -106,7 +106,7 @@ class BrowserUiTests(unittest.TestCase):
         heading = self.driver.execute(
             "return document.querySelector('.experience-card h2').textContent.trim();"
         )
-        self.assertEqual(heading, "Choose the symptom that feels closest.")
+        self.assertEqual(heading, "Choose the issue you want to check.")
 
         self.driver.execute(
             """
@@ -139,7 +139,7 @@ class BrowserUiTests(unittest.TestCase):
             self.driver.execute(
                 "return document.querySelector('[data-self-serve-plan-summary] .mode-chip').textContent.trim();"
             ),
-            "Employee-safe",
+            "Recommended plan",
         )
 
     def test_details_toggle_and_mode_specific_cta_ordering(self) -> None:
@@ -327,6 +327,7 @@ class BrowserUiTests(unittest.TestCase):
                 const stepCount = connectivity.querySelector('[data-progress-step-count]');
                 const phase = connectivity.querySelector('[data-progress-phase]');
                 return {
+                  ariaCurrent: connectivity.getAttribute('aria-current'),
                   stepCount: stepCount ? stepCount.textContent.trim() : null,
                   phase: phase ? phase.textContent.trim() : null,
                 };
@@ -334,6 +335,7 @@ class BrowserUiTests(unittest.TestCase):
             )
 
             self.assertEqual(progress_count, "2 of 7")
+            self.assertEqual(connectivity_row["ariaCurrent"], "step")
             self.assertEqual(connectivity_row["stepCount"], "1/6")
             self.assertEqual(connectivity_row["phase"], "Running now")
         finally:

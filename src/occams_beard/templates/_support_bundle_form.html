@@ -19,7 +19,12 @@
   </ul>
 </div>
 
-<form method="get" action="{{ url_for('download_support_bundle', run_id=record.run_id) }}" class="stack-md">
+<form
+  method="get"
+  action="{{ url_for('download_support_bundle', run_id=record.run_id) }}"
+  class="stack-md"
+  data-support-bundle-form
+>
   <fieldset class="stack-xs form-fieldset">
     <legend id="redaction-level-label" class="field-label">Choose a redaction level</legend>
     <p class="field-help">{{ view.bundle_redaction_note }}</p>
@@ -36,7 +41,9 @@
         <span class="selectable-option-control redaction-indicator" aria-hidden="true"></span>
         <span class="selectable-option-content redaction-copy">
           <span class="redaction-title">Safe</span>
-          <span class="redaction-description">Recommended for most support handoffs.</span>
+          <span class="redaction-description">
+            Recommended. Redacts sensitive values while keeping enough detail for most support troubleshooting.
+          </span>
         </span>
       </label>
       <label class="redaction-option" for="redaction-level-strict">
@@ -51,7 +58,7 @@
         <span class="selectable-option-content redaction-copy">
           <span class="redaction-title">Strict</span>
           <span class="redaction-description">
-            Hide more values when support only needs broad evidence.
+            Redacts more identifiers and collected values when support only needs broad evidence.
           </span>
         </span>
       </label>
@@ -66,9 +73,18 @@
         <span class="selectable-option-control redaction-indicator" aria-hidden="true"></span>
         <span class="selectable-option-content redaction-copy">
           <span class="redaction-title">None</span>
-          <span class="redaction-description">Keep the collected values unredacted.</span>
+          <span class="redaction-description">
+            No redaction. Includes collected values as-is. Use only when support explicitly asks for unredacted data.
+          </span>
         </span>
       </label>
+    </div>
+    <div class="alert alert-warning support-bundle-warning" data-support-bundle-warning hidden>
+      <strong>Unredacted export selected.</strong>
+      <span>
+        This can include hostnames, addresses, and other collected values exactly as captured.
+        Review the bundle locally before you share it.
+      </span>
     </div>
   </fieldset>
 
@@ -87,7 +103,7 @@
     </span>
   </label>
 
-  <p class="field-help">The bundle downloads locally. You can review it before you share it.</p>
+  <p class="field-help">The bundle downloads only to this device. Review it locally before you share it.</p>
 
   <div class="actions" data-results-export-actions>
     <button type="submit" class="primary-button" data-results-action="download-support-bundle">Download Support Bundle</button>

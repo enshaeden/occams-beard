@@ -2,25 +2,32 @@
 
 {% block content %}
   <section class="answer-shell {% if view.mode == 'support' %}answer-shell-support{% endif %}">
-    <article class="card answer-card stack-lg">
+    <article class="card answer-card stack-md">
       <div class="result-status-line">
+        <span class="mode-chip">{{ view.mode_label }}</span>
         <span class="status-pill status-{{ view.status_tone }}">{{ view.status_label }}</span>
       </div>
 
-      <div class="stack-sm">
-        <h2>{{ view.headline }}</h2>
-        <p class="lede">{{ view.top_takeaway }}</p>
+      <div class="answer-hero-grid">
+        <div class="stack-sm">
+          <p class="eyebrow">Main Answer</p>
+          <h2>{{ view.headline }}</h2>
+          <p class="lede">{{ view.top_takeaway }}</p>
+        </div>
+
+        <article class="info-panel answer-next-step stack-sm">
+          <p class="eyebrow">{{ "Primary Handoff" if view.mode == "support" else "Primary Next Step" }}</p>
+          <div class="stack-xs">
+            <h3>{{ "Download the support bundle" if view.mode == "support" else "Do this next" }}</h3>
+            <p>{{ view.primary_next_step }}</p>
+            {% if view.mode == "support" %}
+              <p class="field-help">The bundle card beside this answer is the main artifact to review and share with support.</p>
+            {% endif %}
+          </div>
+        </article>
       </div>
 
-      <article class="info-panel answer-next-step stack-sm">
-        <p class="eyebrow">Answer</p>
-        <div class="stack-xs">
-          <h3>Primary next step</h3>
-          <p>{{ view.primary_next_step }}</p>
-        </div>
-      </article>
-
-      <dl class="summary-list">
+      <dl class="summary-list answer-meta-list">
         {% for item in view.answer_meta %}
           <div>
             <dt>{{ item.label }}</dt>
@@ -49,8 +56,9 @@
             <p class="eyebrow">Primary Handoff</p>
             <h2>Download Support Bundle</h2>
           </div>
-          <span class="status-pill status-attention">Support first</span>
+          <span class="status-pill status-attention">Primary outcome</span>
         </div>
+        <p class="lede">Review redaction and raw-capture choices, then download the bundle locally before you share it with support.</p>
         {% include "_support_bundle_form.html" %}
       </article>
     {% endif %}
@@ -63,7 +71,7 @@
       </div>
     </div>
 
-    <div class="decision-grid">
+    <div class="decision-grid decision-grid-primary">
       <section class="decision-section stack-sm">
         <h3>What we know</h3>
         {% if view.what_we_know %}
@@ -98,7 +106,13 @@
           {% endfor %}
         </ul>
       </section>
+    </div>
 
+    <div class="decision-divider" aria-hidden="true"></div>
+
+    <div class="stack-sm">
+      <p class="eyebrow">Run Details</p>
+      <div class="decision-grid decision-grid-secondary">
       <section class="decision-section stack-sm">
         <h3>What was tested</h3>
         <dl class="summary-list">
@@ -192,6 +206,7 @@
           {% include "_support_bundle_form.html" %}
         {% endif %}
       </section>
+      </div>
     </div>
   </section>
 
@@ -233,7 +248,7 @@
                   {% endfor %}
                 </ul>
                 <p class="muted">
-                  {{ finding.fault_domain }} · confidence {{ finding.confidence }}
+                  {{ finding.fault_domain }} · {{ finding.confidence_label }} (score {{ finding.confidence }})
                 </p>
               </article>
             {% endfor %}

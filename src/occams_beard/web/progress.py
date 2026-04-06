@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from occams_beard.defaults import DEFAULT_CHECKS
 from occams_beard.domain_registry import domain_creates_network_egress
 from occams_beard.execution import (
@@ -49,6 +51,8 @@ def build_progress_view(session) -> dict[str, object]:
     total_count = session.total_count or planned_execution_step_count(session.options)
     completed_count = min(session.completed_count, total_count)
     progress_percent = int((completed_count / total_count) * 100) if total_count else 0
+    elapsed_seconds = _elapsed_seconds(session)
+    elapsed_label = _elapsed_label(elapsed_seconds)
     current_domain_label = (
         DOMAIN_LABELS.get(session.current_domain, session.current_domain.replace("-", " ").title())
         if session.current_domain
@@ -87,12 +91,20 @@ def build_progress_view(session) -> dict[str, object]:
             else (
                 f"Currently running: {current_domain_label}."
                 if current_domain_label is not None
-                else "Preparing the next step."
+            else "Preparing the next step."
             )
         )
 
-    update_notice = "This page updates automatically."
-    presence_notice = "You can stay here or come back when the run finishes."
+    update_notice = (
+        "Still running normally. This page updates automatically."
+        if session.status in {"queued", "running"} and elapsed_seconds >= 20
+        else "This page updates automatically."
+    )
+    presence_notice = (
+        "You can leave this page open or come back when results are ready."
+        if session.status in {"queued", "running"}
+        else "Results stay available locally on this device."
+    )
     mode_notice = (
         "You do not need to refresh this page while the local check runs."
         if session.experience.mode == SELF_SERVE_MODE
@@ -150,6 +162,11 @@ def build_progress_view(session) -> dict[str, object]:
                     and record.selected
                     and record.status == "passed"
                 ),
+                "active": bool(
+                    session.status in {"queued", "running"}
+                    and record.selected
+                    and record.domain == session.current_domain
+                ),
             }
         )
 
@@ -168,11 +185,54 @@ def build_progress_view(session) -> dict[str, object]:
         "progress_text": f"{completed_count} of {total_count} planned probe steps complete.",
         "current_domain_label": current_domain_label,
         "current_substep_label": current_substep_label,
+        "elapsed_seconds": elapsed_seconds,
+        "elapsed_label": elapsed_label,
         "update_notice": update_notice,
         "presence_notice": presence_notice,
         "mode_notice": mode_notice,
+        "live_status_message": _live_status_message(
+            status=session.status,
+            current_domain_label=current_domain_label,
+            completed_count=completed_count,
+            total_count=total_count,
+        ),
         "rows": rows,
     }
+
+
+def _elapsed_seconds(session) -> int:
+    if session.status == "completed" and session.result is not None:
+        return max(0, int(session.result.metadata.elapsed_ms / 1000))
+    return max(0, int(time.monotonic() - session.started_at_monotonic))
+
+
+def _elapsed_label(seconds: int) -> str:
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, remainder = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {remainder:02d}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes:02d}m"
+
+
+def _live_status_message(
+    *,
+    status: str,
+    current_domain_label: str | None,
+    completed_count: int,
+    total_count: int,
+) -> str:
+    if status == "failed":
+        return "Run stopped. Review the error details before trying again."
+    if status == "completed":
+        return "Results are ready."
+    if current_domain_label:
+        return (
+            f"{current_domain_label} is active. "
+            f"{completed_count} of {total_count} planned steps complete."
+        )
+    return f"Preparing the next step. {completed_count} of {total_count} planned steps complete."
 
 
 def _progress_row_tone(status: str) -> str:
